@@ -284,6 +284,58 @@ button:disabled {
   padding: 4px 0 24vh;
 }
 
+.arcana-db-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.arcana-db-table th,
+.arcana-db-table td {
+  height: 37px;
+  padding: 0 8px;
+  vertical-align: middle;
+  background: #fff;
+  border-bottom: 1px solid var(--color-line);
+  border-right: 1px solid var(--color-line);
+}
+
+.arcana-db-table th {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.arcana-db-table th:first-child,
+.arcana-db-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 280px;
+  padding-left: 96px;
+  box-shadow: 1px 0 0 var(--color-line);
+}
+
+.arcana-db-table .arcana-db-add {
+  min-width: 40px;
+  width: 40px;
+  padding: 0;
+  border-right: none;
+  background: transparent;
+}
+
+.arcana-db-table tbody tr:hover td {
+  background: #fafafa;
+}
+
+@media (max-width: 860px) {
+  .arcana-db-table th:first-child,
+  .arcana-db-table td:first-child {
+    padding-left: 24px;
+  }
+}
+
 .arcana-doc > * + * {
   margin-top: 1px;
   margin-bottom: 1px;

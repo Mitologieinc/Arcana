@@ -4,7 +4,7 @@ import { ChevronsRight, ChevronRight, Link2, MoreHorizontal, SmilePlus, Trash2 }
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
-import { parseProps, PropertyValue } from "./PropertyValue";
+import { parseProps, PropertyIcon, PropertyValue } from "./PropertyValue";
 import { RowPeek } from "./RowPeek";
 import { ShareDialog } from "./ShareDialog";
 import { TiptapEditor } from "../editor/TiptapEditor";
@@ -229,7 +229,7 @@ export function PageEditor({
           </div>
         )}
       </header>
-      <div className="group mx-auto max-w-[900px] pb-40 pt-20">
+      <div className={page.type === "database" ? "group pb-32 pt-12" : "group mx-auto max-w-[900px] pb-40 pt-20"}>
         <div className="relative mb-1 px-24 max-[860px]:px-6">
           {page.icon ? (
             <button
@@ -288,33 +288,38 @@ export function PageEditor({
               if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowDown") {
                 e.preventDefault();
                 void saveTitle(title);
-                document.querySelector<HTMLElement>(".arcana-doc")?.focus();
+                if (page.type !== "database") {
+                  document.querySelector<HTMLElement>(".arcana-doc")?.focus();
+                } else {
+                  e.currentTarget.blur();
+                }
               }
             }}
           />
         </div>
         {page.type === "database" ? (
-          <div className="mt-6 px-24 max-[860px]:px-6">
-            <DatabaseView
-              pageId={pageId}
-              schema={dbSchema}
-              views={dbViews}
-              rows={children}
-              editable={editable}
-              onOpenRow={setPeekId}
-              onChanged={async () => {
-                await reloadPage();
-                await onPagesChanged();
-              }}
-            />
-          </div>
+          <DatabaseView
+            pageId={pageId}
+            schema={dbSchema}
+            views={dbViews}
+            rows={children}
+            editable={editable}
+            onOpenRow={setPeekId}
+            onChanged={async () => {
+              await reloadPage();
+              await onPagesChanged();
+            }}
+          />
         ) : (
           <>
             {parentFields.length > 0 && (
-              <div className="mt-4 space-y-1 px-24 max-[860px]:px-6">
+              <div className="mt-4 space-y-0.5 px-24 max-[860px]:px-6">
                 {parentFields.map((p) => (
                   <div key={p.id} className="flex min-h-8 items-center gap-4">
-                    <span className="w-28 shrink-0 truncate text-[13px] text-muted">{p.name}</span>
+                    <span className="flex w-32 shrink-0 items-center gap-1.5 truncate text-[13px] text-muted">
+                      <PropertyIcon type={p.type} />
+                      {p.name}
+                    </span>
                     <PropertyValue
                       property={p}
                       value={pageProps[p.id]}
@@ -349,6 +354,12 @@ export function PageEditor({
             onOpenPage(peekRow.id);
           }}
           onChanged={async () => {
+            await reloadPage();
+            await onPagesChanged();
+          }}
+          onDelete={async () => {
+            await api(`/api/pages/${peekRow.id}`, { method: "DELETE" });
+            setPeekId(null);
             await reloadPage();
             await onPagesChanged();
           }}
