@@ -74,6 +74,8 @@ function center(n: JamNode) {
   return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
 }
 
+type Side = "top" | "right" | "bottom" | "left";
+
 function edgeToward(n: JamNode, tx: number, ty: number) {
   const c = center(n);
   const dx = tx - c.x;
@@ -85,6 +87,23 @@ function edgeToward(n: JamNode, tx: number, ty: number) {
   const sy = Math.abs(dy) < 0.001 ? 1e9 : hh / Math.abs(dy);
   const t = Math.min(sx, sy);
   return { x: c.x + dx * t, y: c.y + dy * t };
+}
+
+function beside(n: JamNode, side: Side, gap = 48) {
+  if (side === "top") return { x: n.x, y: n.y - n.h - gap };
+  if (side === "right") return { x: n.x + n.w + gap, y: n.y };
+  if (side === "bottom") return { x: n.x, y: n.y + n.h + gap };
+  return { x: n.x - n.w - gap, y: n.y };
+}
+
+function stickyH(text: string, w: number, fontSize: number) {
+  const inner = Math.max(80, w - 32);
+  const ch = fontSize * 0.62;
+  let rows = 0;
+  for (const line of (text || " ").split("\n")) {
+    rows += Math.max(1, Math.ceil((line.length * ch) / inner));
+  }
+  return Math.max(STICKY, 28 + rows * fontSize * 1.35);
 }
 
 export function CanvasEditor({
@@ -104,7 +123,7 @@ export function CanvasEditor({
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<null | {
-    mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape";
+    mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape" | "resize" | "port";
     x: number;
     y: number;
     cx: number;
@@ -114,6 +133,11 @@ export function CanvasEditor({
     id?: string;
     ids?: string[];
     origin?: Record<string, { x: number; y: number }>;
+    editOnUp?: boolean;
+    handle?: "se" | "e" | "s";
+    ow?: number;
+    oh?: number;
+    side?: Side;
   }>(null);
   const moveRaf = useRef<number | null>(null);
   const pendingMove = useRef<null | { ids: string[]; origin: Record<string, { x: number; y: number }>; dx: number; dy: number }>(null);
@@ -291,6 +315,79 @@ export function CanvasEditor({
     });
   }
 
+  function backToSelect() {
+    setTool("select");
+    setGhost(null);
+  }
+
+  function duplicateIds(ids: string[], dx = 24, dy = 24) {
+    const copies: string[] = [];
+    collab.doc.transact(() => {
+      for (const id of ids) {
+        const src = collab.map.get(id);
+        if (!isJam(src) || src.kind === "line") continue;
+        const n = clone(src);
+        n.id = nid();
+        n.x += dx;
+        n.y += dy;
+        collab.map.set(n.id, n);
+        collab.order.push([n.id]);
+        copies.push(n.id);
+      }
+    }, ORIGIN);
+    refresh();
+    return copies;
+  }
+
+  function spawnBeside(src: JamNode, side: Side, withLine: boolean, at?: { x: number; y: number }) {
+    const pos = at ?? beside(src, side);
+    const n = clone(src);
+    n.id = nid();
+    n.x = pos.x;
+    n.y = pos.y;
+    n.text = "";
+    if (n.kind === "sticky") n.h = STICKY;
+    put(n);
+    if (withLine) {
+      put({
+        id: nid(),
+        kind: "line",
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        text: "",
+        fill: "transparent",
+        stroke: LINE,
+        fromId: src.id,
+        toId: n.id,
+      });
+    }
+    startEdit(n.id);
+    backToSelect();
+  }
+
+  function beginPort(e: ReactPointerEvent, id: string, side: Side) {
+    e.preventDefault();
+    e.stopPropagation();
+    const n = collab.map.get(id);
+    if (!isJam(n)) return;
+    setLineFrom(id);
+    setLineHover(center(n));
+    drag.current = { mode: "port", x: 0, y: 0, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id, side };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  }
+
+  function beginResize(e: ReactPointerEvent, id: string, handle: "se" | "e" | "s") {
+    e.preventDefault();
+    e.stopPropagation();
+    const n = collab.map.get(id);
+    if (!isJam(n)) return;
+    const w = worldFromClient(e.clientX, e.clientY);
+    drag.current = { mode: "resize", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id, handle, ow: n.w, oh: n.h };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  }
+
   useEffect(() => {
     const el = boardRef.current;
     if (!el) return;
@@ -354,8 +451,7 @@ export function CanvasEditor({
       };
       put(n);
       startEdit(n.id);
-      setTool("select");
-      setGhost(null);
+      backToSelect();
       return;
     }
     if (activeTool === "shape") {
@@ -395,6 +491,7 @@ export function CanvasEditor({
       };
       put(n);
       startEdit(n.id);
+      backToSelect();
       return;
     }
     if (activeTool === "pen") {
@@ -428,18 +525,35 @@ export function CanvasEditor({
 
     const t = topAt(w.x, w.y);
     if (t) {
+      const already = !e.shiftKey && selected.length === 1 && selected[0] === t.id;
       const ids = e.shiftKey || selected.includes(t.id) ? Array.from(new Set([...selected, t.id])) : [t.id];
       setSelected(ids);
-      if (e.detail === 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
+      if (e.detail >= 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
         startEdit(t.id);
         return;
       }
-      const origin: Record<string, { x: number; y: number }> = {};
-      for (const id of ids) {
-        const n = nodes.find((x) => x.id === id);
-        if (n) origin[id] = { x: n.x, y: n.y };
+      let idsMove = ids;
+      if (e.altKey) {
+        idsMove = duplicateIds(ids);
+        setSelected(idsMove);
       }
-      drag.current = { mode: "move", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, ids, origin };
+      const origin: Record<string, { x: number; y: number }> = {};
+      for (const id of idsMove) {
+        const n = collab.map.get(id);
+        if (isJam(n)) origin[id] = { x: n.x, y: n.y };
+      }
+      drag.current = {
+        mode: "move",
+        x: w.x,
+        y: w.y,
+        cx: cam.x,
+        cy: cam.y,
+        sx: e.clientX,
+        sy: e.clientY,
+        ids: idsMove,
+        origin,
+        editOnUp: already,
+      };
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -485,6 +599,20 @@ export function CanvasEditor({
       patch(d.id, { x, y, w: Math.max(1, Math.abs(w.x - d.x)), h: Math.max(1, Math.abs(w.y - d.y)) });
       return;
     }
+    if (d.mode === "resize" && d.id && d.handle) {
+      const dx = w.x - d.x;
+      const dy = w.y - d.y;
+      const ow = d.ow ?? 160;
+      const oh = d.oh ?? 160;
+      if (d.handle === "se") patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) });
+      else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) });
+      else patch(d.id, { h: Math.max(80, oh + dy) });
+      return;
+    }
+    if (d.mode === "port") {
+      setLineHover(w);
+      return;
+    }
     if (d.mode === "line") {
       setLineHover(w);
       return;
@@ -516,6 +644,14 @@ export function CanvasEditor({
       if (isJam(cur) && (cur.w < 24 || cur.h < 24)) {
         patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
       }
+      backToSelect();
+    }
+    if (d?.mode === "port" && d.id && d.side) {
+      const src = collab.map.get(d.id);
+      if (isJam(src) && src.kind !== "line" && src.kind !== "pen") {
+        const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 10;
+        spawnBeside(src, d.side, moved, moved ? { x: w.x - src.w / 2, y: w.y - src.h / 2 } : undefined);
+      }
     }
     if (d?.mode === "line" && d.id) {
       const t = topAt(w.x, w.y);
@@ -534,11 +670,10 @@ export function CanvasEditor({
           toId: t.id,
         });
       }
-      setSelected([]);
     }
-    if (d?.mode === "move" && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
-      const n = nodes.find((x) => x.id === d.ids![0]);
-      if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
+    if (d?.mode === "move" && d.editOnUp && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
+      const n = collab.map.get(d.ids[0]);
+      if (isJam(n) && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
     }
     drag.current = null;
     setMarquee(null);
@@ -549,9 +684,31 @@ export function CanvasEditor({
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (editing || typing) {
+          setEditing(null);
+          if (e.target instanceof HTMLElement) e.target.blur();
+          return;
+        }
+        if (tool !== "select") {
+          backToSelect();
+          setLineFrom(null);
+          setLineHover(null);
+          return;
+        }
+        setSelected([]);
+        return;
+      }
       if (e.key === " " && !editing && !typing) {
         e.preventDefault();
         setSpace(true);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && editing) {
+        e.preventDefault();
+        const src = collab.map.get(editing);
+        if (isJam(src) && (src.kind === "sticky" || src.kind === "shape")) spawnBeside(src, "right", false);
+        return;
       }
       if (editing || typing) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
@@ -562,6 +719,11 @@ export function CanvasEditor({
         return;
       }
       if (!editable) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (selected.length) setSelected(duplicateIds(selected));
+        return;
+      }
       if (e.key === "Backspace" || e.key === "Delete") {
         if (selected.length) {
           e.preventDefault();
@@ -569,12 +731,16 @@ export function CanvasEditor({
         }
         return;
       }
-      if (e.key === "Escape") {
-        setSelected([]);
-        setLineFrom(null);
-        setLineHover(null);
-        setGhost(null);
-        setTool("select");
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown") && selected.length) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        for (const id of selected) {
+          const n = collab.map.get(id);
+          if (isJam(n)) patch(id, { x: n.x + dx, y: n.y + dy });
+        }
+        return;
       }
       const k = e.key.toLowerCase();
       if (k === "v") setTool("select");
@@ -583,7 +749,7 @@ export function CanvasEditor({
       if (k === "r") setTool("shape");
       if (k === "t") setTool("text");
       if (k === "l" || k === "x") setTool("line");
-      if (k === "p") setTool("pen");
+      if (k === "p" || k === "m") setTool("pen");
     };
     const up = (e: KeyboardEvent) => {
       if (e.key === " ") setSpace(false);
@@ -614,6 +780,11 @@ export function CanvasEditor({
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const empty = nodes.length === 0;
   const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text";
+  const solo = selected.length === 1 ? byId.get(selected[0]) : undefined;
+  const box =
+    solo && solo.kind !== "line" && solo.kind !== "pen"
+      ? { l: solo.x * cam.z + cam.x, t: solo.y * cam.z + cam.y, w: solo.w * cam.z, h: solo.h * cam.z }
+      : null;
 
   return (
     <div className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}>
@@ -715,6 +886,7 @@ export function CanvasEditor({
             >
               <textarea
                 data-id={n.id}
+                tabIndex={editing === n.id ? 0 : -1}
                 readOnly={!editable || editing !== n.id}
                 value={n.text}
                 placeholder={n.kind === "sticky" ? "メモ" : n.kind === "text" ? "テキスト" : ""}
@@ -722,8 +894,17 @@ export function CanvasEditor({
                 onPointerDown={(e) => {
                   if (editing === n.id) e.stopPropagation();
                 }}
-                onFocus={() => startEdit(n.id)}
-                onChange={(e) => patch(n.id, { text: e.target.value })}
+                onChange={(e) => {
+                  const text = e.target.value;
+                  if (n.kind === "sticky") patch(n.id, { text, h: stickyH(text, n.w, n.fontSize ?? 18) });
+                  else patch(n.id, { text });
+                }}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && (n.kind === "sticky" || n.kind === "shape")) {
+                    e.preventDefault();
+                    spawnBeside(n, "right", false);
+                  }
+                }}
                 onBlur={() => setEditing((cur) => (cur === n.id ? null : cur))}
               />
             </div>
@@ -746,6 +927,54 @@ export function CanvasEditor({
           <p>付箋を置いて、線でつなぐ</p>
           <p>S 付箋　T 文字　R 図形　L コネクタ</p>
         </div>
+      )}
+      {box && solo && activeTool === "select" && editable && (
+        <>
+          {!editing &&
+            (["top", "right", "bottom", "left"] as Side[]).map((side) => (
+              <button
+                key={side}
+                type="button"
+                className={`jam-port is-${side}`}
+                style={
+                  side === "top"
+                    ? { left: box.l + box.w / 2, top: box.t }
+                    : side === "right"
+                      ? { left: box.l + box.w, top: box.t + box.h / 2 }
+                      : side === "bottom"
+                        ? { left: box.l + box.w / 2, top: box.t + box.h }
+                        : { left: box.l, top: box.t + box.h / 2 }
+                }
+                title="隣に追加"
+                onPointerDown={(e) => beginPort(e, solo.id, side)}
+              />
+            ))}
+          {!editing && (
+            <>
+              <button type="button" className="jam-handle is-e" style={{ left: box.l + box.w, top: box.t + box.h / 2 }} onPointerDown={(e) => beginResize(e, solo.id, "e")} />
+              <button type="button" className="jam-handle is-s" style={{ left: box.l + box.w / 2, top: box.t + box.h }} onPointerDown={(e) => beginResize(e, solo.id, "s")} />
+              <button type="button" className="jam-handle is-se" style={{ left: box.l + box.w, top: box.t + box.h }} onPointerDown={(e) => beginResize(e, solo.id, "se")} />
+            </>
+          )}
+          {solo.kind === "sticky" && (
+            <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
+              {STICKY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`jam-swatch ${solo.fill === c ? "is-on" : ""}`}
+                  style={{ background: c }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    patch(solo.id, { fill: c });
+                    setStickyColor(c);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
       </div>
 

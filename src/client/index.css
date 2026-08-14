@@ -1787,6 +1787,59 @@ html[data-theme="dark"] .jam-label textarea {
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0d99ff;
 }
 
+.jam-port,
+.jam-handle {
+  position: absolute;
+  z-index: 8;
+  padding: 0;
+  border: 2px solid #0d99ff;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.jam-port {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 999px;
+}
+
+.jam-port:hover {
+  background: #0d99ff;
+}
+
+.jam-handle {
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 1px;
+}
+
+.jam-handle.is-e {
+  cursor: ew-resize;
+}
+
+.jam-handle.is-s {
+  cursor: ns-resize;
+}
+
+.jam-handle.is-se {
+  cursor: nwse-resize;
+}
+
+.jam-float {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  gap: 4px;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 6px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 20px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
 .jam-zoom {
   position: absolute;
   right: 14px;
@@ -1900,7 +1953,8 @@ html[data-theme="dark"] .jam-dots {
 html[data-theme="dark"] .jam-bar,
 html[data-theme="dark"] .jam-pop,
 html[data-theme="dark"] .jam-zoom,
-html[data-theme="dark"] .jam-title {
+html[data-theme="dark"] .jam-title,
+html[data-theme="dark"] .jam-float {
   background: #2a2a28;
   box-shadow: 0 0 0 1px #3a3a37, 0 10px 28px rgba(0, 0, 0, 0.35);
 }
