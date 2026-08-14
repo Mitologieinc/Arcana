@@ -1,37 +1,47 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import {
-  CaptureUpdateAction,
-  convertToExcalidrawElements,
-  Excalidraw,
-  getTextFromElements,
-  ROUNDNESS,
-  viewportCoordsToSceneCoords,
-  WelcomeScreen,
-} from "@excalidraw/excalidraw";
-import "@excalidraw/excalidraw/index.css";
-import type {
-  BinaryFileData,
-  BinaryFiles,
-  ExcalidrawImperativeAPI,
-  ExcalidrawProps,
-  SocketId,
-} from "@excalidraw/excalidraw/types";
+  Circle,
+  Diamond,
+  Hand,
+  Minus,
+  MousePointer2,
+  Pencil,
+  Plus,
+  Spline,
+  Square,
+  StickyNote,
+  Type,
+} from "lucide-react";
 import { api } from "../lib/api";
-import { uploadFile } from "../editor/slash";
 import type { User } from "../lib/types";
 import type { PresenceUser } from "./PresencePile";
 
-const ORIGIN = "arcana-canvas";
-const STICKIES = [
-  { color: "#ffec99", label: "黄" },
-  { color: "#ffc9c9", label: "赤" },
-  { color: "#b2f2bb", label: "緑" },
-  { color: "#a5d8ff", label: "青" },
-];
-
+const ORIGIN = "arcana-jam";
+const STICKY = 200;
+const STICKY_COLORS = ["#FFEE99", "#FFD59A", "#FFC7D1", "#C5F0C9", "#BDE3FF", "#E4D4FF"];
+const INK = "#1e1e1e";
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
+
+type Tool = "select" | "hand" | "sticky" | "shape" | "text" | "line" | "pen";
+type ShapeKind = "round" | "ellipse" | "diamond";
+type JamNode = {
+  id: string;
+  kind: "sticky" | "shape" | "text" | "pen" | "line";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+  fill: string;
+  stroke: string;
+  variant?: ShapeKind;
+  points?: { x: number; y: number }[];
+  fromId?: string;
+  toId?: string;
+  fontSize?: number;
+};
 
 function colorFor(id: string) {
   let n = 0;
@@ -39,13 +49,41 @@ function colorFor(id: string) {
   return COLORS[n % COLORS.length];
 }
 
+function nid() {
+  return crypto.randomUUID();
+}
+
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
-type SceneElements = Parameters<NonNullable<ExcalidrawProps["onChange"]>>[0];
-type SceneElement = SceneElements[number];
-type StoredEl = SceneElement & { versionNonce?: number };
+function isJam(n: unknown): n is JamNode {
+  if (!n || typeof n !== "object") return false;
+  const k = (n as JamNode).kind;
+  return k === "sticky" || k === "shape" || k === "text" || k === "pen" || k === "line";
+}
+
+function hit(n: JamNode, x: number, y: number) {
+  if (n.kind === "line" || n.kind === "pen") return false;
+  return x >= n.x && y >= n.y && x <= n.x + n.w && y <= n.y + n.h;
+}
+
+function center(n: JamNode) {
+  return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
+}
+
+function edgeToward(n: JamNode, tx: number, ty: number) {
+  const c = center(n);
+  const dx = tx - c.x;
+  const dy = ty - c.y;
+  if (dx === 0 && dy === 0) return c;
+  const hw = n.w / 2;
+  const hh = n.h / 2;
+  const sx = Math.abs(dx) < 0.001 ? 1e9 : hw / Math.abs(dx);
+  const sy = Math.abs(dy) < 0.001 ? 1e9 : hh / Math.abs(dy);
+  const t = Math.min(sx, sy);
+  return { x: c.x + dx * t, y: c.y + dy * t };
+}
 
 export function CanvasEditor({
   pageId,
@@ -62,31 +100,102 @@ export function CanvasEditor({
   title: string;
   onPresence?: (users: PresenceUser[]) => void;
 }) {
-  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
-  const applyingRef = useRef(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<null | {
+    mode: "pan" | "move" | "pen" | "marquee" | "line";
+    x: number;
+    y: number;
+    cx: number;
+    cy: number;
+    sx: number;
+    sy: number;
+    id?: string;
+    ids?: string[];
+    origin?: Record<string, { x: number; y: number }>;
+  }>(null);
+  const moveRaf = useRef<number | null>(null);
+  const pendingMove = useRef<null | { ids: string[]; origin: Record<string, { x: number; y: number }>; dx: number; dy: number }>(null);
   const indexTimer = useRef<number | null>(null);
-  const uploaded = useRef(new Map<string, string>());
-  const [synced, setSynced] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    document.documentElement.dataset.theme === "dark" ? "dark" : "light",
-  );
+  const [nodes, setNodes] = useState<JamNode[]>([]);
+  const [cam, setCam] = useState({ x: 48, y: 48, z: 1 });
+  const [tool, setTool] = useState<Tool>("select");
+  const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0]);
+  const [shapeKind, setShapeKind] = useState<ShapeKind>("round");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [space, setSpace] = useState(false);
+  const [open, setOpen] = useState<null | "sticky" | "shape">(null);
+  const [cursors, setCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+  const [lineFrom, setLineFrom] = useState<string | null>(null);
+  const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
 
   const collab = useMemo(() => {
     const doc = new Y.Doc();
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const params: Record<string, string> = {};
     if (shareToken) params.token = shareToken;
-    const provider = new WebsocketProvider(`${proto}//${location.host}/api/collab`, pageId, doc, {
-      params,
-    });
-    return {
-      doc,
-      provider,
-      elements: doc.getMap<StoredEl>("canvas.elements"),
-      order: doc.getArray<string>("canvas.order"),
-      files: doc.getMap<BinaryFileData>("canvas.files"),
-    };
+    const provider = new WebsocketProvider(`${proto}//${location.host}/api/collab`, pageId, doc, { params });
+    const map = doc.getMap<JamNode>("jam.nodes");
+    const order = doc.getArray<string>("jam.order");
+    const undo = new Y.UndoManager([map, order]);
+    return { doc, provider, map, order, undo };
   }, [pageId, shareToken]);
+
+  function pull(): JamNode[] {
+    const seen = new Set<string>();
+    const out: JamNode[] = [];
+    for (const id of collab.order.toArray()) {
+      const n = collab.map.get(id);
+      if (!isJam(n) || seen.has(id)) continue;
+      out.push(n);
+      seen.add(id);
+    }
+    collab.map.forEach((n, id) => {
+      if (!isJam(n) || seen.has(id)) return;
+      out.push(n);
+    });
+    return out;
+  }
+
+  function refresh() {
+    setNodes(pull());
+  }
+
+  function put(n: JamNode, atEnd = true) {
+    collab.doc.transact(() => {
+      collab.map.set(n.id, clone(n));
+      const ids = collab.order.toArray();
+      if (!ids.includes(n.id) && atEnd) collab.order.push([n.id]);
+    }, ORIGIN);
+    refresh();
+  }
+
+  function patch(id: string, partial: Partial<JamNode>) {
+    const cur = collab.map.get(id);
+    if (!isJam(cur)) return;
+    collab.doc.transact(() => {
+      collab.map.set(id, clone({ ...cur, ...partial }));
+    }, ORIGIN);
+    refresh();
+  }
+
+  function removeIds(ids: string[]) {
+    const drop = new Set(ids);
+    collab.doc.transact(() => {
+      for (const id of ids) collab.map.delete(id);
+      const next = collab.order.toArray().filter((id) => !drop.has(id));
+      if (collab.order.length) collab.order.delete(0, collab.order.length);
+      if (next.length) collab.order.push(next);
+      collab.map.forEach((n, id) => {
+        if (isJam(n) && n.kind === "line" && (drop.has(n.fromId ?? "") || drop.has(n.toId ?? ""))) {
+          collab.map.delete(id);
+        }
+      });
+    }, ORIGIN);
+    setSelected([]);
+    setEditing(null);
+    refresh();
+  }
 
   useEffect(() => {
     return () => {
@@ -96,24 +205,25 @@ export function CanvasEditor({
   }, [collab]);
 
   useEffect(() => {
-    const el = document.documentElement;
-    const sync = () => setTheme(el.dataset.theme === "dark" ? "dark" : "light");
-    sync();
-    const mo = new MutationObserver(sync);
-    mo.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
+    const on = (_: unknown, txn: Y.Transaction) => {
+      if (txn.origin === ORIGIN) return;
+      refresh();
+    };
+    collab.map.observe(on);
+    collab.order.observe(on);
+    refresh();
+    return () => {
+      collab.map.unobserve(on);
+      collab.order.unobserve(on);
+    };
+  }, [collab]);
 
   useEffect(() => {
     const awareness = collab.provider.awareness;
-    awareness.setLocalStateField("user", {
-      name: user.name || "ゲスト",
-      color: colorFor(user.id),
-      id: user.id,
-    });
+    awareness.setLocalStateField("user", { name: user.name || "ゲスト", color: colorFor(user.id), id: user.id });
     const report = () => {
-      if (!onPresence) return;
       const others: PresenceUser[] = [];
+      const next: { id: string; name: string; color: string; x: number; y: number }[] = [];
       awareness.getStates().forEach((state, clientId) => {
         if (clientId === awareness.clientID) return;
         const raw = state.user as { name?: string; color?: string; id?: string } | undefined;
@@ -124,8 +234,13 @@ export function CanvasEditor({
           name: raw.name,
           color: raw.color || "#37352f",
         });
+        const p = state.jam as { x?: number; y?: number } | undefined;
+        if (typeof p?.x === "number" && typeof p.y === "number") {
+          next.push({ id: String(clientId), name: raw.name, color: raw.color || "#37352f", x: p.x, y: p.y });
+        }
       });
-      onPresence(others);
+      onPresence?.(others);
+      setCursors(next);
     };
     awareness.on("change", report);
     collab.provider.on("status", report);
@@ -137,245 +252,492 @@ export function CanvasEditor({
   }, [collab, user, onPresence]);
 
   useEffect(() => {
-    const onSync = (ok: boolean) => {
-      if (ok) setSynced(true);
-    };
-    if (collab.provider.synced) setSynced(true);
-    collab.provider.on("sync", onSync);
-    return () => {
-      collab.provider.off("sync", onSync);
-    };
-  }, [collab]);
+    if (indexTimer.current) window.clearTimeout(indexTimer.current);
+    indexTimer.current = window.setTimeout(() => {
+      const bodyText = pull()
+        .map((n) => n.text)
+        .filter(Boolean)
+        .join(" ");
+      void api(`/api/pages/${pageId}/index`, { method: "POST", body: JSON.stringify({ title, bodyText }) });
+    }, 1500);
+  }, [nodes, pageId, title]);
 
-  function pullElements(): SceneElement[] {
-    const order = collab.order.toArray();
-    const seen = new Set<string>();
-    const out: SceneElement[] = [];
-    for (const id of order) {
-      const el = collab.elements.get(id);
-      if (!el) continue;
-      out.push(el);
-      seen.add(id);
+  function worldFromClient(clientX: number, clientY: number) {
+    const r = boardRef.current?.getBoundingClientRect();
+    return {
+      x: (clientX - (r?.left ?? 0) - cam.x) / cam.z,
+      y: (clientY - (r?.top ?? 0) - cam.y) / cam.z,
+    };
+  }
+
+  const activeTool: Tool = space || !editable ? (space ? "hand" : "select") : tool;
+
+  function topAt(x: number, y: number) {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (hit(nodes[i], x, y)) return nodes[i];
     }
-    collab.elements.forEach((el, id) => {
-      if (!seen.has(id)) out.push(el);
-    });
-    return out;
+    return null;
   }
 
-  function pullFiles(): BinaryFiles {
-    const files: BinaryFiles = {};
-    collab.files.forEach((file, id) => {
-      files[id as BinaryFileData["id"]] = file;
+  function startEdit(id: string) {
+    if (!editable) return;
+    setEditing(id);
+    setSelected([id]);
+    requestAnimationFrame(() => {
+      boardRef.current?.querySelector<HTMLTextAreaElement>(`textarea[data-id="${id}"]`)?.focus();
     });
-    return files;
   }
 
-  function pushScene(elements: SceneElements, files: BinaryFiles) {
-    collab.doc.transact(() => {
-      const ids: string[] = [];
-      for (const el of elements) {
-        ids.push(el.id);
-        const prev = collab.elements.get(el.id);
-        if (!prev || prev.versionNonce !== el.versionNonce) {
-          collab.elements.set(el.id, clone(el));
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const r = el.getBoundingClientRect();
+        const sx = e.clientX - r.left;
+        const sy = e.clientY - r.top;
+        setCam((c) => {
+          const z = Math.min(3.5, Math.max(0.2, c.z * (e.deltaY > 0 ? 0.92 : 1.08)));
+          const wx = (sx - c.x) / c.z;
+          const wy = (sy - c.y) / c.z;
+          return { z, x: sx - wx * z, y: sy - wy * z };
+        });
+        return;
+      }
+      setCam((c) => ({ ...c, x: c.x - e.deltaX, y: c.y - e.deltaY }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.button === 1 || activeTool === "hand") {
+      drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+    const w = worldFromClient(e.clientX, e.clientY);
+    collab.provider.awareness.setLocalStateField("jam", w);
+    setOpen(null);
+    if (!editable) return;
+    if (editing && (e.target as HTMLElement).tagName !== "TEXTAREA") setEditing(null);
+
+    if (activeTool === "sticky") {
+      const n: JamNode = {
+        id: nid(),
+        kind: "sticky",
+        x: w.x - STICKY / 2,
+        y: w.y - STICKY / 2,
+        w: STICKY,
+        h: STICKY,
+        text: "",
+        fill: stickyColor,
+        stroke: "transparent",
+        fontSize: 18,
+      };
+      put(n);
+      startEdit(n.id);
+      return;
+    }
+    if (activeTool === "shape") {
+      const n: JamNode = {
+        id: nid(),
+        kind: "shape",
+        x: w.x - 80,
+        y: w.y - 80,
+        w: 160,
+        h: 160,
+        text: "",
+        fill: "#ffffff",
+        stroke: INK,
+        variant: shapeKind,
+        fontSize: 16,
+      };
+      put(n);
+      setSelected([n.id]);
+      return;
+    }
+    if (activeTool === "text") {
+      const n: JamNode = {
+        id: nid(),
+        kind: "text",
+        x: w.x,
+        y: w.y - 16,
+        w: 280,
+        h: 48,
+        text: "",
+        fill: "transparent",
+        stroke: "transparent",
+        fontSize: 28,
+      };
+      put(n);
+      startEdit(n.id);
+      return;
+    }
+    if (activeTool === "pen") {
+      const n: JamNode = {
+        id: nid(),
+        kind: "pen",
+        x: w.x,
+        y: w.y,
+        w: 1,
+        h: 1,
+        text: "",
+        fill: "transparent",
+        stroke: INK,
+        points: [{ x: w.x, y: w.y }],
+      };
+      put(n);
+      drag.current = { mode: "pen", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (activeTool === "line") {
+      const t = topAt(w.x, w.y);
+      if (!t || t.kind === "pen" || t.kind === "line") return;
+      if (!lineFrom) {
+        setLineFrom(t.id);
+        setSelected([t.id]);
+        return;
+      }
+      if (lineFrom !== t.id) {
+        put({
+          id: nid(),
+          kind: "line",
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+          text: "",
+          fill: "transparent",
+          stroke: INK,
+          fromId: lineFrom,
+          toId: t.id,
+        });
+      }
+      setLineFrom(null);
+      setSelected([]);
+      return;
+    }
+
+    const t = topAt(w.x, w.y);
+    if (t) {
+      const ids = e.shiftKey || selected.includes(t.id) ? Array.from(new Set([...selected, t.id])) : [t.id];
+      setSelected(ids);
+      if (e.detail === 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
+        startEdit(t.id);
+        return;
+      }
+      const origin: Record<string, { x: number; y: number }> = {};
+      for (const id of ids) {
+        const n = nodes.find((x) => x.id === id);
+        if (n) origin[id] = { x: n.x, y: n.y };
+      }
+      drag.current = { mode: "move", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, ids, origin };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+    setSelected([]);
+    setLineFrom(null);
+    drag.current = { mode: "marquee", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY };
+    setMarquee({ x: w.x, y: w.y, w: 0, h: 0 });
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const w = worldFromClient(e.clientX, e.clientY);
+    collab.provider.awareness.setLocalStateField("jam", w);
+    const d = drag.current;
+    if (!d) return;
+    if (d.mode === "pan") {
+      setCam({ ...cam, x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y) });
+      return;
+    }
+    if (d.mode === "move" && d.ids && d.origin) {
+      pendingMove.current = { ids: d.ids, origin: d.origin, dx: w.x - d.x, dy: w.y - d.y };
+      if (moveRaf.current == null) {
+        moveRaf.current = requestAnimationFrame(() => {
+          moveRaf.current = null;
+          const p = pendingMove.current;
+          if (!p) return;
+          for (const id of p.ids) {
+            const o = p.origin[id];
+            if (o) patch(id, { x: o.x + p.dx, y: o.y + p.dy });
+          }
+        });
+      }
+      return;
+    }
+    if (d.mode === "pen" && d.id) {
+      const cur = collab.map.get(d.id);
+      if (!isJam(cur) || !cur.points) return;
+      const last = cur.points[cur.points.length - 1];
+      if (last && Math.hypot(w.x - last.x, w.y - last.y) < 2) return;
+      patch(d.id, { points: [...cur.points, { x: w.x, y: w.y }] });
+      return;
+    }
+    if (d.mode === "marquee") {
+      const x = Math.min(d.x, w.x);
+      const y = Math.min(d.y, w.y);
+      setMarquee({ x, y, w: Math.abs(w.x - d.x), h: Math.abs(w.y - d.y) });
+    }
+  }
+
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (d?.mode === "marquee" && marquee) {
+      const hits = nodes.filter((n) => n.kind !== "line" && n.kind !== "pen" && n.x < marquee.x + marquee.w && n.y < marquee.y + marquee.h && n.x + n.w > marquee.x && n.y + n.h > marquee.y).map((n) => n.id);
+      setSelected(hits);
+    }
+    if (d?.mode === "move" && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
+      const n = nodes.find((x) => x.id === d.ids![0]);
+      if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
+    }
+    drag.current = null;
+    setMarquee(null);
+  }
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (e.key === " " && !editing && !typing) {
+        e.preventDefault();
+        setSpace(true);
+      }
+      if (editing || typing) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) collab.undo.redo();
+        else collab.undo.undo();
+        refresh();
+        return;
+      }
+      if (!editable) return;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        if (selected.length) {
+          e.preventDefault();
+          removeIds(selected);
         }
+        return;
       }
-      for (const key of [...collab.elements.keys()]) {
-        if (!ids.includes(key)) collab.elements.delete(key);
+      if (e.key === "Escape") {
+        setSelected([]);
+        setLineFrom(null);
+        setTool("select");
+        setOpen(null);
       }
-      const prevOrder = collab.order.toArray();
-      if (prevOrder.length !== ids.length || prevOrder.some((id, i) => id !== ids[i])) {
-        if (collab.order.length) collab.order.delete(0, collab.order.length);
-        if (ids.length) collab.order.push(ids);
-      }
-
-      const fileIds = new Set(Object.keys(files));
-      for (const [id, file] of Object.entries(files)) {
-        const stored = uploaded.current.get(id);
-        const next = clone({
-          ...file,
-          dataURL: (stored || file.dataURL) as BinaryFileData["dataURL"],
-        });
-        const prev = collab.files.get(id);
-        if (!prev || prev.dataURL !== next.dataURL) collab.files.set(id, next);
-      }
-      for (const key of [...collab.files.keys()]) {
-        if (!fileIds.has(key)) collab.files.delete(key);
-      }
-    }, ORIGIN);
-  }
-
-  function applyRemote() {
-    const api = apiRef.current;
-    if (!api) return;
-    applyingRef.current = true;
-    try {
-      const files = Object.values(pullFiles());
-      if (files.length) api.addFiles(files);
-      api.updateScene({
-        elements: pullElements(),
-        captureUpdate: CaptureUpdateAction.NEVER,
-      });
-    } finally {
-      applyingRef.current = false;
-    }
-  }
-
-  useEffect(() => {
-    const onEls = (_: unknown, txn: Y.Transaction) => {
-      if (txn.origin === ORIGIN) return;
-      applyRemote();
+      const k = e.key.toLowerCase();
+      if (k === "v") setTool("select");
+      if (k === "h") setTool("hand");
+      if (k === "s") setTool("sticky");
+      if (k === "r") setTool("shape");
+      if (k === "t") setTool("text");
+      if (k === "l") setTool("line");
+      if (k === "p") setTool("pen");
     };
-    collab.elements.observe(onEls);
-    collab.order.observe(onEls);
-    collab.files.observe(onEls);
+    const up = (e: KeyboardEvent) => {
+      if (e.key === " ") setSpace(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
     return () => {
-      collab.elements.unobserve(onEls);
-      collab.order.unobserve(onEls);
-      collab.files.unobserve(onEls);
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
     };
-  }, [collab]);
+  }, [editing, editable, selected, collab]);
 
-  useEffect(() => {
-    const awareness = collab.provider.awareness;
-    const syncCollabs = () => {
-      const api = apiRef.current;
-      if (!api) return;
-      const next = new Map<SocketId, { username: string; color: { background: string; stroke: string }; pointer?: { x: number; y: number; tool: "pointer" | "laser" }; button?: "up" | "down" }>();
-      awareness.getStates().forEach((state, clientId) => {
-        if (clientId === awareness.clientID) return;
-        const raw = state.user as { name?: string; color?: string } | undefined;
-        if (!raw?.name) return;
-        const pointer = state.pointer as { x: number; y: number; tool: "pointer" | "laser" } | undefined;
-        const button = state.button as "up" | "down" | undefined;
-        next.set(String(clientId) as SocketId, {
-          username: raw.name,
-          color: { background: raw.color || "#37352f", stroke: raw.color || "#37352f" },
-          pointer,
-          button,
-        });
-      });
-      api.updateScene({ collaborators: next });
-    };
-    awareness.on("change", syncCollabs);
-    return () => awareness.off("change", syncCollabs);
-  }, [collab]);
-
-  function addSticky(color: string) {
-    const api = apiRef.current;
-    if (!api || !editable) return;
-    const appState = api.getAppState();
-    const center = viewportCoordsToSceneCoords(
-      { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 },
-      appState,
-    );
-    const created = convertToExcalidrawElements(
-      [
-        {
-          type: "rectangle",
-          x: center.x - 88,
-          y: center.y - 88,
-          width: 176,
-          height: 176,
-          backgroundColor: color,
-          strokeColor: "transparent",
-          fillStyle: "solid",
-          roughness: 0,
-          roundness: { type: ROUNDNESS.ADAPTIVE_RADIUS },
-          label: { text: " " },
-        },
-      ],
-      { regenerateIds: true },
-    );
-    const selected: Record<string, true> = {};
-    for (const el of created) selected[el.id] = true;
-    api.updateScene({
-      elements: [...api.getSceneElements(), ...created],
-      appState: { selectedElementIds: selected },
+  function zoomBy(factor: number) {
+    const el = boardRef.current;
+    if (!el) {
+      setCam((c) => ({ ...c, z: Math.min(3.5, Math.max(0.2, c.z * factor)) }));
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const sx = r.width / 2;
+    const sy = r.height / 2;
+    setCam((c) => {
+      const z = Math.min(3.5, Math.max(0.2, c.z * factor));
+      return { z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z };
     });
   }
 
-  if (!synced) {
-    return <div className="flex h-full items-center justify-center text-[13px] text-muted">読み込み中…</div>;
-  }
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const empty = nodes.length === 0;
+  const placing = activeTool === "sticky" || activeTool === "shape" || activeTool === "text" || activeTool === "line";
 
   return (
-    <div className="arcana-canvas relative h-full min-h-0">
-      <Excalidraw
-        excalidrawAPI={(api) => {
-          apiRef.current = api;
-        }}
-        langCode="ja-JP"
-        theme={theme}
-        name={title || "キャンバス"}
-        viewModeEnabled={!editable}
-        isCollaborating
-        aiEnabled={false}
-        UIOptions={{
-          canvasActions: {
-            loadScene: false,
-            saveToActiveFile: false,
-            toggleTheme: false,
-          },
-        }}
-        initialData={{
-          elements: pullElements(),
-          files: pullFiles(),
-          appState: {
-            viewBackgroundColor: theme === "dark" ? "#191919" : "#f7f6f3",
-            currentItemRoughness: 0,
-          },
-        }}
-        generateIdForFile={async (file) => {
-          const out = await uploadFile(file);
-          const id = out.src.split("/").pop() ?? crypto.randomUUID();
-          uploaded.current.set(id, out.src);
-          return id;
-        }}
-        onPointerUpdate={({ pointer, button }) => {
-          collab.provider.awareness.setLocalStateField("pointer", pointer);
-          collab.provider.awareness.setLocalStateField("button", button);
-        }}
-        onChange={(elements, _appState, files) => {
-          if (applyingRef.current || !editable) return;
-          pushScene(elements, files);
-          if (indexTimer.current) window.clearTimeout(indexTimer.current);
-          indexTimer.current = window.setTimeout(() => {
-            void api(`/api/pages/${pageId}/index`, {
-              method: "POST",
-              body: JSON.stringify({ title, bodyText: getTextFromElements(elements) }),
-            });
-          }, 1500);
-        }}
-      >
-        <WelcomeScreen>
-          <WelcomeScreen.Hints.ToolbarHint>
-            図形・矢印・手書きは左のツールから
-          </WelcomeScreen.Hints.ToolbarHint>
-          <WelcomeScreen.Hints.HelpHint />
-          <WelcomeScreen.Center>
-            <WelcomeScreen.Center.Heading>キャンバス</WelcomeScreen.Center.Heading>
-          </WelcomeScreen.Center>
-        </WelcomeScreen>
-      </Excalidraw>
-      {editable && (
-        <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2">
-          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-line bg-white p-1 shadow-sm dark-stickies">
-            <span className="px-2 text-[11px] text-muted">付箋</span>
-            {STICKIES.map((s) => (
-              <button
-                key={s.color}
-                type="button"
-                title={`${s.label}の付箋`}
-                className="h-7 w-7 rounded-[6px] border border-black/5"
-                style={{ background: s.color }}
-                onClick={() => addSticky(s.color)}
+    <div
+      ref={boardRef}
+      className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" ? "is-pen" : ""} ${placing ? "is-place" : ""}`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <div className="jam-dots" />
+      <div className="jam-world" style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})` }}>
+        <svg className="jam-svg" aria-hidden>
+          {nodes.map((n) => {
+            if (n.kind === "pen" && n.points && n.points.length > 1) {
+              return (
+                <polyline
+                  key={n.id}
+                  fill="none"
+                  stroke={n.stroke}
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={n.points.map((p) => `${p.x},${p.y}`).join(" ")}
+                />
+              );
+            }
+            if (n.kind === "line") {
+              const a = n.fromId ? byId.get(n.fromId) : null;
+              const b = n.toId ? byId.get(n.toId) : null;
+              if (!a || !b) return null;
+              const ac = center(a);
+              const bc = center(b);
+              const p1 = edgeToward(a, bc.x, bc.y);
+              const p2 = edgeToward(b, ac.x, ac.y);
+              const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+              const ah = 10;
+              return (
+                <g key={n.id}>
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={INK} strokeWidth={2} />
+                  <polygon
+                    fill={INK}
+                    points={`${p2.x},${p2.y} ${p2.x - ah * Math.cos(ang - 0.4)},${p2.y - ah * Math.sin(ang - 0.4)} ${p2.x - ah * Math.cos(ang + 0.4)},${p2.y - ah * Math.sin(ang + 0.4)}`}
+                  />
+                </g>
+              );
+            }
+            return null;
+          })}
+        </svg>
+        {nodes.map((n) => {
+          if (n.kind === "pen" || n.kind === "line") return null;
+          const on = selected.includes(n.id);
+          const cls =
+            n.kind === "sticky"
+              ? `jam-sticky ${on ? "is-on" : ""}`
+              : n.kind === "text"
+                ? `jam-label ${on ? "is-on" : ""}`
+                : `jam-shape is-${n.variant ?? "round"} ${on ? "is-on" : ""}`;
+          return (
+            <div
+              key={n.id}
+              className={cls}
+              style={{
+                left: n.x,
+                top: n.y,
+                width: n.w,
+                height: n.h,
+                background: n.kind === "text" ? "transparent" : n.fill,
+                borderColor: n.kind === "shape" ? n.stroke : undefined,
+              }}
+            >
+              <textarea
+                data-id={n.id}
+                readOnly={!editable || editing !== n.id}
+                value={n.text}
+                placeholder={n.kind === "sticky" ? "メモ" : n.kind === "text" ? "テキスト" : ""}
+                style={{ fontSize: n.fontSize ?? (n.kind === "text" ? 28 : 18) }}
+                onPointerDown={(e) => {
+                  if (editing === n.id) e.stopPropagation();
+                }}
+                onFocus={() => startEdit(n.id)}
+                onChange={(e) => patch(n.id, { text: e.target.value })}
+                onBlur={() => setEditing((cur) => (cur === n.id ? null : cur))}
               />
-            ))}
-          </div>
+            </div>
+          );
+        })}
+        {marquee && <div className="jam-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+      </div>
+
+      {cursors.map((c) => (
+        <div key={c.id} className="jam-cursor" style={{ left: c.x * cam.z + cam.x, top: c.y * cam.z + cam.y, color: c.color }}>
+          <svg width="16" height="20" viewBox="0 0 16 20">
+            <path d="M1 1 L1 17 L5.5 13.2 L9.2 19.2 L11.4 18.1 L7.6 12.1 L14 12.1 Z" fill="currentColor" stroke="#fff" strokeWidth="1" />
+          </svg>
+          <span style={{ background: c.color }}>{c.name}</span>
+        </div>
+      ))}
+
+      {empty && (
+        <div className="jam-empty">
+          <p>付箋を置いて、線でつなぐ</p>
+          <p>S 付箋　T 文字　R 図形　L コネクタ</p>
         </div>
       )}
+
+      {editable && (
+        <div className="jam-bar" onPointerDown={(e) => e.stopPropagation()}>
+          <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => setTool("select")} />
+          <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => setTool("hand")} />
+          <span className="jam-sep" />
+          <div className="jam-fly">
+            <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} onClick={() => { setTool("sticky"); setOpen(open === "sticky" ? null : "sticky"); }} />
+            {open === "sticky" && (
+              <div className="jam-pop">
+                {STICKY_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`jam-swatch ${stickyColor === c ? "is-on" : ""}`}
+                    style={{ background: c }}
+                    onClick={() => { setStickyColor(c); setTool("sticky"); }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="jam-fly">
+            <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} onClick={() => { setTool("shape"); setOpen(open === "shape" ? null : "shape"); }} />
+            {open === "shape" && (
+              <div className="jam-pop">
+                <button type="button" className={shapeKind === "round" ? "is-on" : ""} onClick={() => { setShapeKind("round"); setTool("shape"); }}><Square size={16} /></button>
+                <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onClick={() => { setShapeKind("ellipse"); setTool("shape"); }}><Circle size={16} /></button>
+                <button type="button" className={shapeKind === "diamond" ? "is-on" : ""} onClick={() => { setShapeKind("diamond"); setTool("shape"); }}><Diamond size={16} /></button>
+              </div>
+            )}
+          </div>
+          <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} onClick={() => { setTool("text"); setOpen(null); }} />
+          <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} onClick={() => { setTool("line"); setOpen(null); setLineFrom(null); }} />
+          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => { setTool("pen"); setOpen(null); }} />
+        </div>
+      )}
+
+      <div className="jam-zoom" onPointerDown={(e) => e.stopPropagation()}>
+        <button type="button" onClick={() => zoomBy(0.9)} aria-label="縮小">
+          <Minus size={14} />
+        </button>
+        <span>{Math.round(cam.z * 100)}%</span>
+        <button type="button" onClick={() => zoomBy(1.1)} aria-label="拡大">
+          <Plus size={14} />
+        </button>
+      </div>
     </div>
+  );
+}
+
+function ToolBtn({
+  icon: Icon,
+  label,
+  hot,
+  on,
+  onClick,
+}: {
+  icon: typeof MousePointer2;
+  label: string;
+  hot: string;
+  on: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={`jam-tool ${on ? "is-on" : ""}`} title={`${label}（${hot}）`} onClick={onClick}>
+      <Icon size={18} strokeWidth={1.8} />
+    </button>
   );
 }

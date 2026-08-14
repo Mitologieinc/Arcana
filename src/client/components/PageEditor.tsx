@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
@@ -21,8 +21,7 @@ import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
 import { BrandMark } from "./Brand";
 import { pageTypeIcon, permissionLabel } from "../lib/format";
-
-const CanvasEditor = lazy(() => import("./CanvasEditor").then((m) => ({ default: m.CanvasEditor })));
+import { CanvasEditor } from "./CanvasEditor";
 
 type Props = {
   pageId: string;
@@ -288,15 +287,21 @@ export function PageEditor({
   }
 
   return (
-    <div className={page.type === "canvas" ? "flex h-full min-h-0 flex-col" : "min-h-full"}>
-      <header className="sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md">
-        <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
-          {shareToken ? (
+    <div className={page.type === "canvas" ? "relative flex h-full min-h-0 flex-col" : "min-h-full"}>
+      <header
+        className={
+          page.type === "canvas"
+            ? "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between px-3"
+            : "sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md"
+        }
+      >
+        <nav className={`flex min-w-0 items-center gap-0.5 text-[13px] text-muted ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
+          {shareToken && page.type !== "canvas" ? (
             <a href="/" className="mr-1 flex h-7 items-center px-1" title="Arcana">
               <BrandMark className="h-5 w-auto" />
             </a>
           ) : (
-            sidebarCollapsed && (
+            page.type !== "canvas" && sidebarCollapsed && (
             <button
               className="btn-ghost mr-1 h-7 w-7 p-0 text-muted"
               onClick={onExpandSidebar}
@@ -306,7 +311,7 @@ export function PageEditor({
             </button>
             )
           )}
-          {crumbs.map((c) => (
+          {page.type !== "canvas" && crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
               <button
                 className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
@@ -318,12 +323,14 @@ export function PageEditor({
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
+          {page.type !== "canvas" && (
           <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
             <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 inline-block align-[-2px]" />
             {title || "無題"}
           </span>
+          )}
         </nav>
-        <div className="relative flex shrink-0 items-center gap-0.5">
+        <div className={`relative flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
           <PresencePile users={presence} />
           {shareToken && (
             <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
@@ -430,21 +437,35 @@ export function PageEditor({
         </div>
       </header>
       {page.type === "canvas" && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="relative flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+        <div className="relative min-h-0 flex-1">
+          <div className="jam-title" onPointerDown={(e) => e.stopPropagation()}>
+            {shareToken ? (
+              <a href="/" className="jam-title-icon" title="Arcana">
+                <BrandMark className="h-5 w-auto" />
+              </a>
+            ) : (
+              sidebarCollapsed && (
+                <button
+                  className="jam-title-icon"
+                  onClick={onExpandSidebar}
+                  title="サイドバーを開く"
+                >
+                  <ChevronsRight size={16} />
+                </button>
+              )
+            )}
             <button
-              className="rounded-md text-[22px] leading-none hover:bg-hover"
+              className="jam-title-icon"
               onClick={() => {
                 if (!editable) return;
                 setIconOpen((v) => !v);
               }}
               disabled={!editable}
             >
-              <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={22} />
+              <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={20} />
             </button>
             <input
               ref={titleRef}
-              className="page-title page-title-compact min-w-0 flex-1"
               value={title}
               placeholder="無題のキャンバス"
               readOnly={!editable}
@@ -459,7 +480,7 @@ export function PageEditor({
               }}
             />
             {iconOpen && (
-              <div className="menu-panel absolute left-4 top-11 z-20 w-80 p-2" onClick={(e) => e.stopPropagation()}>
+              <div className="menu-panel absolute left-0 top-11 z-20 w-80 p-2" onClick={(e) => e.stopPropagation()}>
                 <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
                 <EmojiPicker
                   onPick={(emo) => {
@@ -484,18 +505,14 @@ export function PageEditor({
               </div>
             )}
           </div>
-          <div className="relative min-h-0 flex-1">
-            <Suspense fallback={<div className="flex h-full items-center justify-center text-[13px] text-muted">読み込み中…</div>}>
-              <CanvasEditor
-                pageId={pageId}
-                user={user}
-                shareToken={shareToken}
-                editable={editable}
-                title={title}
-                onPresence={setPresence}
-              />
-            </Suspense>
-          </div>
+          <CanvasEditor
+            pageId={pageId}
+            user={user}
+            shareToken={shareToken}
+            editable={editable}
+            title={title}
+            onPresence={setPresence}
+          />
         </div>
       )}
       {page.type !== "canvas" && page.coverR2Key && (
