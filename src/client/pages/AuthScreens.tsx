@@ -78,8 +78,7 @@ function AuthLayout({
           <BrandMark className="w-full" animate />
         </div>
         <div className="auth-hero-copy">
-          <BrandLockup className="h-11 w-auto max-w-full" />
-          <p className="auth-word">Arcana</p>
+          <BrandLockup className="h-10 w-auto max-w-full" />
           <p className="auth-line">自分たちの場所で、書く。</p>
         </div>
       </aside>
