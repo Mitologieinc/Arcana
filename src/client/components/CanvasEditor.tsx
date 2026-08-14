@@ -19,9 +19,11 @@ import type { User } from "../lib/types";
 import type { PresenceUser } from "./PresencePile";
 
 const ORIGIN = "arcana-jam";
-const STICKY = 200;
-const STICKY_COLORS = ["#FFEE99", "#FFD59A", "#FFC7D1", "#C5F0C9", "#BDE3FF", "#E4D4FF"];
+const STICKY = 240;
+const STICKY_COLORS = ["#FFE299", "#FFD3A8", "#FFB8A8", "#FFA8DB", "#D3BDFF", "#A8DAFF", "#B3F4EF", "#B3EFBD", "#E6E6E6", "#FFFFFF"];
 const INK = "#1e1e1e";
+const LINE = "#b3b3b3";
+const SHAPE_STROKE = "#b3b3b3";
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
 
 type Tool = "select" | "hand" | "sticky" | "shape" | "text" | "line" | "pen";
@@ -102,7 +104,7 @@ export function CanvasEditor({
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<null | {
-    mode: "pan" | "move" | "pen" | "marquee" | "line";
+    mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape";
     x: number;
     y: number;
     cx: number;
@@ -124,9 +126,10 @@ export function CanvasEditor({
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [space, setSpace] = useState(false);
-  const [open, setOpen] = useState<null | "sticky" | "shape">(null);
   const [cursors, setCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
+  const [lineHover, setLineHover] = useState<{ x: number; y: number } | null>(null);
+  const [ghost, setGhost] = useState<null | { kind: "sticky" | "shape" | "text"; x: number; y: number; w: number; h: number }>(null);
   const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
 
   const collab = useMemo(() => {
@@ -270,7 +273,7 @@ export function CanvasEditor({
     };
   }
 
-  const activeTool: Tool = space || !editable ? (space ? "hand" : "select") : tool;
+  const activeTool: Tool = space || tool === "hand" ? "hand" : !editable ? "select" : tool;
 
   function topAt(x: number, y: number) {
     for (let i = nodes.length - 1; i >= 0; i--) {
@@ -311,26 +314,39 @@ export function CanvasEditor({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  function overUi(t: EventTarget | null) {
+    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title"));
+  }
+
+  function ghostAt(tool: Tool, w: { x: number; y: number }) {
+    if (tool === "sticky") return { kind: "sticky" as const, x: w.x - STICKY / 2, y: w.y - STICKY / 2, w: STICKY, h: STICKY };
+    if (tool === "shape") return { kind: "shape" as const, x: w.x - 80, y: w.y - 80, w: 160, h: 160 };
+    if (tool === "text") return { kind: "text" as const, x: w.x, y: w.y - 16, w: 280, h: 48 };
+    return null;
+  }
+
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (overUi(e.target)) return;
     if (e.button === 1 || activeTool === "hand") {
       drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
+      setGhost(null);
       return;
     }
     const w = worldFromClient(e.clientX, e.clientY);
     collab.provider.awareness.setLocalStateField("jam", w);
-    setOpen(null);
     if (!editable) return;
     if (editing && (e.target as HTMLElement).tagName !== "TEXTAREA") setEditing(null);
 
     if (activeTool === "sticky") {
+      const g = ghostAt("sticky", w)!;
       const n: JamNode = {
         id: nid(),
         kind: "sticky",
-        x: w.x - STICKY / 2,
-        y: w.y - STICKY / 2,
-        w: STICKY,
-        h: STICKY,
+        x: g.x,
+        y: g.y,
+        w: g.w,
+        h: g.h,
         text: "",
         fill: stickyColor,
         stroke: "transparent",
@@ -344,28 +360,32 @@ export function CanvasEditor({
       const n: JamNode = {
         id: nid(),
         kind: "shape",
-        x: w.x - 80,
-        y: w.y - 80,
-        w: 160,
-        h: 160,
+        x: w.x,
+        y: w.y,
+        w: 1,
+        h: 1,
         text: "",
         fill: "#ffffff",
-        stroke: INK,
+        stroke: SHAPE_STROKE,
         variant: shapeKind,
         fontSize: 16,
       };
       put(n);
       setSelected([n.id]);
+      setGhost(null);
+      drag.current = { mode: "shape", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
     if (activeTool === "text") {
+      const g = ghostAt("text", w)!;
       const n: JamNode = {
         id: nid(),
         kind: "text",
-        x: w.x,
-        y: w.y - 16,
-        w: 280,
-        h: 48,
+        x: g.x,
+        y: g.y,
+        w: g.w,
+        h: g.h,
         text: "",
         fill: "transparent",
         stroke: "transparent",
@@ -396,28 +416,11 @@ export function CanvasEditor({
     if (activeTool === "line") {
       const t = topAt(w.x, w.y);
       if (!t || t.kind === "pen" || t.kind === "line") return;
-      if (!lineFrom) {
-        setLineFrom(t.id);
-        setSelected([t.id]);
-        return;
-      }
-      if (lineFrom !== t.id) {
-        put({
-          id: nid(),
-          kind: "line",
-          x: 0,
-          y: 0,
-          w: 0,
-          h: 0,
-          text: "",
-          fill: "transparent",
-          stroke: INK,
-          fromId: lineFrom,
-          toId: t.id,
-        });
-      }
-      setLineFrom(null);
-      setSelected([]);
+      setLineFrom(t.id);
+      setLineHover(w);
+      setSelected([t.id]);
+      drag.current = { mode: "line", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: t.id };
+      e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
 
@@ -449,6 +452,11 @@ export function CanvasEditor({
     const w = worldFromClient(e.clientX, e.clientY);
     collab.provider.awareness.setLocalStateField("jam", w);
     const d = drag.current;
+    if (!d && editable && !overUi(e.target)) {
+      setGhost(ghostAt(activeTool, w));
+    } else if (!d) {
+      setGhost(null);
+    }
     if (!d) return;
     if (d.mode === "pan") {
       setCam({ ...cam, x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y) });
@@ -469,6 +477,16 @@ export function CanvasEditor({
       }
       return;
     }
+    if (d.mode === "shape" && d.id) {
+      const x = Math.min(d.x, w.x);
+      const y = Math.min(d.y, w.y);
+      patch(d.id, { x, y, w: Math.max(1, Math.abs(w.x - d.x)), h: Math.max(1, Math.abs(w.y - d.y)) });
+      return;
+    }
+    if (d.mode === "line") {
+      setLineHover(w);
+      return;
+    }
     if (d.mode === "pen" && d.id) {
       const cur = collab.map.get(d.id);
       if (!isJam(cur) || !cur.points) return;
@@ -486,9 +504,35 @@ export function CanvasEditor({
 
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
     const d = drag.current;
+    const w = worldFromClient(e.clientX, e.clientY);
     if (d?.mode === "marquee" && marquee) {
       const hits = nodes.filter((n) => n.kind !== "line" && n.kind !== "pen" && n.x < marquee.x + marquee.w && n.y < marquee.y + marquee.h && n.x + n.w > marquee.x && n.y + n.h > marquee.y).map((n) => n.id);
       setSelected(hits);
+    }
+    if (d?.mode === "shape" && d.id) {
+      const cur = collab.map.get(d.id);
+      if (isJam(cur) && (cur.w < 24 || cur.h < 24)) {
+        patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
+      }
+    }
+    if (d?.mode === "line" && d.id) {
+      const t = topAt(w.x, w.y);
+      if (t && t.id !== d.id && t.kind !== "pen" && t.kind !== "line") {
+        put({
+          id: nid(),
+          kind: "line",
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+          text: "",
+          fill: "transparent",
+          stroke: LINE,
+          fromId: d.id,
+          toId: t.id,
+        });
+      }
+      setSelected([]);
     }
     if (d?.mode === "move" && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
       const n = nodes.find((x) => x.id === d.ids![0]);
@@ -496,6 +540,8 @@ export function CanvasEditor({
     }
     drag.current = null;
     setMarquee(null);
+    setLineFrom(null);
+    setLineHover(null);
   }
 
   useEffect(() => {
@@ -524,8 +570,9 @@ export function CanvasEditor({
       if (e.key === "Escape") {
         setSelected([]);
         setLineFrom(null);
+        setLineHover(null);
+        setGhost(null);
         setTool("select");
-        setOpen(null);
       }
       const k = e.key.toLowerCase();
       if (k === "v") setTool("select");
@@ -533,7 +580,7 @@ export function CanvasEditor({
       if (k === "s") setTool("sticky");
       if (k === "r") setTool("shape");
       if (k === "t") setTool("text");
-      if (k === "l") setTool("line");
+      if (k === "l" || k === "x") setTool("line");
       if (k === "p") setTool("pen");
     };
     const up = (e: KeyboardEvent) => {
@@ -564,21 +611,22 @@ export function CanvasEditor({
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const empty = nodes.length === 0;
-  const placing = activeTool === "sticky" || activeTool === "shape" || activeTool === "text" || activeTool === "line";
+  const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text";
 
   return (
     <div
       ref={boardRef}
-      className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" ? "is-pen" : ""} ${placing ? "is-place" : ""}`}
+      className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onPointerLeave={() => setGhost(null)}
     >
       <div
         className="jam-dots"
         style={{
-          backgroundSize: `${28 * cam.z}px ${28 * cam.z}px`,
+          backgroundSize: `${24 * cam.z}px ${24 * cam.z}px`,
           backgroundPosition: `${cam.x}px ${cam.y}px`,
         }}
       />
@@ -610,9 +658,9 @@ export function CanvasEditor({
               const ah = 10;
               return (
                 <g key={n.id}>
-                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={INK} strokeWidth={2} />
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={n.stroke || LINE} strokeWidth={2} />
                   <polygon
-                    fill={INK}
+                    fill={n.stroke || LINE}
                     points={`${p2.x},${p2.y} ${p2.x - ah * Math.cos(ang - 0.4)},${p2.y - ah * Math.sin(ang - 0.4)} ${p2.x - ah * Math.cos(ang + 0.4)},${p2.y - ah * Math.sin(ang + 0.4)}`}
                   />
                 </g>
@@ -620,7 +668,26 @@ export function CanvasEditor({
             }
             return null;
           })}
+          {lineFrom && lineHover && (() => {
+            const a = byId.get(lineFrom);
+            if (!a) return null;
+            const p1 = edgeToward(a, lineHover.x, lineHover.y);
+            return <line x1={p1.x} y1={p1.y} x2={lineHover.x} y2={lineHover.y} stroke={LINE} strokeWidth={2} strokeDasharray="6 4" />;
+          })()}
         </svg>
+        {ghost && (
+          <div
+            className={`jam-ghost ${ghost.kind === "sticky" ? "jam-sticky" : ghost.kind === "text" ? "jam-label" : `jam-shape is-${shapeKind}`}`}
+            style={{
+              left: ghost.x,
+              top: ghost.y,
+              width: ghost.w,
+              height: ghost.h,
+              background: ghost.kind === "sticky" ? stickyColor : ghost.kind === "shape" ? "#fff" : "transparent",
+              borderColor: ghost.kind === "shape" ? SHAPE_STROKE : undefined,
+            }}
+          />
+        )}
         {nodes.map((n) => {
           if (n.kind === "pen" || n.kind === "line") return null;
           const on = selected.includes(n.id);
@@ -679,39 +746,40 @@ export function CanvasEditor({
       )}
 
       <div className="jam-bar" onPointerDown={(e) => e.stopPropagation()}>
-          <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} disabled={!editable} onClick={() => setTool("select")} />
-          <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} disabled={!editable} onClick={() => setTool("hand")} />
-          <span className="jam-sep" />
-          <div className="jam-fly">
-            <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} disabled={!editable} onClick={() => { setTool("sticky"); setOpen(open === "sticky" ? null : "sticky"); }} />
-            {editable && open === "sticky" && (
-              <div className="jam-pop">
-                {STICKY_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`jam-swatch ${stickyColor === c ? "is-on" : ""}`}
-                    style={{ background: c }}
-                    onClick={() => { setStickyColor(c); setTool("sticky"); }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="jam-fly">
-            <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} disabled={!editable} onClick={() => { setTool("shape"); setOpen(open === "shape" ? null : "shape"); }} />
-            {editable && open === "shape" && (
-              <div className="jam-pop">
-                <button type="button" className={shapeKind === "round" ? "is-on" : ""} onClick={() => { setShapeKind("round"); setTool("shape"); }}><Square size={16} /></button>
-                <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onClick={() => { setShapeKind("ellipse"); setTool("shape"); }}><Circle size={16} /></button>
-                <button type="button" className={shapeKind === "diamond" ? "is-on" : ""} onClick={() => { setShapeKind("diamond"); setTool("shape"); }}><Diamond size={16} /></button>
-              </div>
-            )}
-          </div>
-          <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} disabled={!editable} onClick={() => { setTool("text"); setOpen(null); }} />
-          <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} disabled={!editable} onClick={() => { setTool("line"); setOpen(null); setLineFrom(null); }} />
-          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} disabled={!editable} onClick={() => { setTool("pen"); setOpen(null); }} />
+        <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} disabled={!editable} onClick={() => setTool("select")} />
+        <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => setTool("hand")} />
+        <span className="jam-sep" />
+        <div className="jam-fly">
+          <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} disabled={!editable} onClick={() => setTool("sticky")} />
+          {editable && tool === "sticky" && (
+            <div className="jam-pop">
+              {STICKY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`jam-swatch ${stickyColor === c ? "is-on" : ""}`}
+                  style={{ background: c }}
+                  onClick={() => setStickyColor(c)}
+                />
+              ))}
+            </div>
+          )}
         </div>
+        <div className="jam-fly">
+          <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} disabled={!editable} onClick={() => setTool("shape")} />
+          {editable && tool === "shape" && (
+            <div className="jam-pop">
+              <button type="button" className={shapeKind === "round" ? "is-on" : ""} onClick={() => setShapeKind("round")}><Square size={16} /></button>
+              <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onClick={() => setShapeKind("ellipse")}><Circle size={16} /></button>
+              <button type="button" className={shapeKind === "diamond" ? "is-on" : ""} onClick={() => setShapeKind("diamond")}><Diamond size={16} /></button>
+            </div>
+          )}
+        </div>
+        <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} disabled={!editable} onClick={() => { setTool("line"); setLineFrom(null); }} />
+        <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} disabled={!editable} onClick={() => setTool("pen")} />
+        <span className="jam-sep" />
+        <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} disabled={!editable} onClick={() => setTool("text")} />
+      </div>
 
       <div className="jam-zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button type="button" onClick={() => zoomBy(0.9)} aria-label="縮小">
