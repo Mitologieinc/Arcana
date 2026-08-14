@@ -57,6 +57,7 @@ extraRoutes.put("/api/favorites/:pageId", async (c) => {
 extraRoutes.get("/api/trash", async (c) => {
   const ctx = await authed(c);
   if ("error" in ctx) return ctx.error;
+  if (ctx.membership.role === "guest") return c.json({ error: "ゴミ箱を開けません" }, 403);
   const pages = await ctx.db
     .select()
     .from(schema.pages)
@@ -89,6 +90,11 @@ extraRoutes.delete("/api/pages/:id/purge", async (c) => {
     return c.json({ error: "完全削除できません" }, 403);
   }
   const id = c.req.param("id");
+  const rows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const page = rows[0];
+  if (!page || page.workspaceId !== ctx.membership.workspaceId) {
+    return c.json({ error: "見つかりません" }, 404);
+  }
   await ctx.db.delete(schema.pages).where(eq(schema.pages.id, id));
   await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
   return c.json({ ok: true });

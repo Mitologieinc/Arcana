@@ -222,6 +222,10 @@ export function SignupPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (password.length < 8) {
+      setError("パスワードは 8 文字以上にしてください");
+      return;
+    }
     setBusy(true);
     try {
       await api("/api/register", {
@@ -278,7 +282,7 @@ export function SignupPage() {
       <form onSubmit={onSubmit}>
         <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
-        <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
+        <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
         <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
           参加する
@@ -300,7 +304,7 @@ export function SetupPage() {
   const [step, setStep] = useState<"workspace" | "owner" | "passkey">("workspace");
   const [ready, setReady] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
-  const [inviteOnly, setInviteOnly] = useState(false);
+  const [inviteOnly, setInviteOnly] = useState(true);
   const [allowedDomains, setAllowedDomains] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -408,8 +412,8 @@ export function SetupPage() {
           <div className="mb-3 grid gap-2">
             {(
               [
-                [false, "この URL を知っていれば参加できる"],
                 [true, "招待リンクがある人だけ"],
+                [false, "この URL を知っていれば参加できる"],
               ] as const
             ).map(([value, label]) => (
               <button

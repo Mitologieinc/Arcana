@@ -6,6 +6,7 @@ import * as schema from "../db/schema";
 import { createAuth, getMembership, getSessionUser } from "../auth";
 import type { AppEnv } from "../types";
 import { emailAllowed, normalizeDomains } from "../lib/access";
+import { allowAttempt, clientIp } from "../lib/rate-limit";
 
 const DEFAULT_DB_PROPERTIES = [
   { id: "title", type: "title", name: "名前" },
@@ -122,7 +123,7 @@ async function bootstrapWorkspace(
   await db.insert(schema.workspaces).values({
     id: workspaceId,
     name: input.workspaceName,
-    inviteOnly: Boolean(input.inviteOnly),
+    inviteOnly: input.inviteOnly ?? true,
     allowedDomains: normalizeDomains(input.allowedDomains),
     createdAt: now,
   });
@@ -209,6 +210,12 @@ async function registerHandler(c: Context<AppEnv>) {
   if (!body.email || !body.password || !body.name) {
     return c.json({ error: "名前、メール、パスワードが必要です" }, 400);
   }
+  if (body.password.length < 8) {
+    return c.json({ error: "パスワードは 8 文字以上にしてください" }, 400);
+  }
+  if (!allowAttempt(`register:${clientIp(c.req.raw)}`, 15, 10 * 60 * 1000)) {
+    return c.json({ error: "少し待ってからやり直してください" }, 429);
+  }
 
   const email = body.email.trim().toLowerCase();
   const existingWs = await db.select().from(schema.workspaces).limit(1);
@@ -251,7 +258,7 @@ async function registerHandler(c: Context<AppEnv>) {
     }
     workspaceId = invite.workspaceId;
     role = invite.role;
-    joinEmail = (invite.email || email).toLowerCase();
+    joinEmail = invite.email.toLowerCase();
     consumedInviteId = invite.id;
   }
 
@@ -330,12 +337,24 @@ workspaceRoutes.get("/api/members", async (c) => {
     .innerJoin(schema.user, eq(schema.user.id, schema.workspaceMembers.userId))
     .where(eq(schema.workspaceMembers.workspaceId, membership.workspaceId));
 
-  const pending = await db
-    .select()
-    .from(schema.invites)
-    .where(eq(schema.invites.workspaceId, membership.workspaceId));
+  const isAdmin = membership.role === "owner" || membership.role === "admin";
+  const pending = isAdmin
+    ? await db
+        .select({
+          id: schema.invites.id,
+          email: schema.invites.email,
+          role: schema.invites.role,
+          expiresAt: schema.invites.expiresAt,
+          createdAt: schema.invites.createdAt,
+        })
+        .from(schema.invites)
+        .where(eq(schema.invites.workspaceId, membership.workspaceId))
+    : [];
 
-  return c.json({ members, invites: pending, seatLimit: null });
+  const publicMembers =
+    membership.role === "guest" ? members.map((m) => ({ ...m, email: "" })) : members;
+
+  return c.json({ members: publicMembers, invites: pending, seatLimit: null });
 });
 
 workspaceRoutes.patch("/api/workspace", async (c) => {
@@ -438,9 +457,15 @@ workspaceRoutes.post("/api/invites/:token/accept", async (c) => {
   }
 
   const body = await c.req.json<{ name: string; password: string; email?: string }>();
-  const email = (body.email ?? invite.email).trim().toLowerCase();
+  const email = invite.email.trim().toLowerCase();
   if (!body.name || !body.password) {
     return c.json({ error: "名前とパスワードが必要です" }, 400);
+  }
+  if (body.password.length < 8) {
+    return c.json({ error: "パスワードは 8 文字以上にしてください" }, 400);
+  }
+  if (!allowAttempt(`invite-accept:${clientIp(c.req.raw)}`, 15, 10 * 60 * 1000)) {
+    return c.json({ error: "少し待ってからやり直してください" }, 429);
   }
   const wsRow = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, invite.workspaceId)).limit(1);
   if (invite.role !== "guest" && wsRow[0] && !emailAllowed(email, wsRow[0].allowedDomains)) {

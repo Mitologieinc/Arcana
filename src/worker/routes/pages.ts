@@ -125,11 +125,20 @@ pageRoutes.get("/api/pages/:id", async (c) => {
   const page = pageRows[0];
   if (!page) return c.json({ error: "見つかりません" }, 404);
 
-  const children = await db
+  const childRows = await db
     .select()
     .from(schema.pages)
     .where(and(eq(schema.pages.parentId, id), isNull(schema.pages.archivedAt)))
     .orderBy(asc(schema.pages.position));
+  const children = [];
+  for (const child of childRows) {
+    const childPerm = await resolvePagePermission(db, {
+      pageId: child.id,
+      userId: user?.id,
+      shareToken,
+    });
+    if (canView(childPerm.permission)) children.push(child);
+  }
 
   let database: { schema: unknown; views: unknown[] } | null = null;
   if (page.type === "database") {
@@ -170,7 +179,7 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
   if (!user) return c.json({ error: "未ログイン" }, 401);
   const db = createDb(c.env.DB);
   const id = c.req.param("id");
-  const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
+  const { permission, workspaceId } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
 
   const body = await c.req.json<{
@@ -185,11 +194,30 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
   const updates: Partial<typeof schema.pages.$inferInsert> = { updatedAt: new Date() };
   if (body.title !== undefined) updates.title = body.title;
   if (body.icon !== undefined) updates.icon = body.icon;
-  if (body.parentId !== undefined) updates.parentId = body.parentId;
   if (body.position !== undefined) updates.position = body.position;
-  if (body.coverR2Key !== undefined) updates.coverR2Key = body.coverR2Key;
   if (body.properties !== undefined) {
     updates.properties = body.properties ? JSON.stringify(body.properties) : null;
+  }
+  if (body.parentId !== undefined) {
+    if (body.parentId === null) {
+      updates.parentId = null;
+    } else {
+      const parents = await db.select().from(schema.pages).where(eq(schema.pages.id, body.parentId)).limit(1);
+      const parent = parents[0];
+      if (!parent || parent.workspaceId !== workspaceId) {
+        return c.json({ error: "移動先が不正です" }, 400);
+      }
+      updates.parentId = body.parentId;
+    }
+  }
+  if (body.coverR2Key !== undefined) {
+    const cover = body.coverR2Key;
+    const ok =
+      cover === null ||
+      cover.startsWith("preset:") ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cover);
+    if (!ok) return c.json({ error: "カバーが不正です" }, 400);
+    updates.coverR2Key = cover;
   }
 
   await db.update(schema.pages).set(updates).where(eq(schema.pages.id, id));

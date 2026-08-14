@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { getMembership, getSessionUser } from "../auth";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
-import { canEdit, resolvePagePermission } from "../lib/acl";
+import { canEdit, canView, resolvePagePermission } from "../lib/acl";
 import type { AppEnv } from "../types";
 
 export const searchRoutes = new Hono<AppEnv>();
@@ -46,7 +46,12 @@ searchRoutes.get("/api/search", async (c) => {
     .all<{ id: string; title: string; icon: string | null; type: string; snippet: string }>();
 
   const seen = new Set(fts.map((r) => r.id));
-  const results = [...fts, ...fallback.results.filter((r) => !seen.has(r.id))];
+  const combined = [...fts, ...fallback.results.filter((r) => !seen.has(r.id))];
+  const results = [];
+  for (const row of combined) {
+    const { permission } = await resolvePagePermission(db, { pageId: row.id, userId: user.id });
+    if (canView(permission)) results.push(row);
+  }
   return c.json({ results });
 });
 

@@ -119,8 +119,6 @@ export async function listVisiblePages(db: Database, workspaceId: string, userId
     .from(pages)
     .where(and(eq(pages.workspaceId, workspaceId), isNull(pages.archivedAt)));
 
-  if (role !== "guest") return all;
-
   const visible: typeof all = [];
   for (const page of all) {
     const { permission } = await resolvePagePermission(db, { pageId: page.id, userId });

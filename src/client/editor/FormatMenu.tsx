@@ -28,6 +28,16 @@ const BG_COLORS: { name: string; value: string | null }[] = [
   { name: "レッド", value: "#ffe2dd" },
 ];
 
+function applyLink(editor: Editor, raw: string) {
+  const next = raw.trim();
+  if (!next) {
+    editor.chain().focus().unsetLink().run();
+    return;
+  }
+  if (!/^(https?:\/\/|\/|#|mailto:)/i.test(next)) return;
+  editor.chain().focus().setLink({ href: next }).run();
+}
+
 export function ColorButton({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false);
   return (
@@ -124,9 +134,7 @@ export function LinkButton({ editor }: { editor: Editor }) {
             onChange={(e) => setHref(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                const next = href.trim();
-                if (next) editor.chain().focus().setLink({ href: next }).run();
-                else editor.chain().focus().unsetLink().run();
+                applyLink(editor, href);
                 setOpen(false);
               }
               if (e.key === "Escape") setOpen(false);
@@ -137,9 +145,7 @@ export function LinkButton({ editor }: { editor: Editor }) {
               type="button"
               className="flex-1 rounded-[6px] px-2 py-1.5 text-[12px] hover:bg-hover"
               onClick={() => {
-                const next = href.trim();
-                if (next) editor.chain().focus().setLink({ href: next }).run();
-                else editor.chain().focus().unsetLink().run();
+                applyLink(editor, href);
                 setOpen(false);
               }}
             >

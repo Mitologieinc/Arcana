@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getSessionUser } from "../auth";
-import { canEdit, canView, resolvePagePermission } from "../lib/acl";
+import { canEdit, resolvePagePermission } from "../lib/acl";
 import type { AppEnv } from "../types";
 
 export const shareRoutes = new Hono<AppEnv>();
@@ -14,7 +14,7 @@ shareRoutes.get("/api/pages/:id/acl", async (c) => {
   const db = createDb(c.env.DB);
   const id = c.req.param("id");
   const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
-  if (!canView(permission)) return c.json({ error: "閲覧できません" }, 403);
+  if (!canEdit(permission)) return c.json({ error: "閲覧できません" }, 403);
   const acls = await db.select().from(schema.pageAcl).where(eq(schema.pageAcl.pageId, id));
   const links = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.pageId, id));
   return c.json({ acls, links, permission });
@@ -31,7 +31,10 @@ shareRoutes.put("/api/pages/:id/acl", async (c) => {
     acls: { principalType: "user" | "workspace"; principalId?: string | null; permission: schema.Permission }[];
   }>();
   await db.delete(schema.pageAcl).where(eq(schema.pageAcl.pageId, id));
+  const allowedPerm: schema.Permission[] = ["full", "edit", "view", "none"];
   for (const acl of body.acls) {
+    if (acl.principalType !== "user" && acl.principalType !== "workspace") continue;
+    if (!allowedPerm.includes(acl.permission)) continue;
     await db.insert(schema.pageAcl).values({
       id: crypto.randomUUID(),
       pageId: id,

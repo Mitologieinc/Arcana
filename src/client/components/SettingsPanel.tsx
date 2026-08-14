@@ -223,8 +223,8 @@ export function SettingsPanel({
                   <div className="grid gap-2">
                     {(
                       [
-                        [false, "URL を知っていれば参加できる"],
                         [true, "招待リンクがある人だけ"],
+                        [false, "URL を知っていれば参加できる"],
                       ] as const
                     ).map(([value, label]) => (
                       <button
