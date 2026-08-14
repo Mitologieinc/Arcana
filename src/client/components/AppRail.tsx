@@ -46,11 +46,11 @@ export function AppRail({
   return (
     <nav className="arcana-rail" aria-label="メイン">
       <button
-        className={`mb-2 flex h-10 w-10 items-center justify-center rounded-[10px] ${home ? "bg-hover" : ""}`}
+        className={`mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] ${home ? "bg-hover" : ""}`}
         onClick={onHome}
         title="ホーム"
       >
-        <BrandMark className="h-7 w-11" hoverAnimate />
+        <BrandMark className="h-7 w-auto" hoverAnimate />
       </button>
       <button className="arcana-rail-btn" onClick={onSearch} title="検索">
         <Search size={18} strokeWidth={1.6} />

@@ -50,7 +50,7 @@ function ArcanaMark({
   const motion = loop ? "is-loop" : animate ? "is-in" : "";
   return (
     <svg
-      viewBox={lockup ? "0 0 1444 263" : "0 0 412 263"}
+      viewBox={lockup ? "0 0 1444 263" : "72 0 340 263"}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`arcana-logo ${motion} ${hoverAnimate ? "is-hover" : ""} ${className ?? ""}`}
