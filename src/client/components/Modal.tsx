@@ -24,7 +24,7 @@ export function Modal({
 
   return (
     <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-[rgba(15,15,15,0.35)] px-4 pt-[13vh] backdrop-blur-[2px]"
+      className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-[rgba(15,15,15,0.18)] px-4 pt-[18vh]"
       onClick={onClose}
     >
       <div
@@ -33,7 +33,7 @@ export function Modal({
       >
         {!hideHeader && (
           <div className="flex items-center justify-between px-4 pt-3.5">
-            <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+            <h2 className="text-[14px] font-medium">{title}</h2>
             <button className="btn-ghost h-7 w-7 p-0 text-muted" onClick={onClose} aria-label="閉じる">
               <X size={16} />
             </button>

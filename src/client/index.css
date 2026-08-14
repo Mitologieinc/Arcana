@@ -39,7 +39,7 @@ button:disabled {
 }
 
 :focus-visible {
-  outline: 2px solid rgba(232, 93, 4, 0.45);
+  outline: 2px solid rgba(55, 53, 47, 0.22);
   outline-offset: 1px;
 }
 
@@ -163,8 +163,8 @@ button:disabled {
 .field input:focus,
 .input:focus,
 .field select:focus {
-  border-color: rgba(232, 93, 4, 0.7);
-  box-shadow: 0 0 0 1px rgba(232, 93, 4, 0.28);
+  border-color: rgba(55, 53, 47, 0.28);
+  box-shadow: 0 0 0 1px rgba(55, 53, 47, 0.08);
 }
 
 .divider {
@@ -201,7 +201,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(232, 93, 4, 0.2);
+  background: rgba(55, 53, 47, 0.12);
 }
 
 .kbd {

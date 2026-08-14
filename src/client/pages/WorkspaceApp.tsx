@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronsLeft, ChevronsRight, FilePlus, LayoutGrid, LogOut, Search, Settings } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, FilePlus, LayoutGrid, Plus, Search } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, relativeTime } from "../lib/format";
@@ -21,8 +21,8 @@ export function WorkspaceApp() {
   const [pages, setPages] = useState<Page[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
-  const [passkeyCount, setPasskeyCount] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("arcana.sidebar") === "1");
 
   function toggleSidebar() {
@@ -44,8 +44,6 @@ export function WorkspaceApp() {
     setWorkspace(me.workspace);
     const list = await api<{ pages: Page[] }>("/api/pages");
     setPages(list.pages);
-    const { data } = await authClient.passkey.listUserPasskeys();
-    setPasskeyCount(Array.isArray(data) ? data.length : 0);
     return true;
   }
 
@@ -66,6 +64,16 @@ export function WorkspaceApp() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    if (!newOpen) return;
+    const close = () => setNewOpen(false);
+    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("click", close);
+    };
+  }, [newOpen]);
+
   const current = useMemo(() => pages.find((p) => p.id === pageId) ?? null, [pages, pageId]);
   const recent = useMemo(
     () =>
@@ -76,6 +84,7 @@ export function WorkspaceApp() {
   );
 
   async function createPage(parentId?: string | null, type: "page" | "database" = "page") {
+    setNewOpen(false);
     const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
       body: JSON.stringify({ parentId: parentId ?? null, type }),
@@ -92,38 +101,50 @@ export function WorkspaceApp() {
 
   if (!ready || !user || !workspace) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas">
-        <div className="flex flex-col items-center gap-3">
-          <BrandMark className="h-10 w-10" />
-          <div className="skeleton h-2 w-16" />
-        </div>
+      <div className="flex h-full items-center justify-center bg-white">
+        <BrandMark className="h-9 w-9" />
       </div>
     );
   }
 
+  const item = collapsed ? "sidebar-item justify-center px-0" : "sidebar-item";
+
   return (
     <div className="flex h-full bg-white">
       <aside
-        className={`flex shrink-0 flex-col bg-sidebar py-2 transition-[width] duration-200 ease-out ${
-          collapsed ? "w-[56px] px-1.5" : "w-[252px] px-1.5"
+        className={`group/sidebar flex shrink-0 flex-col bg-sidebar py-2 transition-[width] duration-200 ease-out ${
+          collapsed ? "w-[52px] px-1.5" : "w-[240px] px-2"
         }`}
       >
-        {collapsed ? (
-          <button className="mb-2 flex justify-center" onClick={() => nav("/")} title="Arcana WorkSquare">
-            <BrandMark className="h-8 w-8" />
+        <div className={`mb-3 flex items-center ${collapsed ? "justify-center" : "gap-1"}`}>
+          <button
+            className={`min-w-0 ${collapsed ? "" : "flex-1 px-1 py-0.5"}`}
+            onClick={() => nav("/")}
+            title="Arcana WorkSquare"
+          >
+            {collapsed ? (
+              <BrandMark className="h-7 w-7" />
+            ) : (
+              <BrandLockup className="h-8 w-full" />
+            )}
           </button>
-        ) : (
-          <button className="mb-2 px-1 py-1" onClick={() => nav("/")} title="Arcana WorkSquare">
-            <BrandLockup className="h-9 w-full" />
+          {!collapsed && (
+            <button
+              className="btn-ghost h-7 w-7 p-0 text-muted opacity-0 group-hover/sidebar:opacity-100"
+              onClick={toggleSidebar}
+              title="サイドバーを閉じる"
+            >
+              <ChevronsLeft size={15} />
+            </button>
+          )}
+        </div>
+        {collapsed && (
+          <button className={`${item} mb-1 text-muted`} onClick={toggleSidebar} title="サイドバーを開く">
+            <ChevronsRight size={15} />
           </button>
         )}
-        {!collapsed && (
-          <button className="sidebar-item mb-2 h-8 px-2 font-medium" onClick={() => nav("/")} title={workspace.name}>
-            <span className="min-w-0 truncate">{workspace.name}</span>
-          </button>
-        )}
-        <button className={`sidebar-item text-muted ${collapsed ? "justify-center px-0" : ""}`} onClick={() => setSearchOpen(true)} title="検索">
-          <Search size={15} strokeWidth={1.75} />
+        <button className={`${item} text-muted`} onClick={() => setSearchOpen(true)} title="検索">
+          <Search size={15} strokeWidth={1.6} />
           {!collapsed && (
             <>
               検索
@@ -131,24 +152,41 @@ export function WorkspaceApp() {
             </>
           )}
         </button>
-        <button
-          className={`sidebar-item text-muted ${collapsed ? "justify-center px-0" : ""}`}
-          onClick={() => createPage(null, "page")}
-          title="新規ページ"
-        >
-          <FilePlus size={15} strokeWidth={1.75} />
-          {!collapsed && "新規ページ"}
-        </button>
-        <button
-          className={`sidebar-item mb-3 text-muted ${collapsed ? "justify-center px-0" : ""}`}
-          onClick={() => createPage(null, "database")}
-          title="新規データベース"
-        >
-          <LayoutGrid size={15} strokeWidth={1.75} />
-          {!collapsed && "新規データベース"}
-        </button>
-        {!collapsed && <div className="mb-1 px-2 text-[11px] font-medium tracking-wide text-muted">ページ</div>}
-        <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-0.5 pb-2">
+        <div className="relative">
+          <button
+            className={`${item} mb-2 text-muted`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setNewOpen((v) => !v);
+            }}
+            title="新規"
+          >
+            <Plus size={15} strokeWidth={1.6} />
+            {!collapsed && "新規"}
+          </button>
+          {newOpen && (
+            <div
+              className={`menu-panel absolute z-20 w-44 p-1 ${collapsed ? "left-full top-0 ml-1" : "left-2 right-2 top-8 w-auto"}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                onClick={() => createPage(null, "page")}
+              >
+                <FilePlus size={14} />
+                ページ
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                onClick={() => createPage(null, "database")}
+              >
+                <LayoutGrid size={14} />
+                データベース
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="sidebar-scroll min-h-0 flex-1 overflow-auto">
           <SidebarTree
             pages={pages}
             currentId={pageId}
@@ -157,44 +195,10 @@ export function WorkspaceApp() {
             onCreateChild={(id) => createPage(id, "page")}
           />
         </div>
-        {passkeyCount === 0 && !collapsed && (
-          <button className="sidebar-item mb-1 text-[12px] text-muted" onClick={openSettings}>
-            パスキーを追加
-          </button>
-        )}
-        <button
-          className={`sidebar-item mb-0.5 text-muted ${collapsed ? "justify-center px-0" : ""}`}
-          onClick={toggleSidebar}
-          title={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
-        >
-          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-          {!collapsed && "サイドバーを閉じる"}
+        <button className={`${item} mt-1`} onClick={openSettings} title={user.name}>
+          <Avatar name={user.name} seed={user.id} size={20} />
+          {!collapsed && <span className="min-w-0 truncate">{user.name}</span>}
         </button>
-        <div className={`mt-0.5 flex items-center gap-0.5 ${collapsed ? "flex-col" : ""}`}>
-          <button
-            className={`sidebar-item min-w-0 ${collapsed ? "justify-center px-0" : "flex-1"}`}
-            onClick={openSettings}
-            title={user.name}
-          >
-            <Avatar name={user.name} seed={user.id} />
-            {!collapsed && (
-              <>
-                <span className="min-w-0 truncate">{user.name}</span>
-                <Settings size={14} className="ml-auto shrink-0 text-muted" />
-              </>
-            )}
-          </button>
-          <button
-            className="btn-ghost h-[30px] w-[30px] p-0 text-muted"
-            title="ログアウト"
-            onClick={async () => {
-              await authClient.signOut();
-              nav("/login");
-            }}
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto">
         {pageId ? (
@@ -208,42 +212,27 @@ export function WorkspaceApp() {
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
-          <div className="mx-auto max-w-[720px] px-16 py-24">
-            <p className="text-[13px] font-medium text-muted">{greeting()}</p>
-            <h1 className="mt-1 text-[40px] font-bold tracking-[-0.03em]">{user.name}</h1>
-            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
-              左のサイドバーからページを開くか、ここから新しく書き始めてください。
-            </p>
-            <div className="mt-8 flex flex-wrap gap-2">
-              <button className="btn btn-primary" onClick={() => createPage(null, "page")}>
-                <FilePlus size={15} />
-                新規ページ
-              </button>
-              <button className="btn btn-secondary" onClick={() => createPage(null, "database")}>
-                <LayoutGrid size={15} />
-                新規データベース
-              </button>
-            </div>
-            {recent.length > 0 && (
-              <div className="mt-14">
-                <p className="mb-2 px-1 text-[12px] font-medium text-muted">ジャンプ</p>
-                <ul className="overflow-hidden rounded-[10px] border border-line">
-                  {recent.map((p) => (
-                    <li key={p.id} className="border-t border-line first:border-t-0">
-                      <button
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[14px] hover:bg-hover"
-                        onClick={() => nav(`/page/${p.id}`)}
-                      >
-                        <span className="text-[16px]">{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
-                        <span className={`min-w-0 flex-1 truncate ${p.title ? "" : "text-muted"}`}>
-                          {p.title || "無題"}
-                        </span>
-                        <span className="shrink-0 text-[12px] text-muted">{relativeTime(p.updatedAt)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div className="mx-auto max-w-[640px] px-16 py-28">
+            <p className="text-[13px] text-muted">{greeting()}、{user.name}</p>
+            {recent.length > 0 ? (
+              <ul className="mt-10">
+                {recent.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      className="flex w-full items-center gap-3 rounded-[6px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
+                      onClick={() => nav(`/page/${p.id}`)}
+                    >
+                      <span className="text-[15px]">{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
+                      <span className={`min-w-0 flex-1 truncate ${p.title ? "" : "text-muted"}`}>
+                        {p.title || "無題"}
+                      </span>
+                      <span className="shrink-0 text-[12px] text-muted">{relativeTime(p.updatedAt)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-10 text-[14px] text-muted">⌘K で探すか、左の ＋ から書いてください。</p>
             )}
           </div>
         )}
@@ -268,6 +257,10 @@ export function WorkspaceApp() {
           onChanged={async () => {
             const data = await api<{ members: Member[] }>("/api/members");
             setMembers(data.members);
+          }}
+          onSignOut={async () => {
+            await authClient.signOut();
+            nav("/login");
           }}
         />
       )}

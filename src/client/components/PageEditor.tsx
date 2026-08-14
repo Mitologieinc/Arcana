@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { ChevronRight, MoreHorizontal, Share2, SmilePlus, Trash2 } from "lucide-react";
+import { ChevronRight, MoreHorizontal, SmilePlus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
@@ -127,7 +127,7 @@ export function PageEditor({
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-[5] flex h-11 items-center justify-between bg-white/80 px-3 backdrop-blur-md">
+      <header className="sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
           {crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
@@ -146,8 +146,7 @@ export function PageEditor({
         </nav>
         {editable && !shareToken && (
           <div className="relative flex shrink-0 items-center gap-0.5">
-            <button className="btn-ghost h-8 gap-1.5 px-2.5 text-[13px] font-medium" onClick={() => setShareOpen(true)}>
-              <Share2 size={14} />
+            <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink" onClick={() => setShareOpen(true)}>
               共有
             </button>
             <button

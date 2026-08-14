@@ -39,7 +39,7 @@ export function SearchModal({
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <kbd className="kbd">esc</kbd>
+        <kbd className="kbd ml-auto">esc</kbd>
       </div>
       <ul className="max-h-80 overflow-auto py-1.5">
         {results.map((r) => (
@@ -59,9 +59,7 @@ export function SearchModal({
         {q && results.length === 0 && (
           <li className="px-3 py-10 text-center text-[14px] text-muted">見つかりませんでした</li>
         )}
-        {!q && (
-          <li className="px-3 py-8 text-center text-[13px] text-muted">ページ名や本文で探せます</li>
-        )}
+        {!q && <li className="px-3 py-10 text-center text-[13px] text-muted">検索</li>}
       </ul>
     </Modal>
   );

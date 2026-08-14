@@ -36,16 +36,14 @@ function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-canvas px-6 py-16">
-      <div className="w-full max-w-[400px]">
-        <div className="mb-8 flex justify-center">
-          <BrandLockup className="h-[52px] w-auto max-w-full" />
+    <div className="flex min-h-full items-center justify-center bg-white px-6">
+      <div className="w-full max-w-[320px] py-24">
+        <div className="mb-12 flex justify-center">
+          <BrandLockup className="h-10 w-auto max-w-full" />
         </div>
-        <div className="rounded-[14px] border border-line bg-white px-6 py-7 shadow-[0_10px_40px_rgba(15,15,15,0.04)]">
-          <h1 className="text-center text-[20px] font-semibold tracking-tight">{title}</h1>
-          {kicker && <p className="mt-2 text-center text-[13px] leading-relaxed text-muted">{kicker}</p>}
-          <div className="mt-6">{children}</div>
-        </div>
+        <h1 className="text-[15px] font-medium tracking-tight">{title}</h1>
+        {kicker && <p className="mt-1 text-[13px] leading-relaxed text-muted">{kicker}</p>}
+        <div className="mt-8">{children}</div>
       </div>
     </div>
   );
@@ -107,14 +105,14 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="ログイン" kicker="パスキー、またはメールとパスワード。">
+    <AuthLayout title="ログイン">
       {needsSetup && (
-        <p className="mb-5 rounded-[8px] bg-canvas px-3 py-2.5 text-[13px] leading-relaxed">
-          この環境はまだ空です。最初のオーナーとして{" "}
-          <Link className="font-semibold text-cf" to="/signup">
-            アカウントを作成
+        <p className="mb-6 text-[13px] leading-relaxed text-muted">
+          まだ空です。最初のオーナーとして{" "}
+          <Link className="underline underline-offset-2" to="/signup">
+            作成
           </Link>
-          してください。
+          。
         </p>
       )}
       <button type="button" className="btn btn-primary w-full" onClick={onPasskey} disabled={busy}>
@@ -136,10 +134,10 @@ export function LoginPage() {
           メールでログイン
         </button>
       </form>
-      <p className="mt-5 text-center text-[13px] text-muted">
-        アカウントをお持ちでない場合{" "}
-        <Link className="font-semibold text-cf" to="/signup">
-          アカウントを作成
+      <p className="mt-8 text-center text-[13px] text-muted">
+        アカウントがない場合{" "}
+        <Link className="underline underline-offset-2" to="/signup">
+          作成
         </Link>
       </p>
     </AuthLayout>
@@ -230,11 +228,11 @@ export function SignupPage() {
         <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
           {needsSetup ? "作成して始める" : "参加する"}
         </button>
-        <p className="mt-3 text-[12px] text-muted">作成後、このデバイスにパスキーを登録できます。</p>
+        <p className="mt-3 text-[12px] text-muted">あとからパスキーを追加できます。</p>
       </form>
-      <p className="mt-5 text-center text-[13px] text-muted">
-        すでにアカウントがある場合{" "}
-        <Link className="font-semibold text-cf" to="/login">
+      <p className="mt-8 text-center text-[13px] text-muted">
+        アカウントがある場合{" "}
+        <Link className="underline underline-offset-2" to="/login">
           ログイン
         </Link>
       </p>

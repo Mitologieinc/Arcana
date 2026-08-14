@@ -37,9 +37,6 @@ export function SidebarTree({ pages, currentId, onOpen, onCreateChild, compact }
 
   return (
     <div>
-      {roots.length === 0 && (
-        <p className="px-2 py-5 text-[12px] leading-relaxed text-muted">まだページはありません</p>
-      )}
       {roots.map((p) => (
         <TreeNode
           key={p.id}

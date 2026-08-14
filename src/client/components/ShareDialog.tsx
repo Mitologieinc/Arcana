@@ -74,9 +74,7 @@ export function ShareDialog({ page, onClose }: Props) {
 
   return (
     <Modal title="共有" onClose={onClose}>
-      <p className="mb-4 text-[13px] leading-relaxed text-muted">
-        権限は親ページから継承されます。ここで上書きできます。
-      </p>
+      <p className="mb-4 text-[13px] leading-relaxed text-muted">親から継承されます。ここで上書きできます。</p>
       <label className="field">
         <span>ワークスペース成員</span>
         <select value={wsPerm} onChange={(e) => saveWsPerm(e.target.value as Permission)}>

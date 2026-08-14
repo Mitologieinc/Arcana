@@ -23,16 +23,16 @@ export function SharePage() {
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
-        <BrandLockup className="h-12 w-auto" />
-        <p className="text-[14px] text-danger">{error}</p>
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-white px-6 text-center">
+        <BrandLockup className="h-10 w-auto" />
+        <p className="text-[13px] text-muted">{error}</p>
       </div>
     );
   }
   if (!page || !token) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas">
-        <BrandMark className="h-10 w-10" />
+      <div className="flex h-full items-center justify-center bg-white">
+        <BrandMark className="h-9 w-9" />
       </div>
     );
   }

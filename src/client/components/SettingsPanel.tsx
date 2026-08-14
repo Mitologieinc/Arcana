@@ -20,11 +20,13 @@ export function SettingsPanel({
   role,
   onClose,
   onChanged,
+  onSignOut,
 }: {
   members: Member[];
   role: MemberRole;
   onClose: () => void;
   onChanged: () => Promise<unknown>;
+  onSignOut: () => Promise<void>;
 }) {
   const [tab, setTab] = useState<"team" | "security">("security");
   const [email, setEmail] = useState("");
@@ -106,10 +108,8 @@ export function SettingsPanel({
 
       {tab === "security" && (
         <div>
-          <p className="mb-4 text-[13px] leading-relaxed text-muted">
-            パスキーは端末の生体認証やセキュリティキーでログインします。パスワードより安全です。
-          </p>
-          <button type="button" className="btn btn-primary mb-4" onClick={addPasskey}>
+          <p className="mb-4 text-[13px] leading-relaxed text-muted">パスキーでログインできます。</p>
+          <button type="button" className="btn btn-secondary mb-4" onClick={addPasskey}>
             <Fingerprint size={15} />
             パスキーを追加
           </button>
@@ -135,7 +135,7 @@ export function SettingsPanel({
 
       {tab === "team" && (
         <div>
-          <p className="mb-4 text-[13px] text-muted">メンバー数に上限はありません。</p>
+          <p className="mb-4 text-[13px] text-muted">人数に上限はありません。</p>
           <ul className="mb-4 divide-y divide-line overflow-hidden rounded-[10px] border border-line">
             {members.map((m) => (
               <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
@@ -166,7 +166,7 @@ export function SettingsPanel({
                   <option value="admin">管理者</option>
                   <option value="guest">ゲスト</option>
                 </select>
-                <button className="btn btn-primary flex-1" onClick={invite}>
+                <button className="btn btn-secondary flex-1" onClick={invite}>
                   招待リンクを発行
                 </button>
               </div>
@@ -176,6 +176,10 @@ export function SettingsPanel({
           )}
         </div>
       )}
+
+      <button type="button" className="mt-6 text-[13px] text-muted hover:text-ink" onClick={() => void onSignOut()}>
+        ログアウト
+      </button>
     </Modal>
   );
 }
