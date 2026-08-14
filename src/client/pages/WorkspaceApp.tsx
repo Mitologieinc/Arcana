@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronsLeft, ChevronsRight, FilePlus, LayoutGrid, Plus, Search } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Plus, Search } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, relativeTime } from "../lib/format";
@@ -21,7 +21,6 @@ export function WorkspaceApp() {
   const [pages, setPages] = useState<Page[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newOpen, setNewOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("arcana.sidebar") === "1");
 
@@ -59,20 +58,14 @@ export function WorkspaceApp() {
         e.preventDefault();
         setSearchOpen(true);
       }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "\\" || e.key === "¥")) {
+        e.preventDefault();
+        toggleSidebar();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  useEffect(() => {
-    if (!newOpen) return;
-    const close = () => setNewOpen(false);
-    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("click", close);
-    };
-  }, [newOpen]);
 
   const current = useMemo(() => pages.find((p) => p.id === pageId) ?? null, [pages, pageId]);
   const recent = useMemo(
@@ -84,13 +77,12 @@ export function WorkspaceApp() {
   );
 
   async function createPage(parentId?: string | null, type: "page" | "database" = "page") {
-    setNewOpen(false);
     const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
       body: JSON.stringify({ parentId: parentId ?? null, type }),
     });
     await refresh();
-    nav(`/page/${res.page.id}`);
+    nav(`/page/${res.page.id}`, { state: { focusTitle: true } });
   }
 
   async function openSettings() {
@@ -152,40 +144,14 @@ export function WorkspaceApp() {
             </>
           )}
         </button>
-        <div className="relative">
-          <button
-            className={`${item} mb-2 text-muted`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setNewOpen((v) => !v);
-            }}
-            title="新規"
-          >
-            <Plus size={15} strokeWidth={1.6} />
-            {!collapsed && "新規"}
-          </button>
-          {newOpen && (
-            <div
-              className={`menu-panel absolute z-20 w-44 p-1 ${collapsed ? "left-full top-0 ml-1" : "left-2 right-2 top-8 w-auto"}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
-                onClick={() => createPage(null, "page")}
-              >
-                <FilePlus size={14} />
-                ページ
-              </button>
-              <button
-                className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
-                onClick={() => createPage(null, "database")}
-              >
-                <LayoutGrid size={14} />
-                データベース
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          className={`${item} mb-2 text-muted`}
+          onClick={() => createPage(null, "page")}
+          title="新規ページ"
+        >
+          <Plus size={15} strokeWidth={1.6} />
+          {!collapsed && "新規ページ"}
+        </button>
         <div className="sidebar-scroll min-h-0 flex-1 overflow-auto">
           <SidebarTree
             pages={pages}
@@ -200,7 +166,7 @@ export function WorkspaceApp() {
           {!collapsed && <span className="min-w-0 truncate">{user.name}</span>}
         </button>
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto">
+      <main className="relative min-w-0 flex-1 overflow-auto">
         {pageId ? (
           <PageEditor
             key={pageId}
@@ -208,11 +174,22 @@ export function WorkspaceApp() {
             user={user}
             pages={pages}
             fallback={current}
+            sidebarCollapsed={collapsed}
+            onExpandSidebar={toggleSidebar}
             onPagesChanged={refresh}
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
           <div className="mx-auto max-w-[640px] px-16 py-28">
+            {collapsed && (
+              <button
+                className="btn-ghost absolute left-2 top-1.5 h-7 w-7 p-0 text-muted"
+                onClick={toggleSidebar}
+                title="サイドバーを開く"
+              >
+                <ChevronsRight size={15} />
+              </button>
+            )}
             <p className="text-[13px] text-muted">{greeting()}、{user.name}</p>
             {recent.length > 0 ? (
               <ul className="mt-10">
@@ -239,10 +216,15 @@ export function WorkspaceApp() {
       </main>
       {searchOpen && (
         <SearchModal
+          pages={pages}
           onClose={() => setSearchOpen(false)}
           onOpen={(id) => {
             setSearchOpen(false);
             nav(`/page/${id}`);
+          }}
+          onCreate={(type) => {
+            setSearchOpen(false);
+            void createPage(null, type);
           }}
         />
       )}

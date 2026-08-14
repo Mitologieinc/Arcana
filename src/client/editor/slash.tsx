@@ -201,6 +201,7 @@ export const SlashCommand = Extension.create({
         editor: this.editor,
         char: "/",
         allowedPrefixes: [" ", "\n"],
+        startOfLine: false,
         shouldShow: ({ transaction }) => !isChangeOrigin(transaction),
         items: ({ query }) => {
           const q = query.toLowerCase().trim();

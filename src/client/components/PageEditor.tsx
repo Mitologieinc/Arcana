@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { ChevronRight, MoreHorizontal, SmilePlus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useLocation } from "react-router-dom";
+import { ChevronsRight, ChevronRight, Link2, MoreHorizontal, SmilePlus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
@@ -13,6 +14,8 @@ type Props = {
   pages?: Page[];
   fallback?: Page | null;
   forcedPermission?: Permission;
+  sidebarCollapsed?: boolean;
+  onExpandSidebar?: () => void;
   onPagesChanged: () => Promise<unknown>;
   onOpenPage: (id: string) => void;
 };
@@ -26,9 +29,13 @@ export function PageEditor({
   pages = [],
   fallback,
   forcedPermission,
+  sidebarCollapsed,
+  onExpandSidebar,
   onPagesChanged,
   onOpenPage,
 }: Props) {
+  const location = useLocation();
+  const titleRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<Page | null>(fallback ?? null);
   const [permission, setPermission] = useState<Permission>(forcedPermission ?? "view");
   const [children, setChildren] = useState<Page[]>([]);
@@ -57,6 +64,13 @@ export function PageEditor({
       })
       .catch(console.error);
   }, [pageId, shareToken]);
+
+  useEffect(() => {
+    if ((location.state as { focusTitle?: boolean } | null)?.focusTitle) {
+      titleRef.current?.focus();
+      titleRef.current?.select();
+    }
+  }, [pageId, location.state]);
 
   useEffect(() => {
     if (!moreOpen && !iconOpen) return;
@@ -95,7 +109,6 @@ export function PageEditor({
   }
 
   async function remove() {
-    if (!confirm("このページを削除しますか？")) return;
     await api(`/api/pages/${pageId}`, { method: "DELETE" });
     await onPagesChanged();
     onOpenPage("");
@@ -129,6 +142,15 @@ export function PageEditor({
     <div className="min-h-full">
       <header className="sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
+          {sidebarCollapsed && (
+            <button
+              className="btn-ghost mr-1 h-7 w-7 p-0 text-muted"
+              onClick={onExpandSidebar}
+              title="サイドバーを開く"
+            >
+              <ChevronsRight size={15} />
+            </button>
+          )}
           {crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
               <button
@@ -159,6 +181,16 @@ export function PageEditor({
             {moreOpen && (
               <div className="menu-panel absolute right-0 top-9 z-20 w-44 p-1" onClick={(e) => e.stopPropagation()}>
                 <button
+                  className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void navigator.clipboard.writeText(window.location.href);
+                  }}
+                >
+                  <Link2 size={14} />
+                  リンクをコピー
+                </button>
+                <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
                   onClick={() => {
                     setMoreOpen(false);
@@ -166,7 +198,7 @@ export function PageEditor({
                   }}
                 >
                   <Trash2 size={14} />
-                  ページを削除
+                  削除
                 </button>
               </div>
             )}
@@ -221,6 +253,7 @@ export function PageEditor({
         </div>
         <div className="px-24 max-[860px]:px-6">
           <input
+            ref={titleRef}
             className="page-title"
             value={title}
             placeholder="無題"
@@ -228,7 +261,7 @@ export function PageEditor({
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => saveTitle(title)}
             onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowDown") {
                 e.preventDefault();
                 void saveTitle(title);
                 document.querySelector<HTMLElement>(".arcana-doc")?.focus();

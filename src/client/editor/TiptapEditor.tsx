@@ -70,8 +70,9 @@ export function TiptapEditor({
         dropcursor: { color: "#37352f", width: 2 },
       }),
       Placeholder.configure({
+        showOnlyCurrent: true,
         placeholder: ({ node }) => {
-          if (node.type.name === "heading") return "見出し";
+          if (node.type.name === "heading") return `見出し ${node.attrs.level}`;
           return "入力するか、'/' でコマンド";
         },
       }),
@@ -120,6 +121,25 @@ export function TiptapEditor({
           }
         })();
         return true;
+      },
+      handleKeyDown(view, event) {
+        if (event.key !== "Backspace" && event.key !== "ArrowUp") return false;
+        const { selection, doc } = view.state;
+        if (!selection.empty) return false;
+        if (selection.from > 2) return false;
+        const first = doc.firstChild;
+        if (!first) return false;
+        if (event.key === "ArrowUp" || first.content.size === 0 || selection.from <= 1) {
+          event.preventDefault();
+          const title = document.querySelector<HTMLInputElement>(".page-title");
+          title?.focus();
+          if (event.key === "Backspace") {
+            const len = title?.value.length ?? 0;
+            title?.setSelectionRange(len, len);
+          }
+          return true;
+        }
+        return false;
       },
     },
     onUpdate: ({ editor: ed }) => {
