@@ -39,7 +39,7 @@ function AuthLayout({
     <div className="flex min-h-full items-center justify-center bg-canvas px-6 py-16">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex justify-center">
-          <BrandLockup className="h-[52px] w-auto max-w-full rounded-[12px] shadow-[0_8px_24px_rgba(0,0,0,0.18)]" />
+          <BrandLockup className="h-[52px] w-auto max-w-full" />
         </div>
         <div className="rounded-[14px] border border-line bg-white px-6 py-7 shadow-[0_10px_40px_rgba(15,15,15,0.04)]">
           <h1 className="text-center text-[20px] font-semibold tracking-tight">{title}</h1>

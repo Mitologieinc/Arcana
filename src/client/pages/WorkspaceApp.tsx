@@ -94,7 +94,7 @@ export function WorkspaceApp() {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <BrandMark className="h-10 w-10 rounded-xl" />
+          <BrandMark className="h-10 w-10" />
           <div className="skeleton h-2 w-16" />
         </div>
       </div>
@@ -110,15 +110,11 @@ export function WorkspaceApp() {
       >
         {collapsed ? (
           <button className="mb-2 flex justify-center" onClick={() => nav("/")} title="Arcana WorkSquare">
-            <BrandMark className="h-8 w-8 rounded-[8px]" />
+            <BrandMark className="h-8 w-8" />
           </button>
         ) : (
-          <button
-            className="mb-2 overflow-hidden rounded-[8px] bg-black px-2 py-1.5"
-            onClick={() => nav("/")}
-            title="Arcana WorkSquare"
-          >
-            <BrandLockup className="h-9 w-full object-contain" />
+          <button className="mb-2 px-1 py-1" onClick={() => nav("/")} title="Arcana WorkSquare">
+            <BrandLockup className="h-9 w-full" />
           </button>
         )}
         {!collapsed && (
