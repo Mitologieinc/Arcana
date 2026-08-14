@@ -8,7 +8,7 @@ export function normalizeMailFrom(raw: string | null | undefined): string {
   }
   const domain = email.split("@")[1] ?? "";
   if (domain === "workers.dev" || domain.endsWith(".workers.dev")) {
-    throw new Error("workers.dev からは送れません。Resend か、独自ドメインの送信元を使ってください。");
+    throw new Error("workers.dev からは送れません。このアカウントの Email Sending に載せたドメインを使ってください。");
   }
   return email;
 }
@@ -105,12 +105,15 @@ export async function sendMail(
   env: Env,
   input: { from: string; to: string; subject: string; text: string; html: string; fromName?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (hasResend(env)) {
-    const sent = await sendViaResend(env, input);
+  const canCf = typeof env.EMAIL?.send === "function";
+  if (canCf) {
+    const sent = await sendViaCloudflare(env, input);
     if (sent.ok) return sent;
-    if (typeof env.EMAIL?.send !== "function") return sent;
+    if (hasResend(env)) return sendViaResend(env, input);
+    return sent;
   }
-  return sendViaCloudflare(env, input);
+  if (hasResend(env)) return sendViaResend(env, input);
+  return { ok: false, error: "メール送信がこの環境に設定されていません。" };
 }
 
 export async function sendVerificationMail(

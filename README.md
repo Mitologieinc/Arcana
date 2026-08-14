@@ -40,16 +40,16 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 
 ## 登録時のメール確認
 
-招待メールの一斉送信はしません。代わりに、登録したアドレスへ 6 桁の確認コードを送ります。送信は **Resend** を使います。ドメインを Cloudflare に置く必要はありません。
+メールは Arcana のサーバからではなく、**顧客がデプロイした Cloudflare アカウント**から出ます。顧客のドメインをそのアカウントの Email Sending に載せると、登録時に確認コードを送れます。
 
-1. [Resend](https://resend.com) で API キーを作り、送信ドメインを認証する（DNS はどこでもよい）
-2. `npx wrangler secret put RESEND_API_KEY`
-3. 初期設定または 設定 → チーム で送信元（例: `noreply@yourdomain.com`）を入れる。あるいは `MAIL_FROM` を vars / `.dev.vars` に書く
+1. 顧客ドメインを Cloudflare DNS に置く
+2. `npx wrangler email sending enable customer-domain.com`（そのアカウントで実行）
+3. 初期設定または 設定 → チーム で送信元（例: `noreply@customer-domain.com`）を入れる
 4. 以降の新規登録は、届いたコードを入力するまでワークスペースに入れません
 
-ローカルは `.dev.vars` に `RESEND_API_KEY` と任意で `MAIL_FROM` を足します。
+`workers.dev` だけ、または送信元が空のときは確認コードを送りません。すぐ参加できます。オーナー初回で送信に失敗した場合は閉じ込めないよう確認をスキップします。
 
-`workers.dev` からは送れません。送信元が空のときは確認コードを送らず、従来どおりすぐ参加できます。オーナー初回セットアップで送信に失敗した場合は、閉じ込めないよう確認をスキップします。Cloudflare Email Sending が残っていれば、Resend が無いときの予備として使います。
+顧客がすでに Resend を使っている場合だけ、そのアカウントの `RESEND_API_KEY` を secret にしても送れます。Arcana 側のキーではありません。
 
 ## 必要環境
 

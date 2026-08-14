@@ -1,4 +1,5 @@
 BETTER_AUTH_SECRET=change-me-run-openssl-rand-base64-32
-# 確認メールを送るなら Resend の API キー。Cloudflare にドメインを置く必要はない。
+# 確認メールはデプロイ先の Cloudflare Email Sending から出る。
+# 顧客が自分の Resend を使うときだけ:
 # RESEND_API_KEY=re_xxxxxxxx
-# MAIL_FROM=noreply@your-domain.com
+# MAIL_FROM=noreply@customer-domain.com

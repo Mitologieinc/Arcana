@@ -585,7 +585,7 @@ export function SetupPage() {
             required={false}
           />
           <p className="mb-3 -mt-1 text-[12px] text-muted">
-            入れると登録時に確認コードを送ります。Resend で認証したアドレスで構いません。Cloudflare にドメインを置く必要はありません。
+            入れると登録時に確認コードを送ります。この Cloudflare アカウントの Email Sending に載せたドメインのアドレスにしてください。空なら確認はしません。
           </p>
           {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
           <button type="submit" className="btn btn-primary w-full">
