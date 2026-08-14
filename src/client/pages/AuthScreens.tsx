@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Fingerprint } from "lucide-react";
+import { Eye, EyeOff, Fingerprint, Loader2 } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { BrandLockup, hideBootSplash } from "../components/Brand";
+import { BrandLockup, BrandMark, hideBootSplash } from "../components/Brand";
 import { NotionImport } from "../components/NotionImport";
 
 function Field({
@@ -15,6 +15,7 @@ function Field({
   placeholder,
   minLength,
   required = true,
+  end,
 }: {
   label: string;
   type?: string;
@@ -24,19 +25,30 @@ function Field({
   placeholder?: string;
   minLength?: number;
   required?: boolean;
+  end?: ReactNode;
 }) {
+  const input = (
+    <input
+      type={type}
+      value={value}
+      autoComplete={autoComplete}
+      placeholder={placeholder}
+      minLength={minLength}
+      required={required}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
   return (
     <label className="field">
       <span>{label}</span>
-      <input
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        minLength={minLength}
-        required={required}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {end ? (
+        <span className="field-wrap">
+          {input}
+          {end}
+        </span>
+      ) : (
+        input
+      )}
     </label>
   );
 }
@@ -60,22 +72,31 @@ function AuthLayout({
     hideBootSplash();
   }, []);
   return (
-    <div className="flex min-h-full items-center justify-center bg-white px-6">
-      <div className={`w-full py-24 ${wide ? "max-w-[380px]" : "max-w-[320px]"}`}>
-        <div className="mb-12">
-          <BrandLockup className="h-12 w-auto max-w-full" />
+    <div className="auth-split">
+      <aside className="auth-hero">
+        <div className="auth-hero-ghost" aria-hidden>
+          <BrandMark className="w-full" animate />
         </div>
-        {step != null && (
-          <div className="setup-dots" aria-hidden>
-            {Array.from({ length: steps }, (_, i) => (
-              <span key={i} className={i + 1 === step ? "is-on" : ""} />
-            ))}
-          </div>
-        )}
-        <h1 className="text-[15px] font-medium tracking-tight">{title}</h1>
-        {kicker && <p className="mt-1 text-[13px] leading-relaxed text-muted">{kicker}</p>}
-        <div className="mt-8">{children}</div>
-      </div>
+        <div className="auth-hero-copy">
+          <BrandLockup className="h-11 w-auto max-w-full" />
+          <p className="auth-word">Arcana</p>
+          <p className="auth-line">自分たちの場所で、書く。</p>
+        </div>
+      </aside>
+      <main className="auth-main">
+        <div className={`auth-card ${wide ? "is-wide" : ""}`}>
+          {step != null && (
+            <div className="setup-dots" aria-hidden>
+              {Array.from({ length: steps }, (_, i) => (
+                <span key={i} className={i + 1 === step ? "is-on" : ""} />
+              ))}
+            </div>
+          )}
+          <h1 className="text-[18px] font-medium tracking-tight">{title}</h1>
+          {kicker && <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{kicker}</p>}
+          <div className="mt-7">{children}</div>
+        </div>
+      </main>
     </div>
   );
 }
@@ -89,16 +110,23 @@ export function LoginPage() {
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [inviteOnly, setInviteOnly] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [environment, setEnvironment] = useState("");
+  const [busy, setBusy] = useState<"passkey" | "email" | null>(null);
 
   useEffect(() => {
-    api<{ needsSetup: boolean; inviteOnly?: boolean }>("/api/bootstrap")
+    api<{ needsSetup: boolean; inviteOnly?: boolean; workspaceName?: string | null; environment?: string }>(
+      "/api/bootstrap",
+    )
       .then((d) => {
         setNeedsSetup(d.needsSetup);
         setInviteOnly(Boolean(d.inviteOnly));
+        setWorkspaceName(d.workspaceName ?? "");
+        setEnvironment(d.environment ?? "");
       })
       .catch(() => setNeedsSetup(false));
   }, []);
@@ -117,11 +145,11 @@ export function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    setBusy(true);
+    setBusy("email");
     const { error: err } = await authClient.signIn.email({ email, password });
-    setBusy(false);
+    setBusy(null);
     if (err) {
-      setError(err.message || "ログインに失敗しました");
+      setError(err.message || "メールまたはパスワードが違います");
       return;
     }
     nav("/");
@@ -129,44 +157,62 @@ export function LoginPage() {
 
   async function onPasskey() {
     setError("");
-    setBusy(true);
+    setBusy("passkey");
     const err = await signInWithPasskey();
-    setBusy(false);
+    setBusy(null);
     if (err) {
-      setError(err.message || "パスキーでログインできませんでした");
+      setError(err.message || "パスキーで入れませんでした");
       return;
     }
     nav("/");
   }
 
   if (needsSetup === true) return <Navigate to="/setup" replace />;
-  if (needsSetup === null) return null;
+
+  const locked = busy !== null;
+  const title = workspaceName ? `${workspaceName} に入る` : "ログイン";
 
   return (
-    <AuthLayout title="ログイン">
-      <button type="button" className="btn btn-primary w-full" onClick={onPasskey} disabled={busy}>
-        <Fingerprint size={16} />
-        パスキーで続ける
+    <AuthLayout title={title} kicker="パスキーがあれば、それで十分です。">
+      <button
+        type="button"
+        className="btn btn-primary h-10 w-full"
+        onClick={onPasskey}
+        disabled={locked}
+      >
+        {busy === "passkey" ? <Loader2 size={16} className="animate-spin" /> : <Fingerprint size={16} />}
+        {busy === "passkey" ? "確認しています…" : "パスキーで続ける"}
       </button>
-      <div className="divider">または</div>
+      <div className="divider">またはメール</div>
       <form onSubmit={onSubmit}>
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="username webauthn" />
         <Field
           label="パスワード"
-          type="password"
+          type={showPassword ? "text" : "password"}
           value={password}
           onChange={setPassword}
           autoComplete="current-password webauthn"
+          end={
+            <button
+              type="button"
+              className="field-eye"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          }
         />
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
-          メールでログイン
+        <button type="submit" className="btn btn-secondary h-10 w-full" disabled={locked}>
+          {busy === "email" && <Loader2 size={15} className="animate-spin" />}
+          {busy === "email" ? "入っています…" : "メールでログイン"}
         </button>
       </form>
-      <p className="mt-4 text-center text-[12px] leading-relaxed text-muted">
-        パスワードを忘れた場合は、管理者にリセットリンクを依頼するか、パスキーで入ってください。
+      <p className="mt-5 text-[12px] leading-relaxed text-muted">
+        忘れた場合は管理者にリセットリンクを依頼するか、パスキーで入ってください。
       </p>
-      <p className="mt-8 text-center text-[13px] text-muted">
+      <p className="mt-8 text-[13px] text-muted">
         {inviteOnly ? (
           "参加は招待リンクから行います。"
         ) : (
@@ -178,6 +224,9 @@ export function LoginPage() {
           </>
         )}
       </p>
+      {environment && environment !== "production" && (
+        <p className="mt-10 text-[11px] tracking-wide text-muted">{environment}</p>
+      )}
     </AuthLayout>
   );
 }
