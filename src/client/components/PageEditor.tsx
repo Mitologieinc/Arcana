@@ -132,6 +132,17 @@ export function PageEditor({
     await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: id }) });
   }
 
+  function pickCover() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) void saveCover(file);
+    };
+    input.click();
+  }
+
   async function saveIcon(icon: string | null) {
     if (!editable) return;
     setIconOpen(false);
@@ -299,59 +310,74 @@ export function PageEditor({
         )}
       </header>
       {page.coverR2Key && (
-        <div className="relative h-48 w-full overflow-hidden bg-canvas">
+        <div className="group/cover relative h-[30vh] min-h-[140px] max-h-[280px] w-full overflow-hidden bg-canvas">
           <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-full w-full object-cover" />
           {editable && (
-            <button
-              className="absolute right-3 top-3 rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
-              onClick={() => void saveCover(null)}
-            >
-              カバーを削除
-            </button>
+            <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
+              <button
+                className="rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
+                onClick={() => pickCover()}
+              >
+                カバーを変更
+              </button>
+              <button
+                className="rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
+                onClick={() => void saveCover(null)}
+              >
+                カバーを削除
+              </button>
+            </div>
           )}
         </div>
       )}
-      <div className={page.type === "database" ? "group pb-32 pt-12" : "group mx-auto max-w-[900px] pb-40 pt-20"}>
+      <div
+        className={
+          page.type === "database"
+            ? `group pb-32 ${page.coverR2Key ? "pt-2" : "pt-12"}`
+            : `group mx-auto max-w-[900px] pb-40 ${page.coverR2Key ? "pt-0" : "pt-20"}`
+        }
+      >
         <div className="relative mb-1 px-24 max-[860px]:px-6">
           {editable && (
-            <div className={`mb-2 flex gap-1 ${page.coverR2Key ? "" : "opacity-0 group-hover:opacity-100"}`}>
+            <div className={`mb-2 flex flex-wrap gap-1 ${iconOpen ? "" : "opacity-0 group-hover:opacity-100"}`}>
+              {!page.icon && (
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
+                  onClick={() => setIconOpen((v) => !v)}
+                >
+                  <SmilePlus size={15} />
+                  アイコンを追加
+                </button>
+              )}
+              {!page.coverR2Key && (
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
+                  onClick={() => pickCover()}
+                >
+                  <ImagePlus size={15} />
+                  カバーを追加
+                </button>
+              )}
               <button
                 className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*";
-                  input.onchange = () => {
-                    const file = input.files?.[0];
-                    if (file) void saveCover(file);
-                  };
-                  input.click();
-                }}
+                onClick={() => setCommentsOpen(true)}
               >
-                <ImagePlus size={15} />
-                カバー
+                <MessageSquare size={15} />
+                コメントを追加
               </button>
             </div>
           )}
           {page.icon ? (
             <button
-              className="mb-1 rounded-xl text-[78px] leading-none transition hover:bg-hover"
+              className={`mb-1 rounded-xl text-[78px] leading-none transition hover:bg-hover ${
+                page.coverR2Key ? "relative z-[1] -mt-[46px]" : ""
+              }`}
               onClick={() => editable && setIconOpen((v) => !v)}
               disabled={!editable}
             >
               {page.icon}
             </button>
-          ) : (
-            editable && (
-              <button
-                className={`mb-2 inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover ${iconOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                onClick={() => setIconOpen((v) => !v)}
-              >
-                <SmilePlus size={15} />
-                アイコンを追加
-              </button>
-            )
-          )}
+          ) : null}
           {iconOpen && (
             <div className="menu-panel absolute left-24 top-[5.5rem] z-20 w-72 p-2 max-[860px]:left-6" onClick={(e) => e.stopPropagation()}>
               <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>

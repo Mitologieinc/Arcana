@@ -6,13 +6,16 @@ import { ReactRenderer } from "@tiptap/react";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import {
   CheckSquare,
+  ChevronRight,
   Code,
   Columns3,
   Database,
+  FileText,
   Heading1,
   Heading2,
   Heading3,
   ImageIcon,
+  Lightbulb,
   List,
   ListOrdered,
   Minus,
@@ -58,10 +61,10 @@ function pickImage(): Promise<File | null> {
   });
 }
 
-async function createChildDatabase(parentId: string) {
+async function createChildPage(parentId: string, type: "page" | "database" = "page") {
   return api<{ page: Page }>("/api/pages", {
     method: "POST",
-    body: JSON.stringify({ parentId, type: "database" }),
+    body: JSON.stringify({ parentId, type }),
   });
 }
 
@@ -175,6 +178,60 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
       command: ({ editor, range }) => insertNamedTable(editor, range),
     },
     {
+      title: "ページ",
+      subtitle: "このページの中にサブページ",
+      aliases: ["page", "ページ", "サブページ", "子"],
+      group: "basic",
+      icon: FileText,
+      command: ({ editor, range }) => {
+        if (!opts.pageId) return;
+        void (async () => {
+          const d = await createChildPage(opts.pageId, "page");
+          await opts.onPagesChanged?.();
+          if (editor.isDestroyed) return;
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: "pageBlock",
+              attrs: {
+                id: d.page.id,
+                title: d.page.title || "無題",
+                icon: d.page.icon || "📄",
+              },
+            })
+            .run();
+        })();
+      },
+    },
+    {
+      title: "コールアウト",
+      subtitle: "強調したヒント",
+      aliases: ["callout", "コールアウト", "hint", "ヒント", "注意"],
+      group: "basic",
+      icon: Lightbulb,
+      command: ({ editor, range }) =>
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: "callout",
+            attrs: { emoji: "💡" },
+            content: [{ type: "paragraph" }],
+          })
+          .run(),
+    },
+    {
+      title: "トグルリスト",
+      subtitle: "開閉できるリスト",
+      aliases: ["toggle", "トグル", "details", "折りたたみ"],
+      group: "basic",
+      icon: ChevronRight,
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setDetails().run(),
+    },
+    {
       title: "データベース – インライン",
       subtitle: "このページに埋め込む",
       aliases: ["database", "db", "データベース", "インライン", "inline", "埋め込み"],
@@ -183,7 +240,7 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
       command: ({ editor, range }) => {
         if (!opts.pageId) return;
         void (async () => {
-          const d = await createChildDatabase(opts.pageId);
+          const d = await createChildPage(opts.pageId, "database");
           await opts.onPagesChanged?.();
           if (editor.isDestroyed) return;
           editor
@@ -210,7 +267,7 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
       command: ({ editor, range }) => {
         if (!opts.pageId) return;
         void (async () => {
-          const d = await createChildDatabase(opts.pageId);
+          const d = await createChildPage(opts.pageId, "database");
           await opts.onPagesChanged?.();
           if (editor.isDestroyed) return;
           editor

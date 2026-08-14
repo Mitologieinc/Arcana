@@ -12,6 +12,9 @@ import TaskItem from "@tiptap/extension-task-item";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import { TableKit } from "@tiptap/extension-table";
+import { TextStyleKit } from "@tiptap/extension-text-style";
+import Underline from "@tiptap/extension-underline";
+import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
 import {
   Bold,
   Italic,
@@ -33,8 +36,10 @@ import { api } from "../lib/api";
 import type { User } from "../lib/types";
 import { EditorChromeContext } from "./chrome";
 import { DatabaseEmbed } from "./databaseEmbed";
+import { Callout } from "./callout";
+import { ColorButton, LinkButton } from "./FormatMenu";
 import { SlashCommand, uploadImage } from "./slash";
-import { PageLink, PageMention } from "./pageLink";
+import { PageBlock, PageLink, PageMention } from "./pageLink";
 import { addNamedColumn } from "./simpleTable";
 
 function showTextBubble({ state }: { state: { selection: { empty: boolean } } }) {
@@ -117,13 +122,23 @@ export function TiptapEditor({
           const parent = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size)).parent;
           if (parent.type.name === "tableHeader") return "列名";
           if (parent.type.name === "tableCell") return "";
-          return "入力するか、'/' でコマンド、'@' でページ";
+          return "入力するか、'/' でコマンド";
         },
       }),
-      Highlight,
+      Highlight.configure({ multicolor: true }),
+      Underline,
+      TextStyleKit.configure({
+        fontFamily: false,
+        fontSize: false,
+        lineHeight: false,
+      }),
       Image.configure({ resize: { enabled: true, minWidth: 80, minHeight: 80 } }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      Details.configure({ persist: true, HTMLAttributes: { class: "arcana-toggle" } }),
+      DetailsSummary,
+      DetailsContent,
+      Callout,
       TableKit.configure({
         table: { resizable: true },
       }),
@@ -134,6 +149,7 @@ export function TiptapEditor({
         onPagesChanged,
       }),
       PageLink,
+      PageBlock,
       PageMention,
       Collaboration.configure({
         document: collab.doc,
@@ -264,6 +280,9 @@ export function TiptapEditor({
           >
             <Code size={14} />
           </button>
+          <span className="bubble-sep" />
+          <LinkButton editor={editor} />
+          <ColorButton editor={editor} />
           <span className="bubble-sep" />
           <button
             type="button"
