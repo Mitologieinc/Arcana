@@ -310,8 +310,8 @@ export function PageEditor({
         )}
       </header>
       {page.coverR2Key && (
-        <div className="group/cover relative h-48 w-full overflow-hidden bg-canvas">
-          <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-full w-full object-cover" />
+        <div className="group/cover relative h-48 w-full bg-canvas">
+          <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-48 w-full object-cover" />
           {editable && (
             <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
               <button
@@ -332,16 +332,24 @@ export function PageEditor({
       )}
       <div
         className={
-          page.type === "database"
-            ? `group pb-32 ${page.coverR2Key ? "pt-0" : "pt-12"}`
-            : `group mx-auto max-w-[900px] pb-40 ${page.coverR2Key ? "pt-0" : "pt-20"}`
+          page.type === "database" ? "group pb-32" : "group mx-auto max-w-[900px] pb-40"
         }
       >
-        <div className="relative mb-1 px-24 max-[860px]:px-6">
+        <div
+          className={`relative px-24 max-[860px]:px-6 ${
+            page.coverR2Key
+              ? page.icon
+                ? "pt-11"
+                : "pt-8"
+              : page.type === "database"
+                ? "pt-12"
+                : "pt-20"
+          }`}
+        >
           {editable && (
             <div
               className={`pointer-events-none absolute left-24 z-[3] flex flex-wrap gap-1 max-[860px]:left-6 ${
-                page.coverR2Key ? "top-3" : "top-0"
+                page.coverR2Key && page.icon ? "top-1" : "top-0"
               } ${iconOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"}`}
             >
               {!page.icon && (
@@ -373,8 +381,10 @@ export function PageEditor({
           )}
           {page.icon ? (
             <button
-              className={`block rounded-xl text-[78px] leading-none transition hover:bg-hover ${
-                page.coverR2Key ? "relative z-[1] -mt-[42px] mb-2" : "mb-1"
+              className={`rounded-xl text-[78px] leading-none transition hover:bg-hover ${
+                page.coverR2Key
+                  ? "absolute left-24 top-[-42px] z-[2] max-[860px]:left-6"
+                  : "mb-1 block"
               }`}
               onClick={() => editable && setIconOpen((v) => !v)}
               disabled={!editable}
@@ -382,10 +392,15 @@ export function PageEditor({
               {page.icon}
             </button>
           ) : (
-            editable && <div className={page.coverR2Key ? "h-12" : "h-8"} />
+            editable && !page.coverR2Key && <div className="h-8" />
           )}
           {iconOpen && (
-            <div className="menu-panel absolute left-24 top-[5.5rem] z-20 w-72 p-2 max-[860px]:left-6" onClick={(e) => e.stopPropagation()}>
+            <div
+              className={`menu-panel absolute left-24 z-20 w-72 p-2 max-[860px]:left-6 ${
+                page.coverR2Key && page.icon ? "top-12" : "top-[5.5rem]"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
               <div className="grid grid-cols-8 gap-0.5">
                 {PAGE_ICONS.map((emo) => (
@@ -408,8 +423,6 @@ export function PageEditor({
               )}
             </div>
           )}
-        </div>
-        <div className="px-24 max-[860px]:px-6">
           <input
             ref={titleRef}
             className="page-title"
