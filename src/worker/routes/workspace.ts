@@ -6,6 +6,8 @@ import * as schema from "../db/schema";
 import { createAuth, getMembership, getSessionUser } from "../auth";
 import type { AppEnv } from "../types";
 import { emailAllowed, normalizeDomains } from "../lib/access";
+import { mailReady, normalizeMailFrom } from "../lib/mail";
+import { consumeEmailOtp, issueEmailOtp, markEmailVerified } from "../lib/verify-email";
 
 const DEFAULT_DB_PROPERTIES = [
   { id: "title", type: "title", name: "名前" },
@@ -31,6 +33,7 @@ workspaceRoutes.get("/api/bootstrap", async (c) => {
     workspaceName: existing[0]?.name ?? null,
     inviteOnly: existing[0]?.inviteOnly ?? false,
     allowedDomains: existing[0]?.allowedDomains ?? "",
+    emailVerification: Boolean(existing[0]?.mailFrom),
     environment: c.env.ENVIRONMENT ?? "local",
   });
 });
@@ -114,7 +117,13 @@ async function createCredentialUser(
 async function bootstrapWorkspace(
   env: Env,
   db: ReturnType<typeof createDb>,
-  input: { workspaceName: string; userId: string; inviteOnly?: boolean; allowedDomains?: string },
+  input: {
+    workspaceName: string;
+    userId: string;
+    inviteOnly?: boolean;
+    allowedDomains?: string;
+    mailFrom?: string;
+  },
 ) {
   const now = new Date();
   const workspaceId = crypto.randomUUID();
@@ -123,6 +132,7 @@ async function bootstrapWorkspace(
     name: input.workspaceName,
     inviteOnly: Boolean(input.inviteOnly),
     allowedDomains: normalizeDomains(input.allowedDomains),
+    mailFrom: input.mailFrom ?? "",
     createdAt: now,
   });
   await db.insert(schema.workspaceMembers).values({
@@ -187,6 +197,54 @@ async function bootstrapWorkspace(
   return { workspaceId, welcomeId };
 }
 
+async function finishRegistration(
+  c: Context<AppEnv>,
+  input: {
+    userId: string;
+    email: string;
+    cookieResponse: Response;
+    extra: Record<string, unknown>;
+    isOwner: boolean;
+    mailFrom: string;
+    workspaceName?: string;
+  },
+) {
+  const headers = new Headers(input.cookieResponse.headers);
+  headers.set("Content-Type", "application/json");
+  const payload = { ok: true, needsVerification: false as boolean, mailWarning: undefined as string | undefined, ...input.extra };
+
+  const db = createDb(c.env.DB);
+  const existing = await db.select().from(schema.user).where(eq(schema.user.id, input.userId)).limit(1);
+  if (existing[0]?.emailVerified) {
+    return new Response(JSON.stringify(payload), { status: 200, headers });
+  }
+
+  if (!mailReady(c.env, input.mailFrom)) {
+    await markEmailVerified(c.env, input.userId);
+    return new Response(JSON.stringify(payload), { status: 200, headers });
+  }
+
+  const sent = await issueEmailOtp(c.env, {
+    email: input.email,
+    mailFrom: input.mailFrom,
+    workspaceName: input.workspaceName,
+    force: true,
+  });
+  if (!sent.ok) {
+    if (input.isOwner) {
+      await markEmailVerified(c.env, input.userId);
+      payload.mailWarning = sent.error;
+      return new Response(JSON.stringify(payload), { status: 200, headers });
+    }
+    payload.needsVerification = true;
+    payload.mailWarning = sent.error;
+    return new Response(JSON.stringify(payload), { status: 200, headers });
+  }
+
+  payload.needsVerification = true;
+  return new Response(JSON.stringify(payload), { status: 200, headers });
+}
+
 async function registerHandler(c: Context<AppEnv>) {
   const db = createDb(c.env.DB);
   const body = await c.req.json<{
@@ -197,6 +255,7 @@ async function registerHandler(c: Context<AppEnv>) {
     inviteToken?: string;
     inviteOnly?: boolean;
     allowedDomains?: string;
+    mailFrom?: string;
   }>();
 
   if (!body.email || !body.password || !body.name) {
@@ -216,15 +275,28 @@ async function registerHandler(c: Context<AppEnv>) {
       password: body.password,
     });
     if ("error" in created) return c.json({ error: created.error }, created.status);
+    let mailFrom = "";
+    try {
+      mailFrom = normalizeMailFrom(body.mailFrom);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "送信元メールが不正です" }, 400);
+    }
     const boot = await bootstrapWorkspace(c.env, db, {
       workspaceName: body.workspaceName.trim(),
       userId: created.userId,
       inviteOnly: body.inviteOnly,
       allowedDomains: body.allowedDomains,
+      mailFrom,
     });
-    const headers = new Headers(created.cookieResponse.headers);
-    headers.set("Content-Type", "application/json");
-    return new Response(JSON.stringify({ ok: true, ...boot }), { status: 200, headers });
+    return finishRegistration(c, {
+      userId: created.userId,
+      email,
+      cookieResponse: created.cookieResponse,
+      extra: boot,
+      isOwner: true,
+      mailFrom,
+      workspaceName: body.workspaceName.trim(),
+    });
   }
 
   const workspace = existingWs[0];
@@ -284,13 +356,48 @@ async function registerHandler(c: Context<AppEnv>) {
     await db.delete(schema.invites).where(eq(schema.invites.id, consumedInviteId));
   }
 
-  const headers = new Headers(created.cookieResponse.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ ok: true, workspaceId }), { status: 200, headers });
+  return finishRegistration(c, {
+    userId: created.userId,
+    email: joinEmail,
+    cookieResponse: created.cookieResponse,
+    extra: { workspaceId },
+    isOwner: false,
+    mailFrom: workspace.mailFrom,
+    workspaceName: workspace.name,
+  });
 }
 
 workspaceRoutes.post("/api/register", registerHandler);
 workspaceRoutes.post("/api/setup", registerHandler);
+
+workspaceRoutes.post("/api/verify-email", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  if (user.emailVerified) return c.json({ ok: true });
+  const body = await c.req.json<{ code?: string }>();
+  const ok = await consumeEmailOtp(c.env, user.email, body.code ?? "");
+  if (!ok) return c.json({ error: "確認コードが違うか、期限切れです" }, 400);
+  return c.json({ ok: true });
+});
+
+workspaceRoutes.post("/api/verify-email/resend", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  if (user.emailVerified) return c.json({ ok: true });
+  const db = createDb(c.env.DB);
+  const ws = await db.select().from(schema.workspaces).limit(1);
+  const mailFrom = ws[0]?.mailFrom ?? "";
+  if (!mailReady(c.env, mailFrom)) {
+    return c.json({ error: "確認メールの送信元が設定されていません。" }, 400);
+  }
+  const sent = await issueEmailOtp(c.env, {
+    email: user.email,
+    mailFrom,
+    workspaceName: ws[0]?.name,
+  });
+  if (!sent.ok) return c.json({ error: sent.error }, sent.status);
+  return c.json({ ok: true });
+});
 
 workspaceRoutes.get("/api/me", async (c) => {
   const user = await getSessionUser(c.env, c.req.raw);
@@ -303,8 +410,13 @@ workspaceRoutes.get("/api/me", async (c) => {
     .from(schema.workspaces)
     .where(eq(schema.workspaces.id, membership.workspaceId))
     .limit(1);
+  const verified = await db
+    .select({ emailVerified: schema.user.emailVerified })
+    .from(schema.user)
+    .where(eq(schema.user.id, user.id))
+    .limit(1);
   return c.json({
-    user,
+    user: { ...user, emailVerified: Boolean(verified[0]?.emailVerified) },
     workspace: ws[0] ? { ...ws[0], role: membership.role } : null,
   });
 });
@@ -343,7 +455,7 @@ workspaceRoutes.patch("/api/workspace", async (c) => {
   if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
     return c.json({ error: "変更する権限がありません" }, 403);
   }
-  const body = await c.req.json<{ name?: string; inviteOnly?: boolean; allowedDomains?: string }>();
+  const body = await c.req.json<{ name?: string; inviteOnly?: boolean; allowedDomains?: string; mailFrom?: string }>();
   const updates: Partial<typeof schema.workspaces.$inferInsert> = {};
   if (body.name !== undefined) {
     const name = body.name.trim();
@@ -352,6 +464,13 @@ workspaceRoutes.patch("/api/workspace", async (c) => {
   }
   if (body.inviteOnly !== undefined) updates.inviteOnly = Boolean(body.inviteOnly);
   if (body.allowedDomains !== undefined) updates.allowedDomains = normalizeDomains(body.allowedDomains);
+  if (body.mailFrom !== undefined) {
+    try {
+      updates.mailFrom = normalizeMailFrom(body.mailFrom);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : "送信元メールが不正です" }, 400);
+    }
+  }
   if (!Object.keys(updates).length) return c.json({ error: "変更がありません" }, 400);
   await db.update(schema.workspaces).set(updates).where(eq(schema.workspaces.id, membership.workspaceId));
   const ws = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, membership.workspaceId)).limit(1);
@@ -518,9 +637,19 @@ workspaceRoutes.post("/api/invites/:token/accept", async (c) => {
 
   await db.delete(schema.invites).where(eq(schema.invites.id, invite.id));
 
-  const headers = new Headers(cookieResponse?.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+  if (!cookieResponse?.ok) {
+    return c.json({ error: "参加に失敗しました" }, 500);
+  }
+
+  return finishRegistration(c, {
+    userId,
+    email,
+    cookieResponse,
+    extra: { workspaceId: invite.workspaceId },
+    isOwner: false,
+    mailFrom: wsRow[0]?.mailFrom ?? "",
+    workspaceName: wsRow[0]?.name,
+  });
 });
 
 export const DEFAULT_DB_PROPERTIES_JSON = JSON.stringify(DEFAULT_DB_PROPERTIES);

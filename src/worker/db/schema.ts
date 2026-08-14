@@ -55,6 +55,7 @@ export const workspaces = sqliteTable("workspaces", {
   name: text("name").notNull(),
   inviteOnly: integer("invite_only", { mode: "boolean" }).notNull().default(false),
   allowedDomains: text("allowed_domains").notNull().default(""),
+  mailFrom: text("mail_from").notNull().default(""),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 

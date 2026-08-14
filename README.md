@@ -14,6 +14,7 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 - 同時編集（Yjs + Durable Objects）
 - メンバー登録、ページ権限、リンク共有
 - パスキー（WebAuthn）ログイン
+- 登録時のメール確認（Cloudflare Email Sending）
 - メンバー数の上限なし（ゲストも席として数えない）
 
 ## 環境の切り方
@@ -36,6 +37,16 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 - 設定から発行した招待リンク（`/signup?invite=<token>`）は、メールと役割を先に決める任意の近道
 
 インスタンスをインターネットに出す場合は、Cloudflare Access などで手前を守ってください。
+
+## 登録時のメール確認
+
+招待メールの一斉送信はしません。代わりに、登録したアドレスへ 6 桁の確認コードを送ります。
+
+1. 独自ドメインを Cloudflare Email Sending に載せる: `npx wrangler email sending enable yourdomain.com`
+2. 初期設定または 設定 → チーム で送信元（例: `noreply@yourdomain.com`）を入れる
+3. 以降の新規登録は、届いたコードを入力するまでワークスペースに入れません
+
+`workers.dev` からは送れません。送信元が空のときは確認コードを送らず、従来どおりすぐ参加できます。オーナー初回セットアップで送信に失敗した場合は、閉じ込めないよう確認をスキップします。
 
 ## 必要環境
 
