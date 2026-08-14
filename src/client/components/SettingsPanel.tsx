@@ -112,7 +112,7 @@ export function SettingsPanel({
             パスキーを追加
           </button>
           {pkError && <p className="mb-3 text-[13px] text-danger">{pkError}</p>}
-          <ul className="divide-y divide-line border border-line">
+          <ul className="divide-y divide-line overflow-hidden rounded-[8px] border border-line">
             {passkeys.length === 0 && (
               <li className="px-3 py-6 text-center text-[13px] text-muted">まだパスキーはありません</li>
             )}
@@ -135,8 +135,8 @@ export function SettingsPanel({
 
       {tab === "team" && (
         <div>
-          <p className="mb-4 text-[13px] text-muted">席の上限はありません。何人招待してもアプリ側の課金は増えません。</p>
-          <ul className="mb-4 divide-y divide-line border border-line">
+          <p className="mb-4 text-[13px] text-muted">メンバー数に上限はありません。</p>
+          <ul className="mb-4 divide-y divide-line overflow-hidden rounded-[8px] border border-line">
             {members.map((m) => (
               <li key={m.userId} className="flex items-center justify-between px-3 py-2.5 text-[13px]">
                 <span>

@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { Brand, BrandMark } from "../components/Brand";
+import { Brand } from "../components/Brand";
 
 function Field({
   label,
@@ -36,30 +36,15 @@ function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full">
-      <aside className="hidden w-[42%] flex-col justify-between bg-ink px-10 py-10 text-white lg:flex">
-        <BrandMark size={22} />
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cf">No seat licenses</p>
-          <h2 className="mt-3 max-w-sm text-[32px] font-semibold leading-tight tracking-tight">
-            チームが増えても、Wiki代は増えない。
-          </h2>
-          <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-white/60">
-            Cloudflare の従量課金だけで動くセルフホスト Notion。パスキーでログインし、ページ・DB・同時編集まで一箇所に。
-          </p>
+    <div className="flex min-h-full items-center justify-center bg-white px-6 py-16">
+      <div className="w-full max-w-[320px]">
+        <div className="mb-8 flex justify-center">
+          <Brand compact />
         </div>
-        <p className="text-[11px] text-white/35">Built for the edge · Workers · D1 · R2</p>
-      </aside>
-      <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-12">
-        <div className="w-full max-w-[400px]">
-          <div className="mb-8 lg:hidden">
-            <Brand />
-          </div>
-          <h1 className="text-[26px] font-semibold tracking-tight">{title}</h1>
-          {kicker && <p className="mt-2 text-[13px] leading-relaxed text-muted">{kicker}</p>}
-          <div className="mt-8">{children}</div>
-        </div>
-      </main>
+        <h1 className="text-center text-[22px] font-semibold tracking-tight">{title}</h1>
+        {kicker && <p className="mt-2 text-center text-[14px] leading-relaxed text-muted">{kicker}</p>}
+        <div className="mt-7">{children}</div>
+      </div>
     </div>
   );
 }
@@ -122,7 +107,7 @@ export function LoginPage() {
   return (
     <AuthLayout title="ログイン" kicker="パスキー、またはメールとパスワード。">
       {needsSetup && (
-        <p className="mb-5 border border-line bg-white px-3 py-2.5 text-[13px]">
+        <p className="mb-5 rounded-[6px] bg-canvas px-3 py-2.5 text-[13px]">
           この環境はまだ空です。最初のオーナーとして{" "}
           <Link className="font-semibold text-cf" to="/signup">
             アカウントを作成
@@ -225,7 +210,7 @@ export function SignupPage() {
     needsSetup === null
       ? "環境を確認しています。"
       : needsSetup
-        ? "この Cloudflare 環境の最初のアカウントがオーナーになります。人数に上限はありません。"
+        ? "最初のアカウントがオーナーになります。"
         : inviteInfo
           ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
           : workspaceName

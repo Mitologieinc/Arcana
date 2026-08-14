@@ -92,7 +92,7 @@ export function DatabaseView({
         {views.map((v) => (
           <button
             key={v.id}
-            className={`h-8 px-3 text-[13px] ${v.id === view.id ? "border-b-2 border-cf font-medium" : "text-muted hover:text-ink"}`}
+            className={`h-8 px-3 text-[14px] ${v.id === view.id ? "border-b-2 border-cf font-medium" : "text-muted hover:text-ink"}`}
             onClick={() => setViewId(v.id)}
           >
             {v.name}
@@ -127,14 +127,14 @@ export function DatabaseView({
           {(statusProp.options ?? []).map((opt) => {
             const colRows = filtered.filter((r) => String(parseProps(r)[statusProp.id] ?? "todo") === opt.id);
             return (
-              <div key={opt.id} className="min-w-56 border border-line bg-canvas p-2">
-                <div className="mb-2 px-1 text-xs font-medium text-muted">
+              <div key={opt.id} className="min-w-56 rounded-[8px] bg-canvas p-2">
+                <div className="mb-2 px-1 text-[12px] font-medium text-muted">
                   {opt.name} · {colRows.length}
                 </div>
                 {colRows.map((row) => (
                   <button
                     key={row.id}
-                    className="mb-2 w-full border border-line bg-white p-2 text-left text-[13px]"
+                    className="mb-2 w-full rounded-[6px] bg-white p-2.5 text-left text-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-[#fafafa]"
                     onClick={() => onOpenRow(row.id)}
                   >
                     {row.icon} {row.title || "無題"}
@@ -145,7 +145,7 @@ export function DatabaseView({
           })}
         </div>
       ) : (
-        <div className="overflow-auto rounded-lg border border-line">
+        <div className="overflow-auto rounded-[8px] border border-line">
           <table className="w-full text-sm">
             <thead className="bg-canvas text-left text-[12px] text-muted">
               <tr>

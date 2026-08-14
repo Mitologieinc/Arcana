@@ -93,7 +93,7 @@ export function ShareDialog({ page, onClose }: Props) {
       </div>
       {copied && <p className="mb-2 break-all text-[12px] text-cf">コピーしました: {copied}</p>}
       {links.length > 0 && (
-        <ul className="max-h-40 divide-y divide-line overflow-auto border border-line text-[13px]">
+        <ul className="max-h-40 divide-y divide-line overflow-auto rounded-[8px] border border-line text-[13px]">
           {links.map((l) => (
             <li key={l.id} className="flex items-center justify-between px-3 py-2">
               <span>

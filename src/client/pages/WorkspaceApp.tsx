@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Fingerprint, LogOut, Plus, Search, Settings } from "lucide-react";
+import { LogOut, Plus, Search, Settings } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import type { Member, Page, User, Workspace } from "../lib/types";
@@ -8,7 +8,12 @@ import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
-import { BrandMark } from "../components/Brand";
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const s = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  return (s || name.slice(0, 1) || "?").toUpperCase();
+}
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
@@ -74,41 +79,38 @@ export function WorkspaceApp() {
 
   if (!ready || !user || !workspace) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas text-[13px] text-muted">
-        Loading
-      </div>
+      <div className="flex h-full items-center justify-center bg-white text-[14px] text-muted">読み込み中…</div>
     );
   }
 
   return (
     <div className="flex h-full bg-white">
-      <aside className="flex w-[248px] shrink-0 flex-col border-r border-line bg-sidebar">
-        <div className="flex items-center gap-2.5 px-4 py-4">
-          <BrandMark />
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold tracking-tight">{workspace.name}</div>
-            <div className="text-[11px] text-muted">Unlimited seats</div>
-          </div>
-        </div>
+      <aside className="flex w-[240px] shrink-0 flex-col bg-sidebar px-1.5 py-2">
         <button
-          className="mx-3 mb-3 flex h-9 items-center gap-2 border border-line bg-white px-3 text-left text-[13px] text-muted"
-          onClick={() => setSearchOpen(true)}
+          className="sidebar-item mb-1.5 h-10 px-2 font-medium"
+          onClick={() => nav("/")}
+          title={workspace.name}
         >
-          <Search size={14} />
-          検索
-          <span className="ml-auto font-mono text-[10px] text-muted/80">⌘K</span>
+          <span className="cf-mark" style={{ width: 22, height: 22, fontSize: 12 }}>
+            {workspace.name.slice(0, 1)}
+          </span>
+          <span className="min-w-0 truncate">{workspace.name}</span>
         </button>
-        <div className="flex gap-1 px-3 pb-3">
-          <button className="btn btn-secondary h-8 flex-1 px-2 text-[12px]" onClick={() => createPage(null, "page")}>
-            <Plus size={12} />
-            ページ
-          </button>
-          <button className="btn btn-secondary h-8 flex-1 px-2 text-[12px]" onClick={() => createPage(null, "database")}>
-            <Plus size={12} />
-            DB
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto px-2 pb-3">
+        <button className="sidebar-item text-muted" onClick={() => setSearchOpen(true)}>
+          <Search size={16} />
+          検索
+          <span className="ml-auto text-[11px] text-[#c4c2bc]">⌘K</span>
+        </button>
+        <button className="sidebar-item text-muted" onClick={() => createPage(null, "page")}>
+          <Plus size={16} />
+          新規ページ
+        </button>
+        <button className="sidebar-item mb-2 text-muted" onClick={() => createPage(null, "database")}>
+          <Plus size={16} />
+          新規データベース
+        </button>
+        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-muted">ページ</div>
+        <div className="flex-1 overflow-auto px-0.5 pb-2">
           <SidebarTree
             pages={pages}
             currentId={pageId}
@@ -117,24 +119,20 @@ export function WorkspaceApp() {
           />
         </div>
         {passkeyCount === 0 && (
-          <button
-            className="mx-3 mb-2 flex items-start gap-2 border border-cf/30 bg-[#fff7f0] px-3 py-2 text-left text-[12px]"
-            onClick={openSettings}
-          >
-            <Fingerprint size={14} className="mt-0.5 text-cf" />
-            <span>
-              <span className="font-semibold">パスキーを追加</span>
-              <span className="mt-0.5 block text-muted">パスワードなしでログイン</span>
-            </span>
+          <button className="sidebar-item mb-1 text-[12px] text-muted" onClick={openSettings}>
+            パスキーを追加
           </button>
         )}
-        <div className="flex items-center border-t border-line px-2 py-2">
-          <button className="btn-ghost flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left" onClick={openSettings}>
-            <Settings size={14} className="text-muted" />
-            <span className="min-w-0 truncate text-[12px]">{user.name}</span>
+        <div className="flex items-center gap-0.5 pb-1">
+          <button className="sidebar-item min-w-0 flex-1" onClick={openSettings}>
+            <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#d3e5ef] text-[10px] font-semibold text-[#37352f]">
+              {initials(user.name)}
+            </span>
+            <span className="min-w-0 truncate">{user.name}</span>
+            <Settings size={14} className="ml-auto shrink-0 text-muted" />
           </button>
           <button
-            className="btn-ghost p-2 text-muted"
+            className="btn-ghost h-[30px] w-[30px] p-0 text-muted"
             title="ログアウト"
             onClick={async () => {
               await authClient.signOut();
@@ -151,25 +149,46 @@ export function WorkspaceApp() {
             key={pageId}
             pageId={pageId}
             user={user}
+            pages={pages}
             fallback={current}
             onPagesChanged={refresh}
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
-          <div className="mx-auto max-w-xl px-10 py-24">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cf">Workspace</p>
-            <h1 className="mt-2 text-[32px] font-semibold tracking-tight">{workspace.name}</h1>
-            <p className="mt-3 text-[14px] leading-relaxed text-muted">
-              左からページを開くか、新しく作成してください。メンバー数に上限はありません。
-            </p>
-            <div className="mt-6 flex gap-2">
-              <button className="btn btn-primary" onClick={() => createPage(null, "page")}>
-                ページを作成
+          <div className="mx-auto max-w-2xl px-16 py-28">
+            <p className="text-[32px] font-bold tracking-tight">こんにちは、{user.name}</p>
+            <p className="mt-2 text-[16px] text-muted">左のサイドバーからページを開くか、新しく書き始めてください。</p>
+            <div className="mt-8 flex flex-wrap gap-2">
+              <button className="btn btn-secondary" onClick={() => createPage(null, "page")}>
+                <Plus size={16} />
+                新規ページ
               </button>
               <button className="btn btn-secondary" onClick={() => createPage(null, "database")}>
-                データベース
+                <Plus size={16} />
+                新規データベース
               </button>
             </div>
+            {pages.length > 0 && (
+              <div className="mt-12">
+                <p className="mb-2 text-[12px] font-medium text-muted">ジャンプ</p>
+                <ul>
+                  {pages
+                    .filter((p) => !p.parentId)
+                    .slice(0, 8)
+                    .map((p) => (
+                      <li key={p.id}>
+                        <button
+                          className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[14px] hover:bg-hover"
+                          onClick={() => nav(`/page/${p.id}`)}
+                        >
+                          <span>{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
+                          <span className="truncate">{p.title || "無題"}</span>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </main>

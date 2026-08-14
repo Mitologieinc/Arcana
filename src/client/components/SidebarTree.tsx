@@ -18,7 +18,7 @@ export function SidebarTree({ pages, currentId, onOpen, onCreateChild }: Props) 
   return (
     <div>
       {roots.length === 0 && (
-        <p className="px-2 py-6 text-center text-[12px] text-muted">ページはまだありません</p>
+        <p className="px-2 py-4 text-[12px] text-muted">ページはまだありません</p>
       )}
       {roots.map((p) => (
         <TreeNode
@@ -57,22 +57,26 @@ function TreeNode({
   return (
     <div>
       <div
-        className={`group flex items-center pr-1 text-[13px] ${active ? "bg-white shadow-[inset_2px_0_0_#f6821f]" : "hover:bg-white/80"}`}
-        style={{ paddingLeft: 6 + depth * 12 }}
+        className={`group flex h-[30px] items-center rounded-[6px] pr-1 text-[14px] ${active ? "bg-hover" : "hover:bg-hover"}`}
+        style={{ paddingLeft: 4 + depth * 12 }}
       >
-        <button className="p-1 text-muted" onClick={() => setOpen((v) => !v)} aria-label="展開">
-          <ChevronRight size={12} className={open && children.length ? "rotate-90" : ""} />
+        <button
+          className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="展開"
+        >
+          <ChevronRight size={14} className={open && children.length ? "rotate-90" : "opacity-50"} />
         </button>
-        <button className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left" onClick={() => onOpen(page.id)}>
-          <span className="text-[12px]">{page.icon || (page.type === "database" ? "▦" : "▪")}</span>
-          <span className="truncate">{page.title || "無題"}</span>
+        <button className="flex min-w-0 flex-1 items-center gap-1.5 px-0.5 text-left" onClick={() => onOpen(page.id)}>
+          <span className="text-[14px] leading-none">{page.icon || (page.type === "database" ? "🗃️" : "📄")}</span>
+          <span className="truncate text-[#37352f]">{page.title || "無題"}</span>
         </button>
         <button
-          className="hidden rounded p-1 text-muted group-hover:block"
+          className="hidden h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5 group-hover:flex"
           onClick={() => onCreateChild(page.id)}
-          title="子ページ"
+          title="子ページを追加"
         >
-          <Plus size={12} />
+          <Plus size={14} />
         </button>
       </div>
       {open &&

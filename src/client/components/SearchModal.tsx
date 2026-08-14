@@ -29,35 +29,36 @@ export function SearchModal({
   }, [q]);
 
   return (
-    <Modal title="検索" onClose={onClose} wide>
-      <div className="mb-3 flex items-center gap-2 border border-line px-3">
-        <Search size={14} className="text-muted" />
+    <Modal title="検索" onClose={onClose} wide hideHeader>
+      <div className="flex items-center gap-2 border-b border-line px-3">
+        <Search size={16} className="text-muted" />
         <input
           autoFocus
-          className="h-10 flex-1 border-none bg-transparent text-[14px] outline-none"
-          placeholder="ページ名または本文"
+          className="h-12 flex-1 border-none bg-transparent text-[16px] outline-none"
+          placeholder="ページを検索…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
-      <ul className="max-h-80 overflow-auto">
+      <ul className="max-h-80 overflow-auto py-1">
         {results.map((r) => (
           <li key={r.id}>
             <button
-              className="flex w-full items-start gap-2 px-2 py-2 text-left text-[13px] hover:bg-canvas"
+              className="flex w-full items-start gap-2 rounded-[6px] px-3 py-2 text-left text-[14px] hover:bg-hover"
               onClick={() => onOpen(r.id)}
             >
-              <span>{r.icon || "▪"}</span>
+              <span>{r.icon || (r.type === "database" ? "🗃️" : "📄")}</span>
               <span>
-                <span className="block font-medium">{r.title || "無題"}</span>
-                {r.snippet && <span className="block text-[12px] text-muted">{r.snippet}</span>}
+                <span className="block">{r.title || "無題"}</span>
+                {r.snippet && <span className="mt-0.5 block text-[12px] text-muted">{r.snippet}</span>}
               </span>
             </button>
           </li>
         ))}
         {q && results.length === 0 && (
-          <li className="px-2 py-8 text-center text-[13px] text-muted">見つかりませんでした</li>
+          <li className="px-3 py-8 text-center text-[14px] text-muted">見つかりませんでした</li>
         )}
+        {!q && <li className="px-3 py-6 text-center text-[13px] text-muted">ページ名や本文で探せます</li>}
       </ul>
     </Modal>
   );
