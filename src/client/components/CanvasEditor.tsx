@@ -122,6 +122,16 @@ export function CanvasEditor({
   onPresence?: (users: PresenceUser[]) => void;
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const worldRef = useRef<HTMLDivElement>(null);
+  const dotsRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const zoomLabelRef = useRef<HTMLSpanElement>(null);
+  const camRef = useRef({ x: 48, y: 48, z: 1 });
+  const nodesRef = useRef<JamNode[]>([]);
+  const awareRaf = useRef<number | null>(null);
+  const camRaf = useRef<number | null>(null);
+  const camSync = useRef<number | null>(null);
+  const cursorBuf = useRef({ x: 0, y: 0 });
   const drag = useRef<null | {
     mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape" | "resize" | "port";
     x: number;
@@ -153,8 +163,8 @@ export function CanvasEditor({
   const [cursors, setCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [lineHover, setLineHover] = useState<{ x: number; y: number } | null>(null);
-  const [ghost, setGhost] = useState<null | { kind: "sticky" | "shape" | "text"; x: number; y: number; w: number; h: number }>(null);
   const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
+  const [busy, setBusy] = useState(false);
 
   const collab = useMemo(() => {
     const doc = new Y.Doc();
@@ -164,7 +174,7 @@ export function CanvasEditor({
     const provider = new WebsocketProvider(`${proto}//${location.host}/api/collab`, pageId, doc, { params });
     const map = doc.getMap<JamNode>("jam.nodes");
     const order = doc.getArray<string>("jam.order");
-    const undo = new Y.UndoManager([map, order]);
+    const undo = new Y.UndoManager([map, order], { trackedOrigins: new Set([ORIGIN]), captureTimeout: 400 });
     return { doc, provider, map, order, undo };
   }, [pageId, shareToken]);
 
@@ -185,7 +195,9 @@ export function CanvasEditor({
   }
 
   function refresh() {
-    setNodes(pull());
+    const next = pull();
+    nodesRef.current = next;
+    setNodes(next);
   }
 
   function put(n: JamNode, atEnd = true) {
@@ -194,16 +206,66 @@ export function CanvasEditor({
       const ids = collab.order.toArray();
       if (!ids.includes(n.id) && atEnd) collab.order.push([n.id]);
     }, ORIGIN);
-    refresh();
+    nodesRef.current = [...nodesRef.current.filter((x) => x.id !== n.id), n];
+    setNodes(nodesRef.current);
   }
 
-  function patch(id: string, partial: Partial<JamNode>) {
-    const cur = collab.map.get(id);
+  function patch(id: string, partial: Partial<JamNode>, sync = true) {
+    const cur = (nodesRef.current.find((n) => n.id === id) ?? collab.map.get(id)) as JamNode | undefined;
     if (!isJam(cur)) return;
+    const next = { ...cur, ...partial };
+    nodesRef.current = nodesRef.current.map((n) => (n.id === id ? next : n));
+    setNodes(nodesRef.current);
+    if (!sync) return;
     collab.doc.transact(() => {
-      collab.map.set(id, clone({ ...cur, ...partial }));
+      collab.map.set(id, clone(next));
     }, ORIGIN);
-    refresh();
+  }
+
+  function paintCam(c: { x: number; y: number; z: number }, commit = false) {
+    camRef.current = c;
+    if (worldRef.current) worldRef.current.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.z})`;
+    if (dotsRef.current) {
+      dotsRef.current.style.backgroundSize = `${24 * c.z}px ${24 * c.z}px`;
+      dotsRef.current.style.backgroundPosition = `${c.x}px ${c.y}px`;
+    }
+    if (zoomLabelRef.current) zoomLabelRef.current.textContent = `${Math.round(c.z * 100)}%`;
+    if (commit) {
+      if (camSync.current) window.clearTimeout(camSync.current);
+      setCam(c);
+      return;
+    }
+    if (camSync.current) window.clearTimeout(camSync.current);
+    camSync.current = window.setTimeout(() => {
+      camSync.current = null;
+      setCam({ ...camRef.current });
+    }, 120);
+  }
+
+  function paintGhost(g: { kind: "sticky" | "shape" | "text"; x: number; y: number; w: number; h: number } | null) {
+    const el = ghostRef.current;
+    if (!el) return;
+    if (!g) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.style.left = `${g.x}px`;
+    el.style.top = `${g.y}px`;
+    el.style.width = `${g.w}px`;
+    el.style.height = `${g.h}px`;
+    el.style.background = g.kind === "sticky" ? stickyColor : g.kind === "shape" ? "#fff" : "transparent";
+    el.style.borderColor = g.kind === "shape" ? SHAPE_STROKE : "transparent";
+    el.className = `jam-ghost ${g.kind === "sticky" ? "jam-sticky" : g.kind === "text" ? "jam-label" : `jam-shape is-${shapeKind}`}`;
+  }
+
+  function sendCursor(w: { x: number; y: number }) {
+    cursorBuf.current = w;
+    if (awareRaf.current != null) return;
+    awareRaf.current = requestAnimationFrame(() => {
+      awareRaf.current = null;
+      collab.provider.awareness.setLocalStateField("jam", cursorBuf.current);
+    });
   }
 
   function removeIds(ids: string[]) {
@@ -267,7 +329,10 @@ export function CanvasEditor({
         }
       });
       onPresence?.(others);
-      setCursors(next);
+      setCursors((prev) => {
+        if (prev.length === next.length && prev.every((c, i) => c.id === next[i].id && c.x === next[i].x && c.y === next[i].y)) return prev;
+        return next;
+      });
     };
     awareness.on("change", report);
     collab.provider.on("status", report);
@@ -281,27 +346,29 @@ export function CanvasEditor({
   useEffect(() => {
     if (indexTimer.current) window.clearTimeout(indexTimer.current);
     indexTimer.current = window.setTimeout(() => {
-      const bodyText = pull()
+      const bodyText = nodesRef.current
         .map((n) => n.text)
         .filter(Boolean)
         .join(" ");
       void api(`/api/pages/${pageId}/index`, { method: "POST", body: JSON.stringify({ title, bodyText }) });
-    }, 1500);
-  }, [nodes, pageId, title]);
+    }, 4000);
+  }, [pageId, title, nodes.length]);
 
   function worldFromClient(clientX: number, clientY: number) {
     const r = boardRef.current?.getBoundingClientRect();
+    const c = camRef.current;
     return {
-      x: (clientX - (r?.left ?? 0) - cam.x) / cam.z,
-      y: (clientY - (r?.top ?? 0) - cam.y) / cam.z,
+      x: (clientX - (r?.left ?? 0) - c.x) / c.z,
+      y: (clientY - (r?.top ?? 0) - c.y) / c.z,
     };
   }
 
   const activeTool: Tool = space || tool === "hand" ? "hand" : !editable ? "select" : tool;
 
   function topAt(x: number, y: number) {
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      if (hit(nodes[i], x, y)) return nodes[i];
+    const list = nodesRef.current;
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (hit(list[i], x, y)) return list[i];
     }
     return null;
   }
@@ -317,7 +384,7 @@ export function CanvasEditor({
 
   function backToSelect() {
     setTool("select");
-    setGhost(null);
+    paintGhost(null);
   }
 
   function duplicateIds(ids: string[], dx = 24, dy = 24) {
@@ -374,7 +441,8 @@ export function CanvasEditor({
     if (!isJam(n)) return;
     setLineFrom(id);
     setLineHover(center(n));
-    drag.current = { mode: "port", x: 0, y: 0, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id, side };
+    drag.current = { mode: "port", x: 0, y: 0, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id, side };
+    setBusy(true);
     boardRef.current?.setPointerCapture(e.pointerId);
   }
 
@@ -384,7 +452,8 @@ export function CanvasEditor({
     const n = collab.map.get(id);
     if (!isJam(n)) return;
     const w = worldFromClient(e.clientX, e.clientY);
-    drag.current = { mode: "resize", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id, handle, ow: n.w, oh: n.h };
+    drag.current = { mode: "resize", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id, handle, ow: n.w, oh: n.h };
+    setBusy(true);
     boardRef.current?.setPointerCapture(e.pointerId);
   }
 
@@ -393,19 +462,16 @@ export function CanvasEditor({
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const c = camRef.current;
       if (e.ctrlKey || e.metaKey) {
         const r = el.getBoundingClientRect();
         const sx = e.clientX - r.left;
         const sy = e.clientY - r.top;
-        setCam((c) => {
-          const z = Math.min(3.5, Math.max(0.2, c.z * (e.deltaY > 0 ? 0.92 : 1.08)));
-          const wx = (sx - c.x) / c.z;
-          const wy = (sy - c.y) / c.z;
-          return { z, x: sx - wx * z, y: sy - wy * z };
-        });
+        const z = Math.min(3.5, Math.max(0.2, c.z * (e.deltaY > 0 ? 0.92 : 1.08)));
+        paintCam({ z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z });
         return;
       }
-      setCam((c) => ({ ...c, x: c.x - e.deltaX, y: c.y - e.deltaY }));
+      paintCam({ ...c, x: c.x - e.deltaX, y: c.y - e.deltaY });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -425,13 +491,14 @@ export function CanvasEditor({
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (overUi(e.target)) return;
     if (e.button === 1 || activeTool === "hand") {
-      drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY };
+      drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
-      setGhost(null);
+      paintGhost(null);
+      setBusy(true);
       return;
     }
     const w = worldFromClient(e.clientX, e.clientY);
-    collab.provider.awareness.setLocalStateField("jam", w);
+    sendCursor(w);
     if (!editable) return;
     if (editing && (e.target as HTMLElement).tagName !== "TEXTAREA") setEditing(null);
 
@@ -470,8 +537,9 @@ export function CanvasEditor({
       };
       put(n);
       setSelected([n.id]);
-      setGhost(null);
-      drag.current = { mode: "shape", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      paintGhost(null);
+      setBusy(true);
+      drag.current = { mode: "shape", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id: n.id };
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -508,7 +576,8 @@ export function CanvasEditor({
         points: [{ x: w.x, y: w.y }],
       };
       put(n);
-      drag.current = { mode: "pen", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      drag.current = { mode: "pen", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      setBusy(true);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -518,7 +587,8 @@ export function CanvasEditor({
       setLineFrom(t.id);
       setLineHover(w);
       setSelected([t.id]);
-      drag.current = { mode: "line", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY, id: t.id };
+      drag.current = { mode: "line", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id: t.id };
+      setBusy(true);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -546,36 +616,35 @@ export function CanvasEditor({
         mode: "move",
         x: w.x,
         y: w.y,
-        cx: cam.x,
-        cy: cam.y,
+        cx: camRef.current.x,
+        cy: camRef.current.y,
         sx: e.clientX,
         sy: e.clientY,
         ids: idsMove,
         origin,
         editOnUp: already,
       };
+      setBusy(true);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
     setSelected([]);
     setLineFrom(null);
-    drag.current = { mode: "marquee", x: w.x, y: w.y, cx: cam.x, cy: cam.y, sx: e.clientX, sy: e.clientY };
+    drag.current = { mode: "marquee", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
     setMarquee({ x: w.x, y: w.y, w: 0, h: 0 });
+    setBusy(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const w = worldFromClient(e.clientX, e.clientY);
-    collab.provider.awareness.setLocalStateField("jam", w);
+    sendCursor(w);
     const d = drag.current;
-    if (!d && editable && !overUi(e.target)) {
-      setGhost(ghostAt(activeTool, w));
-    } else if (!d) {
-      setGhost(null);
-    }
+    if (!d && editable && !overUi(e.target)) paintGhost(ghostAt(activeTool, w));
+    else if (!d) paintGhost(null);
     if (!d) return;
     if (d.mode === "pan") {
-      setCam({ ...cam, x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y) });
+      paintCam({ x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y), z: camRef.current.z });
       return;
     }
     if (d.mode === "move" && d.ids && d.origin) {
@@ -585,18 +654,17 @@ export function CanvasEditor({
           moveRaf.current = null;
           const p = pendingMove.current;
           if (!p) return;
-          for (const id of p.ids) {
-            const o = p.origin[id];
-            if (o) patch(id, { x: o.x + p.dx, y: o.y + p.dy });
-          }
+          nodesRef.current = nodesRef.current.map((n) => {
+            const o = p.origin[n.id];
+            return o ? { ...n, x: o.x + p.dx, y: o.y + p.dy } : n;
+          });
+          setNodes(nodesRef.current);
         });
       }
       return;
     }
     if (d.mode === "shape" && d.id) {
-      const x = Math.min(d.x, w.x);
-      const y = Math.min(d.y, w.y);
-      patch(d.id, { x, y, w: Math.max(1, Math.abs(w.x - d.x)), h: Math.max(1, Math.abs(w.y - d.y)) });
+      patch(d.id, { x: Math.min(d.x, w.x), y: Math.min(d.y, w.y), w: Math.max(1, Math.abs(w.x - d.x)), h: Math.max(1, Math.abs(w.y - d.y)) }, false);
       return;
     }
     if (d.mode === "resize" && d.id && d.handle) {
@@ -604,50 +672,63 @@ export function CanvasEditor({
       const dy = w.y - d.y;
       const ow = d.ow ?? 160;
       const oh = d.oh ?? 160;
-      if (d.handle === "se") patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) });
-      else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) });
-      else patch(d.id, { h: Math.max(80, oh + dy) });
+      if (d.handle === "se") patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) }, false);
+      else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) }, false);
+      else patch(d.id, { h: Math.max(80, oh + dy) }, false);
       return;
     }
-    if (d.mode === "port") {
-      setLineHover(w);
-      return;
-    }
-    if (d.mode === "line") {
+    if (d.mode === "port" || d.mode === "line") {
       setLineHover(w);
       return;
     }
     if (d.mode === "pen" && d.id) {
-      const cur = collab.map.get(d.id);
+      const cur = nodesRef.current.find((n) => n.id === d.id);
       if (!isJam(cur) || !cur.points) return;
       const last = cur.points[cur.points.length - 1];
-      if (last && Math.hypot(w.x - last.x, w.y - last.y) < 2) return;
-      patch(d.id, { points: [...cur.points, { x: w.x, y: w.y }] });
+      if (last && Math.hypot(w.x - last.x, w.y - last.y) < 3) return;
+      patch(d.id, { points: [...cur.points, { x: w.x, y: w.y }] }, false);
       return;
     }
     if (d.mode === "marquee") {
-      const x = Math.min(d.x, w.x);
-      const y = Math.min(d.y, w.y);
-      setMarquee({ x, y, w: Math.abs(w.x - d.x), h: Math.abs(w.y - d.y) });
+      setMarquee({ x: Math.min(d.x, w.x), y: Math.min(d.y, w.y), w: Math.abs(w.x - d.x), h: Math.abs(w.y - d.y) });
     }
   }
 
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
     const d = drag.current;
     const w = worldFromClient(e.clientX, e.clientY);
+    if (d?.mode === "pan") setCam({ ...camRef.current });
     if (d?.mode === "marquee" && marquee) {
-      const hits = nodes.filter((n) => n.kind !== "line" && n.kind !== "pen" && n.x < marquee.x + marquee.w && n.y < marquee.y + marquee.h && n.x + n.w > marquee.x && n.y + n.h > marquee.y).map((n) => n.id);
+      const hits = nodesRef.current.filter((n) => n.kind !== "line" && n.kind !== "pen" && n.x < marquee.x + marquee.w && n.y < marquee.y + marquee.h && n.x + n.w > marquee.x && n.y + n.h > marquee.y).map((n) => n.id);
       setSelected(hits);
     }
+    if (d?.mode === "move" && d.ids && d.origin) {
+      const dx = w.x - d.x;
+      const dy = w.y - d.y;
+      collab.doc.transact(() => {
+        for (const id of d.ids!) {
+          const cur = collab.map.get(id);
+          const o = d.origin![id];
+          if (isJam(cur) && o) collab.map.set(id, clone({ ...cur, x: o.x + dx, y: o.y + dy }));
+        }
+      }, ORIGIN);
+    }
     if (d?.mode === "shape" && d.id) {
-      const cur = collab.map.get(d.id);
-      if (isJam(cur) && (cur.w < 24 || cur.h < 24)) {
-        patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
-      }
+      const cur = nodesRef.current.find((n) => n.id === d.id);
+      if (isJam(cur) && (cur.w < 24 || cur.h < 24)) patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
+      else if (isJam(cur)) patch(d.id, { x: cur.x, y: cur.y, w: cur.w, h: cur.h });
       backToSelect();
     }
+    if (d?.mode === "resize" && d.id) {
+      const cur = nodesRef.current.find((n) => n.id === d.id);
+      if (isJam(cur)) patch(d.id, { x: cur.x, y: cur.y, w: cur.w, h: cur.h });
+    }
+    if (d?.mode === "pen" && d.id) {
+      const cur = nodesRef.current.find((n) => n.id === d.id);
+      if (isJam(cur)) patch(d.id, { points: cur.points });
+    }
     if (d?.mode === "port" && d.id && d.side) {
-      const src = collab.map.get(d.id);
+      const src = nodesRef.current.find((n) => n.id === d.id) ?? collab.map.get(d.id);
       if (isJam(src) && src.kind !== "line" && src.kind !== "pen") {
         const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 10;
         spawnBeside(src, d.side, moved, moved ? { x: w.x - src.w / 2, y: w.y - src.h / 2 } : undefined);
@@ -672,13 +753,14 @@ export function CanvasEditor({
       }
     }
     if (d?.mode === "move" && d.editOnUp && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
-      const n = collab.map.get(d.ids[0]);
-      if (isJam(n) && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
+      const n = nodesRef.current.find((x) => x.id === d.ids![0]);
+      if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
     }
     drag.current = null;
     setMarquee(null);
     setLineFrom(null);
     setLineHover(null);
+    setBusy(false);
   }
 
   useEffect(() => {
@@ -764,17 +846,16 @@ export function CanvasEditor({
 
   function zoomBy(factor: number) {
     const el = boardRef.current;
+    const c = camRef.current;
     if (!el) {
-      setCam((c) => ({ ...c, z: Math.min(3.5, Math.max(0.2, c.z * factor)) }));
+      paintCam({ ...c, z: Math.min(3.5, Math.max(0.2, c.z * factor)) }, true);
       return;
     }
     const r = el.getBoundingClientRect();
     const sx = r.width / 2;
     const sy = r.height / 2;
-    setCam((c) => {
-      const z = Math.min(3.5, Math.max(0.2, c.z * factor));
-      return { z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z };
-    });
+    const z = Math.min(3.5, Math.max(0.2, c.z * factor));
+    paintCam({ z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z }, true);
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -795,16 +876,17 @@ export function CanvasEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setGhost(null)}
+        onPointerLeave={() => paintGhost(null)}
       >
       <div
+        ref={dotsRef}
         className="jam-dots"
         style={{
           backgroundSize: `${24 * cam.z}px ${24 * cam.z}px`,
           backgroundPosition: `${cam.x}px ${cam.y}px`,
         }}
       />
-      <div className="jam-world" style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})` }}>
+      <div ref={worldRef} className="jam-world" style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})` }}>
         <svg className="jam-svg" aria-hidden>
           {nodes.map((n) => {
             if (n.kind === "pen" && n.points && n.points.length > 1) {
@@ -849,19 +931,7 @@ export function CanvasEditor({
             return <line x1={p1.x} y1={p1.y} x2={lineHover.x} y2={lineHover.y} stroke={LINE} strokeWidth={2} strokeDasharray="6 4" />;
           })()}
         </svg>
-        {ghost && (
-          <div
-            className={`jam-ghost ${ghost.kind === "sticky" ? "jam-sticky" : ghost.kind === "text" ? "jam-label" : `jam-shape is-${shapeKind}`}`}
-            style={{
-              left: ghost.x,
-              top: ghost.y,
-              width: ghost.w,
-              height: ghost.h,
-              background: ghost.kind === "sticky" ? stickyColor : ghost.kind === "shape" ? "#fff" : "transparent",
-              borderColor: ghost.kind === "shape" ? SHAPE_STROKE : undefined,
-            }}
-          />
-        )}
+        <div ref={ghostRef} className="jam-ghost jam-sticky" hidden />
         {nodes.map((n) => {
           if (n.kind === "pen" || n.kind === "line") return null;
           const on = selected.includes(n.id);
@@ -928,7 +998,7 @@ export function CanvasEditor({
           <p>S 付箋　T 文字　R 図形　L コネクタ</p>
         </div>
       )}
-      {box && solo && activeTool === "select" && editable && (
+      {box && solo && activeTool === "select" && editable && !busy && (
         <>
           {!editing &&
             (["top", "right", "bottom", "left"] as Side[]).map((side) => (
@@ -1022,7 +1092,7 @@ export function CanvasEditor({
         <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(0.9); }} aria-label="縮小">
           <Minus size={14} />
         </button>
-        <span>{Math.round(cam.z * 100)}%</span>
+        <span ref={zoomLabelRef}>{Math.round(cam.z * 100)}%</span>
         <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(1.1); }} aria-label="拡大">
           <Plus size={14} />
         </button>
