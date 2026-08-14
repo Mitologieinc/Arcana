@@ -4,6 +4,7 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, listVisiblePages, resolvePagePermission } from "../lib/acl";
+import { plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 import { DEFAULT_DB_PROPERTIES_JSON } from "./workspace";
 
@@ -243,6 +244,26 @@ pageRoutes.delete("/api/pages/:id", async (c) => {
   if (permission !== "full") return c.json({ error: "削除できません" }, 403);
   await db.update(schema.pages).set({ archivedAt: new Date() }).where(eq(schema.pages.id, id));
   await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  return c.json({ ok: true });
+});
+
+pageRoutes.post("/api/pages/:id/body", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
+  if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
+  const body = await c.req.json<{ doc: unknown; text?: string }>();
+  if (!body.doc || typeof body.doc !== "object") return c.json({ error: "本文がありません" }, 400);
+  const update = tiptapJsonToUpdate(body.doc);
+  const stub = c.env.Y_DURABLE_OBJECTS.get(c.env.Y_DURABLE_OBJECTS.idFromName(id));
+  await stub.importYjs(update);
+  const text = body.text ?? plainTextFromDoc(body.doc);
+  const pageRows = await db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const title = pageRows[0]?.title ?? "";
+  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  await c.env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)").bind(id, title, text).run();
   return c.json({ ok: true });
 });
 

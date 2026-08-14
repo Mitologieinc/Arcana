@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
+import { Fingerprint, Import, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { roleLabel } from "../lib/format";
 import { Modal } from "./Modal";
 import { Avatar } from "./Avatar";
+import { NotionImport } from "./NotionImport";
 import type { Member, MemberRole, User, Workspace } from "../lib/types";
 
 type PasskeyRow = {
@@ -15,7 +16,7 @@ type PasskeyRow = {
   deviceType?: string;
 };
 
-type Tab = "account" | "appearance" | "team";
+type Tab = "account" | "appearance" | "team" | "import";
 
 export function SettingsPanel({
   user,
@@ -101,6 +102,7 @@ export function SettingsPanel({
     { id: "appearance", label: "表示", icon: Monitor },
     { id: "team", label: "チーム", icon: Users },
   ];
+  if (canInvite) tabs.push({ id: "import", label: "移行", icon: Import });
 
   return (
     <Modal title="設定" onClose={onClose} wide flush>
@@ -318,6 +320,8 @@ export function SettingsPanel({
               )}
             </div>
           )}
+
+          {tab === "import" && canInvite && <NotionImport onChanged={onChanged} />}
         </div>
       </div>
     </Modal>

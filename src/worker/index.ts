@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { hc } from "hono/client";
 import { YDurableObjects, type YDurableObjectsAppType } from "y-durableobjects";
 import { upgrade } from "y-durableobjects/helpers/upgrade";
+import { applyUpdate } from "yjs";
 import { createAuth, getSessionUser } from "./auth";
 import { createDb } from "./db/client";
 import { canEdit, canView, resolvePagePermission } from "./lib/acl";
@@ -11,6 +12,7 @@ import { shareRoutes } from "./routes/share";
 import { searchRoutes } from "./routes/search";
 import { fileRoutes } from "./routes/files";
 import { extraRoutes } from "./routes/extras";
+import { importRoutes } from "./routes/import";
 import { allowAttempt, clientIp } from "./lib/rate-limit";
 import type { AppEnv } from "./types";
 
@@ -50,6 +52,11 @@ export class PageRoom extends YDurableObjects<AppEnv> {
       if (!allowed) return;
     }
     return super.webSocketMessage(ws, message);
+  }
+
+  async importYjs(update: Uint8Array) {
+    applyUpdate(this.doc, update);
+    await this.storage.storeUpdate(update);
   }
 }
 
@@ -91,6 +98,7 @@ app.route("/", searchRoutes);
 app.route("/", fileRoutes);
 
 app.route("/", extraRoutes);
+app.route("/", importRoutes);
 
 app.get("/api/collab/:id", upgrade(), async (c) => {
   const pageId = c.req.param("id");
