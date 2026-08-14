@@ -12,10 +12,12 @@ const DELAY = [0, 2, 4, 1, 3, 5];
 function ArcanaMark({
   className,
   animate = false,
+  hoverAnimate = false,
   label = "Arcana",
 }: {
   className?: string;
   animate?: boolean;
+  hoverAnimate?: boolean;
   label?: string;
 }) {
   return (
@@ -23,7 +25,7 @@ function ArcanaMark({
       viewBox="0 0 412 263"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`arcana-logo ${animate ? "is-in" : ""} ${className ?? ""}`}
+      className={`arcana-logo ${animate ? "is-in" : ""} ${hoverAnimate ? "is-hover" : ""} ${className ?? ""}`}
       role="img"
       aria-label={label}
     >
@@ -46,11 +48,13 @@ function ArcanaMark({
 export function BrandMark({
   className = "h-8 w-auto",
   animate = false,
+  hoverAnimate = false,
 }: {
   className?: string;
   animate?: boolean;
+  hoverAnimate?: boolean;
 }) {
-  return <ArcanaMark className={className} animate={animate} />;
+  return <ArcanaMark className={className} animate={animate} hoverAnimate={hoverAnimate} />;
 }
 
 export function BrandLockup({

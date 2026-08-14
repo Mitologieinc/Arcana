@@ -80,9 +80,13 @@ html[data-theme="dark"] .arcana-nav {
   overflow: visible;
 }
 
-.arcana-logo.is-in .arcana-logo-d {
+.arcana-logo.is-in .arcana-logo-d,
+.arcana-logo.is-hover .arcana-logo-d {
   transform-box: fill-box;
   transform-origin: center;
+}
+
+.arcana-logo.is-in .arcana-logo-d {
   animation: arcana-logo-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -101,8 +105,17 @@ html[data-theme="dark"] .arcana-nav {
   }
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .arcana-rail button:hover .arcana-logo.is-hover .arcana-logo-d,
+  .arcana-logo.is-hover:hover .arcana-logo-d {
+    animation: arcana-logo-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .arcana-logo.is-in .arcana-logo-d {
+  .arcana-logo.is-in .arcana-logo-d,
+  .arcana-rail button:hover .arcana-logo.is-hover .arcana-logo-d,
+  .arcana-logo.is-hover:hover .arcana-logo-d {
     animation: none;
   }
 }
