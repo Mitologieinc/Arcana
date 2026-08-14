@@ -36,8 +36,6 @@
       },
     ],
   },
-  // from は Cloudflare Email Sending に onboard 済みのドメイン必須。workers.dev からは送れない。
-  "send_email": [{ "name": "EMAIL" }],
   "migrations": [
     {
       "tag": "v1",
@@ -70,7 +68,6 @@
           },
         ],
       },
-      "send_email": [{ "name": "EMAIL" }],
     },
     "production": {
       "name": "arcana-production",
@@ -96,7 +93,6 @@
           },
         ],
       },
-      "send_email": [{ "name": "EMAIL" }],
     },
   },
 }

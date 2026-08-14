@@ -4,8 +4,6 @@ import { YDurableObjects, type YDurableObjectsAppType } from "y-durableobjects";
 import { upgrade } from "y-durableobjects/helpers/upgrade";
 import { createAuth, getSessionUser } from "./auth";
 import { createDb } from "./db/client";
-import * as schema from "./db/schema";
-import { eq } from "drizzle-orm";
 import { canView, resolvePagePermission } from "./lib/acl";
 import { workspaceRoutes } from "./routes/workspace";
 import { pageRoutes } from "./routes/pages";
@@ -22,35 +20,6 @@ const app = new Hono<AppEnv>();
 app.get("/api/health", (c) =>
   c.json({ ok: true, name: "arcana", seatBilling: false }),
 );
-
-function isOpenApi(path: string, method: string) {
-  if (path === "/api/health" || path === "/api/bootstrap") return true;
-  if (path === "/api/register" || path === "/api/setup") return true;
-  if (path.startsWith("/api/auth")) return true;
-  if (path === "/api/me") return true;
-  if (path.startsWith("/api/verify-email")) return true;
-  if (path.startsWith("/api/share")) return true;
-  if (method === "GET" && /^\/api\/invites\/[^/]+$/.test(path)) return true;
-  if (method === "POST" && /^\/api\/invites\/[^/]+\/accept$/.test(path)) return true;
-  return false;
-}
-
-app.use("/api/*", async (c, next) => {
-  if (isOpenApi(c.req.path, c.req.method)) return next();
-  const user = await getSessionUser(c.env, c.req.raw);
-  if (user && user.emailVerified === false) {
-    const db = createDb(c.env.DB);
-    const row = await db
-      .select({ emailVerified: schema.user.emailVerified })
-      .from(schema.user)
-      .where(eq(schema.user.id, user.id))
-      .limit(1);
-    if (!row[0]?.emailVerified) {
-      return c.json({ error: "メールを確認してください", needsVerification: true }, 403);
-    }
-  }
-  return next();
-});
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
   const auth = createAuth(c.env, c.req.raw);

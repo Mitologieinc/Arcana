@@ -40,7 +40,6 @@ export function SettingsPanel({
   const [pkError, setPkError] = useState("");
   const [inviteOnly, setInviteOnly] = useState(Boolean(workspace.inviteOnly));
   const [allowedDomains, setAllowedDomains] = useState(workspace.allowedDomains ?? "");
-  const [mailFrom, setMailFrom] = useState(workspace.mailFrom ?? "");
   const [accessSaved, setAccessSaved] = useState("");
   const [accessError, setAccessError] = useState("");
   const canInvite = role === "owner" || role === "admin";
@@ -201,17 +200,6 @@ export function SettingsPanel({
                 />
               </label>
               <p className="text-[12px] text-muted">カンマ区切り。空ならドメインは制限しません。ゲスト招待は対象外です。</p>
-              <label className="field">
-                <span>確認メールの送信元</span>
-                <input
-                  value={mailFrom}
-                  placeholder="noreply@example.com"
-                  onChange={(e) => setMailFrom(e.target.value)}
-                />
-              </label>
-              <p className="text-[12px] text-muted">
-                入れると新規登録で確認コードを送ります。この Cloudflare アカウントの Email Sending に載せたドメインのアドレスにしてください。空なら確認はしません。
-              </p>
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -221,7 +209,7 @@ export function SettingsPanel({
                   try {
                     await api("/api/workspace", {
                       method: "PATCH",
-                      body: JSON.stringify({ inviteOnly, allowedDomains, mailFrom }),
+                      body: JSON.stringify({ inviteOnly, allowedDomains }),
                     });
                     setAccessSaved("保存しました");
                     await onChanged();

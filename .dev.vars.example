@@ -1,5 +1,1 @@
 BETTER_AUTH_SECRET=change-me-run-openssl-rand-base64-32
-# 確認メールはデプロイ先の Cloudflare Email Sending から出る。
-# 顧客が自分の Resend を使うときだけ:
-# RESEND_API_KEY=re_xxxxxxxx
-# MAIL_FROM=noreply@customer-domain.com

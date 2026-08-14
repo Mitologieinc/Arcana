@@ -14,7 +14,6 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 - 同時編集（Yjs + Durable Objects）
 - メンバー登録、ページ権限、リンク共有
 - パスキー（WebAuthn）ログイン
-- 登録時のメール確認（Cloudflare Email Sending）
 - メンバー数の上限なし（ゲストも席として数えない）
 
 ## 環境の切り方
@@ -37,19 +36,6 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 - 設定から発行した招待リンク（`/signup?invite=<token>`）は、メールと役割を先に決める任意の近道
 
 インスタンスをインターネットに出す場合は、Cloudflare Access などで手前を守ってください。
-
-## 登録時のメール確認
-
-メールは Arcana のサーバからではなく、**顧客がデプロイした Cloudflare アカウント**から出ます。顧客のドメインをそのアカウントの Email Sending に載せると、登録時に確認コードを送れます。
-
-1. 顧客ドメインを Cloudflare DNS に置く
-2. `npx wrangler email sending enable customer-domain.com`（そのアカウントで実行）
-3. 初期設定または 設定 → チーム で送信元（例: `noreply@customer-domain.com`）を入れる
-4. 以降の新規登録は、届いたコードを入力するまでワークスペースに入れません
-
-`workers.dev` だけ、または送信元が空のときは確認コードを送りません。すぐ参加できます。オーナー初回で送信に失敗した場合は閉じ込めないよう確認をスキップします。
-
-顧客がすでに Resend を使っている場合だけ、そのアカウントの `RESEND_API_KEY` を secret にしても送れます。Arcana 側のキーではありません。
 
 ## 必要環境
 

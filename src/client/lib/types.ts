@@ -6,7 +6,6 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  emailVerified?: boolean;
   image?: string | null;
 };
 
@@ -16,7 +15,6 @@ export type Workspace = {
   role: MemberRole;
   inviteOnly?: boolean;
   allowedDomains?: string;
-  mailFrom?: string;
 };
 
 export type Page = {

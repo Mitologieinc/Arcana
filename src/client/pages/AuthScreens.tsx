@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type HTMLAttributes } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
@@ -14,7 +14,6 @@ function Field({
   placeholder,
   minLength,
   required = true,
-  inputMode,
 }: {
   label: string;
   type?: string;
@@ -24,7 +23,6 @@ function Field({
   placeholder?: string;
   minLength?: number;
   required?: boolean;
-  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <label className="field">
@@ -36,7 +34,6 @@ function Field({
         placeholder={placeholder}
         minLength={minLength}
         required={required}
-        inputMode={inputMode}
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
@@ -77,126 +74,9 @@ function AuthLayout({
   );
 }
 
-async function goAfterAuth(nav: ReturnType<typeof useNavigate>) {
-  const me = await api<{ user: { emailVerified?: boolean } | null }>("/api/me").catch(() => null);
-  nav(me?.user && me.user.emailVerified === false ? "/verify" : "/", { replace: true });
-}
-
 async function signInWithPasskey() {
   const { error } = await authClient.signIn.passkey();
   return error;
-}
-
-function VerifyEmailForm({
-  email,
-  warning,
-  onVerified,
-}: {
-  email: string;
-  warning?: string;
-  onVerified: () => void;
-}) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState(warning ?? "");
-  const [busy, setBusy] = useState(false);
-  const [resent, setResent] = useState("");
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
-    try {
-      await api("/api/verify-email", { method: "POST", body: JSON.stringify({ code }) });
-      onVerified();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "確認できませんでした");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resend() {
-    setError("");
-    setResent("");
-    setBusy(true);
-    try {
-      await api("/api/verify-email/resend", { method: "POST", body: "{}" });
-      setResent("確認コードを再送信しました");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "再送信できませんでした");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={(e) => void submit(e)}>
-      <Field
-        label="確認コード"
-        value={code}
-        onChange={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
-        autoComplete="one-time-code"
-        placeholder="6桁"
-        inputMode="numeric"
-      />
-      <p className="mb-3 -mt-1 text-[12px] text-muted">{email} に送った 6 桁のコードを入力してください。</p>
-      {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-      {resent && <p className="mb-3 text-[13px] text-muted">{resent}</p>}
-      <button type="submit" className="btn btn-primary w-full" disabled={busy || code.length !== 6}>
-        確認する
-      </button>
-      <button type="button" className="btn btn-ghost mt-2 w-full text-muted" onClick={() => void resend()} disabled={busy}>
-        コードを再送信
-      </button>
-    </form>
-  );
-}
-
-export function VerifyEmailPage() {
-  const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api<{ user: { email: string; emailVerified?: boolean } | null }>("/api/me")
-      .then((d) => {
-        if (!d.user) {
-          nav("/login", { replace: true });
-          return;
-        }
-        if (d.user.emailVerified) {
-          nav("/", { replace: true });
-          return;
-        }
-        setEmail(d.user.email);
-        setReady(true);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "確認できませんでした"));
-  }, [nav]);
-
-  if (error) {
-    return (
-      <AuthLayout title="メールを確認できません" kicker={error}>
-        <Link className="underline underline-offset-2 text-[13px]" to="/login">
-          ログインへ
-        </Link>
-      </AuthLayout>
-    );
-  }
-  if (!ready) {
-    return (
-      <div className="flex h-full items-center justify-center bg-white">
-        <BrandLockup className="h-12 w-auto" />
-      </div>
-    );
-  }
-
-  return (
-    <AuthLayout title="メールを確認" kicker="登録を完了するには、届いた確認コードが必要です。">
-      <VerifyEmailForm email={email} onVerified={() => nav("/", { replace: true })} />
-    </AuthLayout>
-  );
 }
 
 export function LoginPage() {
@@ -223,7 +103,7 @@ export function LoginPage() {
     void cred.isConditionalMediationAvailable().then((ok) => {
       if (!ok) return;
       void authClient.signIn.passkey({ autoFill: true }).then(({ error: err, data }) => {
-        if (!err && data) void goAfterAuth(nav);
+        if (!err && data) nav("/");
       });
     });
   }, [nav]);
@@ -238,7 +118,7 @@ export function LoginPage() {
       setError(err.message || "ログインに失敗しました");
       return;
     }
-    await goAfterAuth(nav);
+    nav("/");
   }
 
   async function onPasskey() {
@@ -250,7 +130,7 @@ export function LoginPage() {
       setError(err.message || "パスキーでログインできませんでした");
       return;
     }
-    await goAfterAuth(nav);
+    nav("/");
   }
 
   if (needsSetup === true) return <Navigate to="/setup" replace />;
@@ -307,7 +187,6 @@ export function SignupPage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [inviteOnly, setInviteOnly] = useState(false);
   const [allowedDomains, setAllowedDomains] = useState("");
-  const [emailVerification, setEmailVerification] = useState(false);
   const [inviteInfo, setInviteInfo] = useState<{ email: string; workspaceName: string; role: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -321,14 +200,12 @@ export function SignupPage() {
       workspaceName: string | null;
       inviteOnly?: boolean;
       allowedDomains?: string;
-      emailVerification?: boolean;
     }>("/api/bootstrap")
       .then((d) => {
         setNeedsSetup(d.needsSetup);
         if (d.workspaceName) setWorkspaceName(d.workspaceName);
         setInviteOnly(Boolean(d.inviteOnly));
         setAllowedDomains(d.allowedDomains ?? "");
-        setEmailVerification(Boolean(d.emailVerification));
       })
       .catch((e) => setError(e instanceof Error ? e.message : "初期化に失敗しました"));
   }, []);
@@ -350,7 +227,7 @@ export function SignupPage() {
     setError("");
     setBusy(true);
     try {
-      const d = await api<{ needsVerification?: boolean }>("/api/register", {
+      await api("/api/register", {
         method: "POST",
         body: JSON.stringify({
           name,
@@ -360,10 +237,6 @@ export function SignupPage() {
           inviteToken: inviteFromUrl || undefined,
         }),
       });
-      if (d.needsVerification) {
-        nav("/verify", { replace: true });
-        return;
-      }
       try {
         await authClient.passkey.addPasskey({ name: "このデバイス" });
       } catch {
@@ -412,9 +285,7 @@ export function SignupPage() {
         <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
           参加する
         </button>
-        <p className="mt-3 text-[12px] text-muted">
-          {emailVerification ? "登録すると確認コードをメールで送ります。" : "あとからパスキーを追加できます。"}
-        </p>
+        <p className="mt-3 text-[12px] text-muted">あとからパスキーを追加できます。</p>
       </form>
       <p className="mt-8 text-center text-[13px] text-muted">
         アカウントがある場合{" "}
@@ -428,23 +299,17 @@ export function SignupPage() {
 
 export function SetupPage() {
   const nav = useNavigate();
-  const [step, setStep] = useState<"workspace" | "owner" | "verify" | "passkey">("workspace");
+  const [step, setStep] = useState<"workspace" | "owner" | "passkey">("workspace");
   const [ready, setReady] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const [inviteOnly, setInviteOnly] = useState(false);
   const [allowedDomains, setAllowedDomains] = useState("");
-  const [mailFrom, setMailFrom] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [welcomeId, setWelcomeId] = useState<string | null>(null);
-  const [mailWarning, setMailWarning] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const stepOrder = (mailFrom.trim() ? ["workspace", "owner", "verify", "passkey"] : ["workspace", "owner", "passkey"]) as string[];
-  const found = stepOrder.indexOf(step);
-  const stepIndex = found >= 0 ? found + 1 : stepOrder.length;
 
   useEffect(() => {
     api<{ needsSetup: boolean }>("/api/bootstrap")
@@ -471,7 +336,7 @@ export function SetupPage() {
     }
     setBusy(true);
     try {
-      const d = await api<{ welcomeId?: string; needsVerification?: boolean; mailWarning?: string }>("/api/setup", {
+      const d = await api<{ welcomeId?: string }>("/api/setup", {
         method: "POST",
         body: JSON.stringify({
           name,
@@ -480,12 +345,10 @@ export function SetupPage() {
           workspaceName,
           inviteOnly,
           allowedDomains,
-          mailFrom,
         }),
       });
       setWelcomeId(d.welcomeId ?? null);
-      setMailWarning(d.mailWarning ?? "");
-      setStep(d.needsVerification ? "verify" : "passkey");
+      setStep("passkey");
     } catch (err) {
       setError(err instanceof Error ? err.message : "失敗しました");
     } finally {
@@ -527,8 +390,7 @@ export function SetupPage() {
       <AuthLayout
         title="この環境をセットアップ"
         kicker="1 URL につき 1 ワークスペースです。最初の人がオーナーになります。"
-        step={stepIndex}
-        steps={stepOrder.length}
+        step={1}
       >
         <form
           onSubmit={(e) => {
@@ -576,17 +438,6 @@ export function SetupPage() {
             required={false}
           />
           <p className="mb-3 -mt-1 text-[12px] text-muted">カンマ区切り。空ならドメインは制限しません。ゲスト招待は対象外です。</p>
-          <Field
-            label="確認メールの送信元（任意）"
-            type="email"
-            value={mailFrom}
-            onChange={setMailFrom}
-            placeholder="noreply@example.com"
-            required={false}
-          />
-          <p className="mb-3 -mt-1 text-[12px] text-muted">
-            入れると登録時に確認コードを送ります。この Cloudflare アカウントの Email Sending に載せたドメインのアドレスにしてください。空なら確認はしません。
-          </p>
           {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
           <button type="submit" className="btn btn-primary w-full">
             続ける
@@ -598,19 +449,12 @@ export function SetupPage() {
 
   if (step === "owner") {
     return (
-      <AuthLayout
-        title="オーナーアカウント"
-        kicker={`「${workspaceName}」の管理者になります。`}
-        step={stepIndex}
-        steps={stepOrder.length}
-      >
+      <AuthLayout title="オーナーアカウント" kicker={`「${workspaceName}」の管理者になります。`} step={2}>
         <form onSubmit={(e) => void createWorkspace(e)}>
           <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
           <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
           <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
-          <p className="mb-3 -mt-1 text-[12px] text-muted">
-            8 文字以上。{mailFrom.trim() ? "登録後に確認コードを送ります。" : "あとからパスキーも使えます。"}
-          </p>
+          <p className="mb-3 -mt-1 text-[12px] text-muted">8 文字以上。あとからパスキーも使えます。</p>
           {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
           <button type="submit" className="btn btn-primary w-full" disabled={busy}>
             作成して始める
@@ -623,34 +467,12 @@ export function SetupPage() {
     );
   }
 
-  if (step === "verify") {
-    return (
-      <AuthLayout
-        title="メールを確認"
-        kicker="届いた 6 桁のコードを入力してください。"
-        step={stepIndex}
-        steps={stepOrder.length}
-      >
-        <VerifyEmailForm
-          email={email}
-          warning={mailWarning}
-          onVerified={() => {
-            setMailWarning("");
-            setStep("passkey");
-          }}
-        />
-      </AuthLayout>
-    );
-  }
-
   return (
     <AuthLayout
       title="パスキーを登録"
       kicker="指紋や顔で入れるようにできます。あとから設定でも構いません。"
-      step={stepIndex}
-      steps={stepOrder.length}
+      step={3}
     >
-      {mailWarning && <p className="mb-3 text-[13px] text-muted">{mailWarning}</p>}
       {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
       <button type="button" className="btn btn-primary w-full" onClick={() => void addPasskey()} disabled={busy}>
         <Fingerprint size={16} />

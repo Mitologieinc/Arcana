@@ -45,10 +45,6 @@ export function WorkspaceApp() {
       nav(boot.needsSetup ? "/setup" : "/login", { replace: true });
       return false;
     }
-    if (me.user.emailVerified === false) {
-      nav("/verify", { replace: true });
-      return false;
-    }
     setUser(me.user);
     setWorkspace(me.workspace);
     const list = await api<{ pages: Page[] }>("/api/pages");
