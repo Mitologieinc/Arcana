@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { Columns3, GripVertical, Plus, Search, Table2, Trash2 } from "lucide-react";
+import { CalendarDays, Columns3, GripVertical, LayoutGrid, Plus, Search, Table2, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
-import type { DbFilter, DbProperty, DbView, Page } from "../lib/types";
+import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
 import { FloatMenu } from "./FloatMenu";
 import {
   optionClass,
@@ -26,6 +26,8 @@ type Props = {
   schema: DbProperty[];
   views: DbView[];
   rows: Page[];
+  pages?: Page[];
+  members?: Member[];
   editable: boolean;
   onOpenRow: (id: string) => void;
   onChanged: () => Promise<unknown>;
@@ -73,6 +75,7 @@ function createProperty(type: Exclude<DbProperty["type"], "title">): DbProperty 
       { id: "done", name: "完了", color: "green" },
     ];
   }
+  if (type === "formula") prop.expression = "{名前}";
   return prop;
 }
 
@@ -81,6 +84,8 @@ export function DatabaseView({
   schema,
   views,
   rows,
+  pages = [],
+  members = [],
   editable,
   onOpenRow,
   onChanged,
@@ -94,7 +99,12 @@ export function DatabaseView({
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [addProp, setAddProp] = useState<DOMRect | null>(null);
+  const [addView, setAddView] = useState<DOMRect | null>(null);
   const [rename, setRename] = useState("");
+  const [calCursor, setCalCursor] = useState(() => {
+    const n = new Date();
+    return { y: n.getFullYear(), m: n.getMonth() };
+  });
   const titleInputRef = useRef<HTMLInputElement>(null);
   const skipTitleBlur = useRef(false);
   const dragging = useRef(false);
@@ -346,7 +356,7 @@ export function DatabaseView({
             }`}
             onClick={() => setViewId(v.id)}
           >
-            {v.type === "board" ? <Columns3 size={14} /> : <Table2 size={14} />}
+            {v.type === "board" ? <Columns3 size={14} /> : v.type === "calendar" ? <CalendarDays size={14} /> : v.type === "gallery" ? <LayoutGrid size={14} /> : <Table2 size={14} />}
             {v.name}
           </button>
         ))}
@@ -379,13 +389,112 @@ export function DatabaseView({
           </button>
         )}
         {editable && (
+          <button
+            className="btn-ghost h-8 w-8 p-0 text-muted"
+            title="ビューを追加"
+            onClick={(e) => setAddView(e.currentTarget.getBoundingClientRect())}
+          >
+            <Plus size={15} />
+          </button>
+        )}
+        {editable && views.length > 1 && (
+          <button
+            className="btn-ghost h-8 px-2 text-[12px] text-muted"
+            onClick={() => void api(`/api/views/${view.id}`, { method: "DELETE" }).then(onChanged)}
+          >
+            ビュー削除
+          </button>
+        )}
+        {editable && (
           <button className="btn-ghost ml-auto h-8 px-2.5 text-[13px]" onClick={() => void addRow()}>
             新規
           </button>
         )}
       </div>
 
-      {view.type === "board" && statusProp ? (
+      {view.type === "gallery" ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 px-24 max-[860px]:px-6">
+          {filtered.map((row) => (
+            <button
+              key={row.id}
+              className="overflow-hidden rounded-[10px] border border-line text-left hover:bg-hover"
+              onClick={() => onOpenRow(row.id)}
+            >
+              <div className="h-24 bg-canvas">
+                {row.coverR2Key && <img src={`/api/files/${row.coverR2Key}`} alt="" className="h-full w-full object-cover" />}
+              </div>
+              <div className="px-3 py-2 text-[14px]">{row.icon ? `${row.icon} ` : ""}{row.title || "無題"}</div>
+            </button>
+          ))}
+          {editable && (
+            <button className="rounded-[10px] border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover" onClick={() => void addRow()}>
+              + 新規
+            </button>
+          )}
+        </div>
+      ) : view.type === "calendar" ? (
+        <div className="px-24 max-[860px]:px-6">
+          {(() => {
+            const dateProp = schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy);
+            const start = new Date(calCursor.y, calCursor.m, 1);
+            const startPad = (start.getDay() + 6) % 7;
+            const days = new Date(calCursor.y, calCursor.m + 1, 0).getDate();
+            const cells = [...Array(startPad + days)].map((_, i) => {
+              if (i < startPad) return null;
+              const day = i - startPad + 1;
+              const iso = `${calCursor.y}-${String(calCursor.m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const dayRows = dateProp
+                ? filtered.filter((r) => String(parseProps(r.properties)[dateProp.id] ?? "") === iso)
+                : [];
+              return { day, iso, dayRows };
+            });
+            return (
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    className="btn-ghost h-7 px-2 text-[13px] text-muted"
+                    onClick={() =>
+                      setCalCursor((c) => (c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }))
+                    }
+                  >
+                    ←
+                  </button>
+                  <p className="text-[13px] text-muted">
+                    {calCursor.y}年{calCursor.m + 1}月
+                  </p>
+                  <button
+                    className="btn-ghost h-7 px-2 text-[13px] text-muted"
+                    onClick={() =>
+                      setCalCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))
+                    }
+                  >
+                    →
+                  </button>
+                </div>
+                <div className="grid grid-cols-7 gap-px rounded-[8px] bg-line">
+                  {["月", "火", "水", "木", "金", "土", "日"].map((d) => (
+                    <div key={d} className="bg-white px-2 py-1 text-[11px] text-muted">{d}</div>
+                  ))}
+                  {cells.map((cell, i) => (
+                    <div key={i} className="min-h-24 bg-white p-1">
+                      {cell && (
+                        <>
+                          <div className="text-[11px] text-muted">{cell.day}</div>
+                          {cell.dayRows.map((r) => (
+                            <button key={r.id} className="mt-0.5 block w-full truncate rounded px-1 text-left text-[12px] hover:bg-hover" onClick={() => onOpenRow(r.id)}>
+                              {r.title || "無題"}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      ) : view.type === "board" && statusProp ? (
         <div className="flex gap-3 overflow-x-auto px-24 pb-2 max-[860px]:px-6">
           {(() => {
             const options = statusProp.options ?? [];
@@ -623,6 +732,11 @@ export function DatabaseView({
                           property={p}
                           value={props[p.id]}
                           editable={editable}
+                          members={members}
+                          pages={pages.length ? pages : rows}
+                          title={row.title}
+                          schema={schema}
+                          allProps={props}
                           onChange={(v) => void updateRow(row, { properties: { ...props, [p.id]: v } })}
                           onUpdateOptions={(options) =>
                             void saveSchema(schema.map((s) => (s.id === p.id ? { ...s, options } : s)))
@@ -699,6 +813,25 @@ export function DatabaseView({
           >
             降順
           </button>
+          {headerMenuProp.type === "formula" && (
+            <input
+              className="mb-1 h-8 w-full rounded-[6px] bg-canvas px-2 text-[13px] outline-none"
+              defaultValue={headerMenuProp.expression ?? ""}
+              placeholder="{名前} や {プロパティ名}"
+              onBlur={(e) => {
+                const expression = e.target.value;
+                if (expression !== (headerMenuProp.expression ?? "")) {
+                  void saveSchema(
+                    schema.map((p) => (p.id === headerMenuProp.id ? { ...p, expression } : p)),
+                  );
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
           {headerMenuProp.type !== "title" && (
             <button
               className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
@@ -713,6 +846,28 @@ export function DatabaseView({
         </FloatMenu>
       )}
 
+      {addView && (
+        <FloatMenu anchor={addView} onClose={() => setAddView(null)} width={200}>
+          {(["table", "board", "calendar", "gallery"] as const).map((t) => (
+            <button
+              key={t}
+              className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+              onClick={async () => {
+                const d = await api<{ id: string }>(`/api/pages/${pageId}/views`, {
+                  method: "POST",
+                  body: JSON.stringify({ type: t }),
+                });
+                setAddView(null);
+                await onChanged();
+                setViewId(d.id);
+              }}
+            >
+              {t === "table" ? "テーブル" : t === "board" ? "ボード" : t === "calendar" ? "カレンダー" : "ギャラリー"}
+            </button>
+          ))}
+        </FloatMenu>
+      )}
+
       {addProp && (
         <FloatMenu anchor={addProp} onClose={() => setAddProp(null)} width={220}>
           <p className="px-2 py-1.5 text-[11px] font-medium text-muted">プロパティを追加</p>
@@ -721,7 +876,9 @@ export function DatabaseView({
               key={t.type}
               className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
               onClick={() => {
-                void saveSchema([...schema, createProperty(t.type)]);
+                const prop = createProperty(t.type);
+                if (t.type === "relation") prop.databaseId = pageId;
+                void saveSchema([...schema, prop]);
                 setAddProp(null);
               }}
             >

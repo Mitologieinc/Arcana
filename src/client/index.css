@@ -25,6 +25,101 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
+html[data-theme="dark"] {
+  --color-ink: #e8e6e3;
+  --color-muted: #9b9a97;
+  --color-line: #3a3a37;
+  --color-canvas: #202020;
+  --color-sidebar: #191919;
+  --color-hover: rgba(255, 255, 255, 0.08);
+  --color-danger: #eb5757;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background: #191919;
+  color: var(--color-ink);
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/75,
+html[data-theme="dark"] .bg-white\/90 {
+  background-color: #191919 !important;
+}
+
+html[data-theme="dark"] .menu-panel,
+html[data-theme="dark"] .modal-panel {
+  background: #2a2a28;
+  border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .arcana-db-table th,
+html[data-theme="dark"] .arcana-db-table td,
+html[data-theme="dark"] .arcana-db-table tbody tr:hover td {
+  background: #191919;
+}
+
+html[data-theme="dark"] .page-title,
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea {
+  color: var(--color-ink);
+}
+
+html[data-theme="dark"] .arcana-rail {
+  background: #191919;
+  border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .arcana-nav {
+  background: #191919;
+  border-color: #3a3a37;
+}
+
+.page-link {
+  color: #2383e2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.arcana-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 99px;
+  background: #e85d04;
+  color: #fff;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .arcana-nav {
+    position: absolute;
+    inset: 0 0 0 56px;
+    z-index: 20;
+    width: min(280px, calc(100vw - 56px));
+    box-shadow: 8px 0 32px rgba(15, 15, 15, 0.12);
+  }
+
+  .arcana-doc {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .arcana-db-table th:first-child,
+  .arcana-db-table td:first-child {
+    padding-left: 16px;
+    min-width: 160px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

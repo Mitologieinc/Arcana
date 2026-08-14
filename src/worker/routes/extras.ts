@@ -1,0 +1,269 @@
+import { Hono } from "hono";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { createDb } from "../db/client";
+import * as schema from "../db/schema";
+import { getMembership, getSessionUser } from "../auth";
+import { canEdit, canView, resolvePagePermission } from "../lib/acl";
+import type { AppEnv } from "../types";
+
+export const extraRoutes = new Hono<AppEnv>();
+
+async function authed(c: Parameters<Parameters<typeof extraRoutes.use>[1]>[0]) {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return { error: c.json({ error: "未ログイン" }, 401) } as const;
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return { error: c.json({ error: "ワークスペースがありません" }, 403) } as const;
+  return { user, db, membership };
+}
+
+extraRoutes.get("/api/favorites", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const rows = await ctx.db.select().from(schema.favorites).where(eq(schema.favorites.userId, ctx.user.id));
+  const ids = rows.map((r) => r.pageId);
+  if (!ids.length) return c.json({ pages: [] });
+  const pages = await ctx.db.select().from(schema.pages);
+  return c.json({
+    pages: pages.filter((p) => ids.includes(p.id) && !p.archivedAt),
+  });
+});
+
+extraRoutes.put("/api/favorites/:pageId", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const pageId = c.req.param("pageId");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId, userId: ctx.user.id });
+  if (!canView(permission)) return c.json({ error: "閲覧できません" }, 403);
+  const existing = await ctx.db
+    .select()
+    .from(schema.favorites)
+    .where(and(eq(schema.favorites.userId, ctx.user.id), eq(schema.favorites.pageId, pageId)))
+    .limit(1);
+  if (existing[0]) {
+    await ctx.db
+      .delete(schema.favorites)
+      .where(and(eq(schema.favorites.userId, ctx.user.id), eq(schema.favorites.pageId, pageId)));
+    return c.json({ favorited: false });
+  }
+  await ctx.db.insert(schema.favorites).values({
+    userId: ctx.user.id,
+    pageId,
+    createdAt: new Date(),
+  });
+  return c.json({ favorited: true });
+});
+
+extraRoutes.get("/api/trash", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const pages = await ctx.db
+    .select()
+    .from(schema.pages)
+    .where(and(eq(schema.pages.workspaceId, ctx.membership.workspaceId), isNotNull(schema.pages.archivedAt)))
+    .orderBy(desc(schema.pages.archivedAt));
+  return c.json({ pages });
+});
+
+extraRoutes.post("/api/pages/:id/restore", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (permission !== "full") return c.json({ error: "復元できません" }, 403);
+  const rows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const page = rows[0];
+  if (!page) return c.json({ error: "見つかりません" }, 404);
+  await ctx.db.update(schema.pages).set({ archivedAt: null, updatedAt: new Date() }).where(eq(schema.pages.id, id));
+  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  await c.env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
+    .bind(id, page.title, "")
+    .run();
+  return c.json({ ok: true });
+});
+
+extraRoutes.delete("/api/pages/:id/purge", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  if (ctx.membership.role !== "owner" && ctx.membership.role !== "admin") {
+    return c.json({ error: "完全削除できません" }, 403);
+  }
+  const id = c.req.param("id");
+  await ctx.db.delete(schema.pages).where(eq(schema.pages.id, id));
+  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  return c.json({ ok: true });
+});
+
+extraRoutes.get("/api/pages/:id/comments", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canView(permission)) return c.json({ error: "閲覧できません" }, 403);
+  const rows = await ctx.db
+    .select()
+    .from(schema.comments)
+    .where(eq(schema.comments.pageId, id))
+    .orderBy(asc(schema.comments.createdAt));
+  const users = await ctx.db.select().from(schema.user);
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return c.json({
+    comments: rows.map((r) => ({
+      ...r,
+      name: byId.get(r.userId)?.name ?? "不明",
+    })),
+  });
+});
+
+extraRoutes.post("/api/pages/:id/comments", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canEdit(permission) && permission !== "view") return c.json({ error: "投稿できません" }, 403);
+  if (!canView(permission)) return c.json({ error: "投稿できません" }, 403);
+  const body = await c.req.json<{ body: string }>();
+  const text = (body.body ?? "").trim();
+  if (!text) return c.json({ error: "本文が空です" }, 400);
+  const now = new Date();
+  const commentId = crypto.randomUUID();
+  await ctx.db.insert(schema.comments).values({
+    id: commentId,
+    pageId: id,
+    userId: ctx.user.id,
+    body: text,
+    createdAt: now,
+  });
+  const pageRows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const page = pageRows[0];
+  const members = await ctx.db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(eq(schema.workspaceMembers.workspaceId, ctx.membership.workspaceId));
+  for (const m of members) {
+    if (m.userId === ctx.user.id) continue;
+    await ctx.db.insert(schema.notifications).values({
+      id: crypto.randomUUID(),
+      userId: m.userId,
+      actorId: ctx.user.id,
+      pageId: id,
+      type: "comment",
+      body: `${ctx.user.name} が「${page?.title || "無題"}」にコメントしました`,
+      createdAt: now,
+    });
+  }
+  return c.json({ ok: true, id: commentId });
+});
+
+extraRoutes.delete("/api/comments/:id", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const rows = await ctx.db.select().from(schema.comments).where(eq(schema.comments.id, id)).limit(1);
+  const row = rows[0];
+  if (!row) return c.json({ error: "見つかりません" }, 404);
+  if (row.userId !== ctx.user.id && ctx.membership.role !== "owner" && ctx.membership.role !== "admin") {
+    return c.json({ error: "削除できません" }, 403);
+  }
+  await ctx.db.delete(schema.comments).where(eq(schema.comments.id, id));
+  return c.json({ ok: true });
+});
+
+extraRoutes.get("/api/notifications", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const rows = await ctx.db
+    .select()
+    .from(schema.notifications)
+    .where(eq(schema.notifications.userId, ctx.user.id))
+    .orderBy(desc(schema.notifications.createdAt))
+    .limit(40);
+  return c.json({ notifications: rows, unread: rows.filter((r) => !r.readAt).length });
+});
+
+extraRoutes.post("/api/notifications/read", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const body = await c.req.json<{ id?: string }>().catch(() => ({} as { id?: string }));
+  if (body.id) {
+    await ctx.db
+      .update(schema.notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(schema.notifications.id, body.id), eq(schema.notifications.userId, ctx.user.id)));
+  } else {
+    await ctx.db
+      .update(schema.notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(schema.notifications.userId, ctx.user.id), isNull(schema.notifications.readAt)));
+  }
+  return c.json({ ok: true });
+});
+
+extraRoutes.get("/api/pages/:id/revisions", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canView(permission)) return c.json({ error: "閲覧できません" }, 403);
+  const rows = await ctx.db
+    .select()
+    .from(schema.pageRevisions)
+    .where(eq(schema.pageRevisions.pageId, id))
+    .orderBy(desc(schema.pageRevisions.createdAt))
+    .limit(40);
+  return c.json({ revisions: rows });
+});
+
+extraRoutes.get("/api/pages/:id/export", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canView(permission)) return c.json({ error: "閲覧できません" }, 403);
+  const pages = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const page = pages[0];
+  if (!page) return c.json({ error: "見つかりません" }, 404);
+  const search = await c.env.DB.prepare("SELECT body_text FROM page_search WHERE page_id = ?")
+    .bind(id)
+    .first<{ body_text: string }>();
+  const md = `# ${page.title || "無題"}\n\n${search?.body_text ?? ""}\n`;
+  return c.json({ markdown: md, title: page.title || "無題" });
+});
+
+extraRoutes.post("/api/pages/:id/views", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
+  const body = await c.req.json<{ name?: string; type?: "table" | "board" | "calendar" | "gallery"; groupBy?: string }>();
+  const type = body.type ?? "table";
+  const names: Record<string, string> = { table: "テーブル", board: "ボード", calendar: "カレンダー", gallery: "ギャラリー" };
+  const existing = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.pageId, id));
+  const position = existing.reduce((m, v) => Math.max(m, v.position), 0) + 1;
+  const viewId = crypto.randomUUID();
+  await ctx.db.insert(schema.databaseViews).values({
+    id: viewId,
+    pageId: id,
+    name: body.name ?? names[type] ?? "ビュー",
+    type,
+    config: JSON.stringify({ groupBy: body.groupBy ?? (type === "board" ? "status" : type === "calendar" ? "date" : undefined), filters: [], sorts: [] }),
+    position,
+  });
+  return c.json({ id: viewId });
+});
+
+extraRoutes.delete("/api/views/:id", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const viewId = c.req.param("id");
+  const views = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.id, viewId)).limit(1);
+  const view = views[0];
+  if (!view) return c.json({ error: "見つかりません" }, 404);
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: view.pageId, userId: ctx.user.id });
+  if (!canEdit(permission)) return c.json({ error: "削除できません" }, 403);
+  const siblings = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.pageId, view.pageId));
+  if (siblings.length <= 1) return c.json({ error: "最後のビューは削除できません" }, 400);
+  await ctx.db.delete(schema.databaseViews).where(eq(schema.databaseViews.id, viewId));
+  return c.json({ ok: true });
+});

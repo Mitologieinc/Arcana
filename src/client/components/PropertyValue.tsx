@@ -5,11 +5,12 @@ import {
   CheckSquare,
   CircleDot,
   Hash,
+  Link2,
   List,
   Type,
   User,
 } from "lucide-react";
-import type { DbProperty, SelectOption } from "../lib/types";
+import type { DbProperty, Member, Page, SelectOption } from "../lib/types";
 import { FloatMenu } from "./FloatMenu";
 
 const PILL: Record<string, string> = {
@@ -48,6 +49,8 @@ export function PropertyIcon({ type, size = 14 }: { type: DbProperty["type"]; si
   if (type === "select") return <List {...p} />;
   if (type === "status") return <CircleDot {...p} />;
   if (type === "person") return <User {...p} />;
+  if (type === "relation") return <Link2 {...p} />;
+  if (type === "formula") return <Hash {...p} />;
   return <AlignLeft {...p} />;
 }
 
@@ -58,6 +61,9 @@ export const PROPERTY_TYPES: { type: Exclude<DbProperty["type"], "title">; name:
   { type: "status", name: "ステータス" },
   { type: "date", name: "日付" },
   { type: "checkbox", name: "チェックボックス" },
+  { type: "person", name: "担当者" },
+  { type: "relation", name: "リレーション" },
+  { type: "formula", name: "数式" },
 ];
 
 export function newSelectOption(name: string, existing = 0): SelectOption {
@@ -74,12 +80,22 @@ export function PropertyValue({
   editable,
   onChange,
   onUpdateOptions,
+  members = [],
+  pages = [],
+  title = "",
+  schema = [],
+  allProps = {},
 }: {
   property: DbProperty;
   value: unknown;
   editable: boolean;
   onChange: (next: unknown) => void;
   onUpdateOptions?: (options: SelectOption[]) => void;
+  members?: Member[];
+  pages?: Page[];
+  title?: string;
+  schema?: DbProperty[];
+  allProps?: Record<string, unknown>;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -92,6 +108,94 @@ export function PropertyValue({
     setAnchor(el.getBoundingClientRect());
     setDraft(value == null ? "" : String(value));
     setOpen(true);
+  }
+
+  if (property.type === "formula") {
+    const expr = property.expression ?? "";
+    const shown = expr.replace(/\{([^}]+)\}/g, (_, name: string) => {
+      if (name === "名前" || name === "title") return title;
+      const prop = schema.find((s) => s.name === name || s.id === name);
+      if (!prop) return "";
+      const raw = allProps[prop.id];
+      if (prop.type === "select" || prop.type === "status") {
+        return prop.options?.find((o) => o.id === String(raw ?? ""))?.name ?? "";
+      }
+      return raw == null ? "" : String(raw);
+    });
+    return <span className="truncate text-[13px] text-muted">{shown || "—"}</span>;
+  }
+
+  if (property.type === "person") {
+    const current = members.find((m) => m.userId === String(value ?? ""));
+    return (
+      <>
+        <button
+          type="button"
+          disabled={!editable}
+          className="flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover"
+          onClick={(e) => {
+            e.stopPropagation();
+            openMenu(e.currentTarget);
+          }}
+        >
+          {current ? current.name : <span className="text-transparent">空</span>}
+        </button>
+        {open && anchor && (
+          <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={220}>
+            <button className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] text-muted hover:bg-hover" onClick={() => { onChange(null); setOpen(false); }}>
+              空
+            </button>
+            {members.map((m) => (
+              <button key={m.userId} className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover" onClick={() => { onChange(m.userId); setOpen(false); }}>
+                {m.name}
+              </button>
+            ))}
+          </FloatMenu>
+        )}
+      </>
+    );
+  }
+
+  if (property.type === "relation") {
+    const ids = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
+    const linked = pages.filter((p) => ids.includes(p.id));
+    const pool = property.databaseId ? pages.filter((p) => p.parentId === property.databaseId) : pages;
+    return (
+      <>
+        <button
+          type="button"
+          disabled={!editable}
+          className="flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover"
+          onClick={(e) => {
+            e.stopPropagation();
+            openMenu(e.currentTarget);
+          }}
+        >
+          {linked.length ? linked.map((p) => (
+            <span key={p.id} className="truncate rounded-[4px] bg-canvas px-1.5 py-0.5 text-[12px]">{p.title || "無題"}</span>
+          )) : <span className="text-transparent">空</span>}
+        </button>
+        {open && anchor && (
+          <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={240}>
+            {pool.slice(0, 30).map((p) => {
+              const on = ids.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                  onClick={() => {
+                    const next = on ? ids.filter((x) => x !== p.id) : [...ids, p.id];
+                    onChange(next);
+                  }}
+                >
+                  {on ? "✓ " : ""}{p.icon || "📄"} {p.title || "無題"}
+                </button>
+              );
+            })}
+          </FloatMenu>
+        )}
+      </>
+    );
   }
 
   if (property.type === "checkbox") {
@@ -181,7 +285,7 @@ export function PropertyValue({
     );
   }
 
-  if (open && (property.type === "number" || property.type === "date" || property.type === "text" || property.type === "person")) {
+  if (open && (property.type === "number" || property.type === "date" || property.type === "text")) {
     return (
       <input
         autoFocus

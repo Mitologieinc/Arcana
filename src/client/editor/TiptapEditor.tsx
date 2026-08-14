@@ -15,6 +15,7 @@ import { Bold, Italic, Strikethrough, Code, Underline as UnderlineIcon, Heading1
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
 import { SlashCommand, uploadImage } from "./slash";
+import { PageLink, PageMention } from "./pageLink";
 
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
 
@@ -75,7 +76,7 @@ export function TiptapEditor({
         showOnlyCurrent: true,
         placeholder: ({ node }) => {
           if (node.type.name === "heading") return `見出し ${node.attrs.level}`;
-          return "入力するか、'/' でコマンド";
+          return "入力するか、'/' でコマンド、'@' でページ";
         },
       }),
       Highlight,
@@ -83,6 +84,8 @@ export function TiptapEditor({
       TaskList,
       TaskItem.configure({ nested: true }),
       SlashCommand,
+      PageLink,
+      PageMention,
       Collaboration.configure({
         document: collab.doc,
         field: "prosemirror",

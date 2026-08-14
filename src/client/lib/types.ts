@@ -22,20 +22,24 @@ export type Page = {
   type: PageType;
   title: string;
   icon: string | null;
+  coverR2Key?: string | null;
   position: number;
   properties: string | null;
   createdBy: string;
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
+  archivedAt?: string | number | Date | null;
 };
 
 export type SelectOption = { id: string; name: string; color: string };
 
 export type DbProperty = {
   id: string;
-  type: "title" | "select" | "status" | "date" | "person" | "number" | "checkbox" | "text";
+  type: "title" | "select" | "status" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
   name: string;
   options?: SelectOption[];
+  databaseId?: string;
+  expression?: string;
 };
 
 export type DbFilter = {
@@ -48,7 +52,7 @@ export type DbView = {
   id: string;
   pageId: string;
   name: string;
-  type: "table" | "board";
+  type: "table" | "board" | "calendar" | "gallery";
   config: {
     groupBy?: string;
     filters?: DbFilter[];

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronsRight, ChevronRight, Link2, MoreHorizontal, SmilePlus, Trash2 } from "lucide-react";
+import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
-import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
+import type { DbProperty, DbView, Member, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
 import { parseProps, PropertyIcon, PropertyValue } from "./PropertyValue";
 import { RowPeek } from "./RowPeek";
 import { ShareDialog } from "./ShareDialog";
+import { CommentsPanel } from "./CommentsPanel";
+import { HistoryPanel } from "./HistoryPanel";
 import { TiptapEditor } from "../editor/TiptapEditor";
+import { uploadImage } from "../editor/slash";
 
 type Props = {
   pageId: string;
@@ -49,6 +52,10 @@ export function PageEditor({
   const [title, setTitle] = useState(fallback?.title ?? "");
   const [peekId, setPeekId] = useState<string | null>(null);
   const [parentSchema, setParentSchema] = useState<DbProperty[]>([]);
+  const [favorited, setFavorited] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
 
   async function reloadPage() {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
@@ -72,6 +79,12 @@ export function PageEditor({
   useEffect(() => {
     setPeekId(null);
     reloadPage().catch(console.error);
+    api<{ pages: Page[] }>("/api/favorites")
+      .then((d) => setFavorited(d.pages.some((p) => p.id === pageId)))
+      .catch(() => undefined);
+    api<{ members: Member[] }>("/api/members")
+      .then((d) => setMembers(d.members))
+      .catch(() => undefined);
   }, [pageId, shareToken]);
 
   useEffect(() => {
@@ -104,6 +117,19 @@ export function PageEditor({
       body: JSON.stringify({ title: next }),
     });
     await onPagesChanged();
+  }
+
+  async function saveCover(file: File | null) {
+    if (!editable) return;
+    if (!file) {
+      setPage((p) => (p ? { ...p, coverR2Key: null } : p));
+      await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: null }) });
+      return;
+    }
+    const src = await uploadImage(file);
+    const id = src.split("/").pop() ?? null;
+    setPage((p) => (p ? { ...p, coverR2Key: id } : p));
+    await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: id }) });
   }
 
   async function saveIcon(icon: string | null) {
@@ -190,11 +216,27 @@ export function PageEditor({
             {page.icon || "📄"} {title || "無題"}
           </span>
         </nav>
-        {editable && !shareToken && (
+        {!shareToken && (
           <div className="relative flex shrink-0 items-center gap-0.5">
-            <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink" onClick={() => setShareOpen(true)}>
-              共有
+            <button
+              className={`btn-ghost h-8 w-8 p-0 ${favorited ? "text-[#d9730d]" : "text-muted"}`}
+              title="お気に入り"
+              onClick={async () => {
+                const d = await api<{ favorited: boolean }>(`/api/favorites/${pageId}`, { method: "PUT" });
+                setFavorited(d.favorited);
+                await onPagesChanged();
+              }}
+            >
+              <Star size={15} fill={favorited ? "currentColor" : "none"} />
             </button>
+            <button className="btn-ghost h-8 w-8 p-0 text-muted" title="コメント" onClick={() => setCommentsOpen(true)}>
+              <MessageSquare size={15} />
+            </button>
+            {editable && (
+              <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink" onClick={() => setShareOpen(true)}>
+                共有
+              </button>
+            )}
             <button
               className="btn-ghost h-8 w-8 p-0 text-muted"
               onClick={() => setMoreOpen((v) => !v)}
@@ -203,7 +245,7 @@ export function PageEditor({
               <MoreHorizontal size={16} />
             </button>
             {moreOpen && (
-              <div className="menu-panel absolute right-0 top-9 z-20 w-44 p-1" onClick={(e) => e.stopPropagation()}>
+              <div className="menu-panel absolute right-0 top-9 z-20 w-48 p-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
@@ -215,22 +257,82 @@ export function PageEditor({
                   リンクをコピー
                 </button>
                 <button
-                  className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
+                  className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
                     setMoreOpen(false);
-                    void remove();
+                    setHistoryOpen(true);
                   }}
                 >
-                  <Trash2 size={14} />
-                  削除
+                  <Clock size={14} />
+                  履歴
                 </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                  onClick={async () => {
+                    setMoreOpen(false);
+                    const d = await api<{ markdown: string; title: string }>(`/api/pages/${pageId}/export`);
+                    const blob = new Blob([d.markdown], { type: "text/markdown" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `${d.title || "無題"}.md`;
+                    a.click();
+                  }}
+                >
+                  <Download size={14} />
+                  Markdown
+                </button>
+                {editable && (
+                  <button
+                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      void remove();
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    削除
+                  </button>
+                )}
               </div>
             )}
           </div>
         )}
       </header>
+      {page.coverR2Key && (
+        <div className="relative h-48 w-full overflow-hidden bg-canvas">
+          <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-full w-full object-cover" />
+          {editable && (
+            <button
+              className="absolute right-3 top-3 rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
+              onClick={() => void saveCover(null)}
+            >
+              カバーを削除
+            </button>
+          )}
+        </div>
+      )}
       <div className={page.type === "database" ? "group pb-32 pt-12" : "group mx-auto max-w-[900px] pb-40 pt-20"}>
         <div className="relative mb-1 px-24 max-[860px]:px-6">
+          {editable && (
+            <div className={`mb-2 flex gap-1 ${page.coverR2Key ? "" : "opacity-0 group-hover:opacity-100"}`}>
+              <button
+                className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.onchange = () => {
+                    const file = input.files?.[0];
+                    if (file) void saveCover(file);
+                  };
+                  input.click();
+                }}
+              >
+                <ImagePlus size={15} />
+                カバー
+              </button>
+            </div>
+          )}
           {page.icon ? (
             <button
               className="mb-1 rounded-xl text-[78px] leading-none transition hover:bg-hover"
@@ -298,13 +400,15 @@ export function PageEditor({
           />
         </div>
         {page.type === "database" ? (
-          <DatabaseView
-            pageId={pageId}
-            schema={dbSchema}
-            views={dbViews}
-            rows={children}
-            editable={editable}
-            onOpenRow={setPeekId}
+            <DatabaseView
+              pageId={pageId}
+              schema={dbSchema}
+              views={dbViews}
+              rows={children}
+              pages={pages}
+              members={members}
+              editable={editable}
+              onOpenRow={setPeekId}
             onChanged={async () => {
               await reloadPage();
               await onPagesChanged();
@@ -324,6 +428,11 @@ export function PageEditor({
                       property={p}
                       value={pageProps[p.id]}
                       editable={editable}
+                      members={members}
+                      pages={pages}
+                      title={title}
+                      schema={parentSchema}
+                      allProps={pageProps}
                       onChange={(v) => void saveProp(p.id, v)}
                     />
                   </div>
@@ -366,6 +475,10 @@ export function PageEditor({
         />
       )}
       {shareOpen && page && <ShareDialog page={page} onClose={() => setShareOpen(false)} />}
+      {commentsOpen && (
+        <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
+      )}
+      {historyOpen && <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />}
     </div>
   );
 }

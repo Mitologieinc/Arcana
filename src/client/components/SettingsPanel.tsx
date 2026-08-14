@@ -28,7 +28,8 @@ export function SettingsPanel({
   onChanged: () => Promise<unknown>;
   onSignOut: () => Promise<void>;
 }) {
-  const [tab, setTab] = useState<"team" | "security">("security");
+  const [tab, setTab] = useState<"team" | "security" | "appearance">("security");
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "light");
   const [email, setEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<MemberRole>("member");
   const [inviteUrl, setInviteUrl] = useState("");
@@ -91,6 +92,7 @@ export function SettingsPanel({
         {(
           [
             ["security", "セキュリティ"],
+            ["appearance", "表示"],
             ["team", "チーム"],
           ] as const
         ).map(([id, label]) => (
@@ -130,6 +132,32 @@ export function SettingsPanel({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {tab === "appearance" && (
+        <div>
+          <p className="mb-3 text-[13px] text-muted">画面の明るさ</p>
+          <div className="flex gap-2">
+            {(
+              [
+                ["light", "ライト"],
+                ["dark", "ダーク"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={`btn btn-secondary ${theme === id ? "ring-1 ring-ink" : ""}`}
+                onClick={() => {
+                  document.documentElement.dataset.theme = id;
+                  localStorage.setItem("arcana.theme", id);
+                  setTheme(id);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

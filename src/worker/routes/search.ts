@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { desc, eq } from "drizzle-orm";
 import { getMembership, getSessionUser } from "../auth";
 import { createDb } from "../db/client";
+import * as schema from "../db/schema";
 import { canEdit, resolvePagePermission } from "../lib/acl";
 import type { AppEnv } from "../types";
 
@@ -62,5 +64,24 @@ searchRoutes.post("/api/pages/:id/index", async (c) => {
   )
     .bind(id, body.title ?? "", body.bodyText ?? "")
     .run();
+
+  const last = await db
+    .select()
+    .from(schema.pageRevisions)
+    .where(eq(schema.pageRevisions.pageId, id))
+    .orderBy(desc(schema.pageRevisions.createdAt))
+    .limit(1);
+  const nextBody = body.bodyText ?? "";
+  const nextTitle = body.title ?? "";
+  if (!last[0] || last[0].bodyText !== nextBody || last[0].title !== nextTitle) {
+    await db.insert(schema.pageRevisions).values({
+      id: crypto.randomUUID(),
+      pageId: id,
+      title: nextTitle,
+      bodyText: nextBody,
+      createdBy: user.id,
+      createdAt: new Date(),
+    });
+  }
   return c.json({ ok: true });
 });

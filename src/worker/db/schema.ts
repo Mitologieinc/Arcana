@@ -152,9 +152,47 @@ export const databaseViews = sqliteTable("database_views", {
     .notNull()
     .references(() => pages.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  type: text("type").notNull().$type<"table" | "board">(),
+  type: text("type").notNull().$type<"table" | "board" | "calendar" | "gallery">(),
   config: text("config").notNull(),
   position: real("position").notNull().default(0),
+});
+
+export const favorites = sqliteTable(
+  "favorites",
+  {
+    userId: text("user_id").notNull(),
+    pageId: text("page_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.pageId] })],
+);
+
+export const comments = sqliteTable("comments", {
+  id: text("id").primaryKey(),
+  pageId: text("page_id").notNull(),
+  userId: text("user_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  actorId: text("actor_id").notNull(),
+  pageId: text("page_id"),
+  type: text("type").notNull(),
+  body: text("body").notNull(),
+  readAt: integer("read_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const pageRevisions = sqliteTable("page_revisions", {
+  id: text("id").primaryKey(),
+  pageId: text("page_id").notNull(),
+  title: text("title").notNull(),
+  bodyText: text("body_text").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 export type MemberRole = "owner" | "admin" | "member" | "guest";

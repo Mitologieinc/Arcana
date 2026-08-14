@@ -10,6 +10,8 @@ import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
+import { TrashPanel } from "../components/TrashPanel";
+import { NotifPanel } from "../components/NotifPanel";
 import { BrandMark } from "../components/Brand";
 
 export function WorkspaceApp() {
@@ -23,6 +25,10 @@ export function WorkspaceApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [navOpen, setNavOpen] = useState(() => localStorage.getItem("arcana.sidebar") === "0");
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [favorites, setFavorites] = useState<Page[]>([]);
+  const [unread, setUnread] = useState(0);
 
   function toggleNav() {
     setNavOpen((v) => {
@@ -43,6 +49,10 @@ export function WorkspaceApp() {
     setWorkspace(me.workspace);
     const list = await api<{ pages: Page[] }>("/api/pages");
     setPages(list.pages);
+    const fav = await api<{ pages: Page[] }>("/api/favorites").catch(() => ({ pages: [] as Page[] }));
+    setFavorites(fav.pages);
+    const notes = await api<{ unread: number }>("/api/notifications").catch(() => ({ unread: 0 }));
+    setUnread(notes.unread);
     return true;
   }
 
@@ -105,11 +115,14 @@ export function WorkspaceApp() {
         user={user}
         home={!pageId}
         navOpen={navOpen}
+        unread={unread}
         onHome={() => nav("/")}
         onSearch={() => setSearchOpen(true)}
         onToggleNav={toggleNav}
         onNewPage={() => void createPage(null, "page")}
         onSettings={() => void openSettings()}
+        onTrash={() => setTrashOpen(true)}
+        onNotifs={() => setNotifOpen(true)}
       />
       {navOpen && (
         <aside className="arcana-nav">
@@ -119,6 +132,21 @@ export function WorkspaceApp() {
               <Plus size={15} strokeWidth={1.6} />
             </button>
           </div>
+          {favorites.length > 0 && (
+            <div className="mb-2 px-2">
+              <p className="px-2 pb-1 text-[11px] font-medium text-muted">お気に入り</p>
+              {favorites.map((p) => (
+                <button
+                  key={p.id}
+                  className="flex h-[30px] w-full items-center gap-1.5 rounded-[6px] px-2 text-left text-[13px] hover:bg-hover"
+                  onClick={() => nav(`/page/${p.id}`)}
+                >
+                  <span>{p.icon || "⭐"}</span>
+                  <span className="min-w-0 truncate">{p.title || "無題"}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-2 pb-3">
             <SidebarTree
               pages={pages}
@@ -196,6 +224,24 @@ export function WorkspaceApp() {
           onCreate={(type) => {
             setSearchOpen(false);
             void createPage(null, type);
+          }}
+        />
+      )}
+      {trashOpen && (
+        <TrashPanel
+          onClose={() => setTrashOpen(false)}
+          onChanged={refresh}
+        />
+      )}
+      {notifOpen && (
+        <NotifPanel
+          onClose={() => {
+            setNotifOpen(false);
+            void refresh();
+          }}
+          onOpen={(id) => {
+            setNotifOpen(false);
+            nav(`/page/${id}`);
           }}
         />
       )}

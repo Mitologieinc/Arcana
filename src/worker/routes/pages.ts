@@ -179,6 +179,7 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
     parentId?: string | null;
     position?: number;
     properties?: Record<string, unknown> | null;
+    coverR2Key?: string | null;
   }>();
 
   const updates: Partial<typeof schema.pages.$inferInsert> = { updatedAt: new Date() };
@@ -186,6 +187,7 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
   if (body.icon !== undefined) updates.icon = body.icon;
   if (body.parentId !== undefined) updates.parentId = body.parentId;
   if (body.position !== undefined) updates.position = body.position;
+  if (body.coverR2Key !== undefined) updates.coverR2Key = body.coverR2Key;
   if (body.properties !== undefined) {
     updates.properties = body.properties ? JSON.stringify(body.properties) : null;
   }

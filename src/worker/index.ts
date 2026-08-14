@@ -10,6 +10,7 @@ import { pageRoutes } from "./routes/pages";
 import { shareRoutes } from "./routes/share";
 import { searchRoutes } from "./routes/search";
 import { fileRoutes } from "./routes/files";
+import { extraRoutes } from "./routes/extras";
 import type { AppEnv } from "./types";
 
 export class PageRoom extends YDurableObjects<AppEnv> {}
@@ -30,6 +31,8 @@ app.route("/", pageRoutes);
 app.route("/", shareRoutes);
 app.route("/", searchRoutes);
 app.route("/", fileRoutes);
+
+app.route("/", extraRoutes);
 
 app.get("/api/collab/:id", upgrade(), async (c) => {
   const pageId = c.req.param("id");
