@@ -1,1 +1,6 @@
 BETTER_AUTH_SECRET=change-me-run-openssl-rand-base64-32
+
+# Cloudflare Access（本番。両方セットしたときだけ Worker が JWT を検証する）
+# ローカルではコメントのままにする。
+# TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+# POLICY_AUD=

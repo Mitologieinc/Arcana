@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true,
   },
+  // Access を有効にするときはダッシュボードまたは wrangler secret で
+  // TEAM_DOMAIN（https://<team>.cloudflareaccess.com）と POLICY_AUD をセットする。
+  // vars に空文字を書かないこと（デプロイで上書きされる）。
   "vars": {
     "ENVIRONMENT": "production",
   },
