@@ -19,6 +19,19 @@ import type { User } from "../lib/types";
 import type { PresenceUser } from "./PresencePile";
 
 const ORIGIN = "arcana-jam";
+const CLIP = { nodes: [] as JamNode[], n: 0 };
+
+function snapshot(list: JamNode[], ids: string[]) {
+  const set = new Set(ids);
+  const out: JamNode[] = [];
+  for (const n of list) {
+    if (set.has(n.id) && n.kind !== "line") out.push(clone(n));
+  }
+  for (const n of list) {
+    if (n.kind === "line" && n.fromId && n.toId && set.has(n.fromId) && set.has(n.toId)) out.push(clone(n));
+  }
+  return out;
+}
 const STICKY = 240;
 const STICKY_COLORS = ["#FFE299", "#FFD3A8", "#FFB8A8", "#FFA8DB", "#D3BDFF", "#A8DAFF", "#B3F4EF", "#B3EFBD", "#E6E6E6", "#FFFFFF"];
 const INK = "#1e1e1e";
@@ -129,7 +142,6 @@ export function CanvasEditor({
   const camRef = useRef({ x: 48, y: 48, z: 1 });
   const nodesRef = useRef<JamNode[]>([]);
   const awareRaf = useRef<number | null>(null);
-  const camRaf = useRef<number | null>(null);
   const camSync = useRef<number | null>(null);
   const cursorBuf = useRef({ x: 0, y: 0 });
   const drag = useRef<null | {
@@ -388,22 +400,67 @@ export function CanvasEditor({
   }
 
   function duplicateIds(ids: string[], dx = 24, dy = 24) {
-    const copies: string[] = [];
+    return insertNodes(snapshot(nodesRef.current, ids), dx, dy);
+  }
+
+  function insertNodes(items: JamNode[], dx = 24, dy = 24) {
+    if (!items.length) return [] as string[];
+    const idMap = new Map<string, string>();
+    const copies = items.map((n) => {
+      const next = clone(n);
+      const id = nid();
+      idMap.set(n.id, id);
+      next.id = id;
+      if (next.kind !== "line") {
+        next.x += dx;
+        next.y += dy;
+      }
+      return next;
+    });
+    for (const n of copies) {
+      if (n.fromId) n.fromId = idMap.get(n.fromId) ?? n.fromId;
+      if (n.toId) n.toId = idMap.get(n.toId) ?? n.toId;
+    }
+    const created: string[] = [];
     collab.doc.transact(() => {
-      for (const id of ids) {
-        const src = collab.map.get(id);
-        if (!isJam(src) || src.kind === "line") continue;
-        const n = clone(src);
-        n.id = nid();
-        n.x += dx;
-        n.y += dy;
-        collab.map.set(n.id, n);
+      for (const n of copies) {
+        collab.map.set(n.id, clone(n));
         collab.order.push([n.id]);
-        copies.push(n.id);
+        if (n.kind !== "line") created.push(n.id);
       }
     }, ORIGIN);
     refresh();
-    return copies;
+    setSelected(created);
+    setTool("select");
+    paintGhost(null);
+    return created;
+  }
+
+  function copySelected() {
+    const items = snapshot(nodesRef.current, selected);
+    if (!items.length) return false;
+    CLIP.nodes = items;
+    CLIP.n = 1;
+    void navigator.clipboard?.writeText(JSON.stringify({ arcanaJam: 1, nodes: items })).catch(() => {});
+    return true;
+  }
+
+  async function pasteClipboard() {
+    let items = CLIP.nodes;
+    try {
+      const raw = await navigator.clipboard.readText();
+      const parsed = JSON.parse(raw) as { arcanaJam?: number; nodes?: unknown };
+      if (parsed?.arcanaJam === 1 && Array.isArray(parsed.nodes)) {
+        items = parsed.nodes.filter(isJam);
+      }
+    } catch {
+      /* in-memory */
+    }
+    if (!items.length) return;
+    const n = CLIP.nodes === items ? CLIP.n : 1;
+    insertNodes(items, 24 * n, 24 * n);
+    CLIP.nodes = items;
+    CLIP.n = n + 1;
   }
 
   function spawnBeside(src: JamNode, side: Side, withLine: boolean, at?: { x: number; y: number }) {
@@ -801,6 +858,26 @@ export function CanvasEditor({
         return;
       }
       if (!editable) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelected(nodesRef.current.filter((n) => n.kind !== "line").map((n) => n.id));
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        copySelected();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        if (copySelected()) removeIds(selected);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        void pasteClipboard();
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
         e.preventDefault();
         if (selected.length) setSelected(duplicateIds(selected));
