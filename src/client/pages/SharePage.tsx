@@ -24,7 +24,7 @@ export function SharePage() {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-        <BrandLockup className="h-10 w-auto" />
+        <BrandLockup className="h-12 w-auto" />
         <p className="text-[13px] text-muted">{error}</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function SharePage() {
   if (!page || !token) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
-        <BrandMark className="h-9 w-9" />
+        <BrandMark className="h-14 w-auto" animate />
       </div>
     );
   }

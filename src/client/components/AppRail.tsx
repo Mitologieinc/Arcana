@@ -33,7 +33,7 @@ export function AppRail({
   return (
     <nav className="arcana-rail" aria-label="メイン">
       <button className="mb-2 flex h-10 w-10 items-center justify-center" onClick={onHome} title="Arcana WorkSquare">
-        <BrandMark className="h-7 w-7" />
+        <BrandMark className="h-7 w-11" />
       </button>
       <button className="arcana-rail-btn" onClick={onSearch} title="検索">
         <Search size={18} strokeWidth={1.6} />

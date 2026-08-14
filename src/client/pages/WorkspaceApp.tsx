@@ -104,7 +104,7 @@ export function WorkspaceApp() {
   if (!ready || !user || !workspace) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
-        <BrandMark className="h-9 w-9" />
+        <BrandMark className="h-14 w-auto" animate />
       </div>
     );
   }

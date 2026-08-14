@@ -76,6 +76,37 @@ html[data-theme="dark"] .arcana-nav {
   border-color: #3a3a37;
 }
 
+.arcana-logo {
+  overflow: visible;
+}
+
+.arcana-logo.is-in .arcana-logo-d {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arcana-logo-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes arcana-logo-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.28);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcana-logo.is-in .arcana-logo-d {
+    animation: none;
+  }
+}
+
 .page-link {
   color: #2383e2;
   text-decoration: underline;

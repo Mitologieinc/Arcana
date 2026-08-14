@@ -55,7 +55,7 @@ function AuthLayout({
     <div className="flex min-h-full items-center justify-center bg-white px-6">
       <div className="w-full max-w-[320px] py-24">
         <div className="mb-12">
-          <BrandLockup className="h-10 w-auto max-w-full object-left" />
+          <BrandLockup className="h-12 w-auto max-w-full" />
         </div>
         {step != null && (
           <div className="setup-dots" aria-hidden>
@@ -131,7 +131,7 @@ export function LoginPage() {
   if (needsSetup === null) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
-        <BrandLockup className="h-10 w-auto" />
+        <BrandLockup className="h-12 w-auto" />
       </div>
     );
   }
@@ -341,7 +341,7 @@ export function SetupPage() {
     }
     return (
       <div className="flex h-full items-center justify-center bg-white">
-        <BrandLockup className="h-10 w-auto" />
+        <BrandLockup className="h-12 w-auto" />
       </div>
     );
   }
