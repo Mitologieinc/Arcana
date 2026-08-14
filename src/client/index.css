@@ -740,8 +740,29 @@ button:disabled {
   margin: 2px 0;
 }
 
+.arcana-doc ul {
+  list-style: disc outside;
+}
+
+.arcana-doc ol {
+  list-style: decimal outside;
+}
+
+.arcana-doc ul ul {
+  list-style-type: circle;
+}
+
+.arcana-doc ul ul ul {
+  list-style-type: square;
+}
+
 .arcana-doc li {
+  display: list-item;
   padding: 2px 0;
+}
+
+.arcana-doc li p {
+  padding: 1px 0;
 }
 
 .arcana-doc ul[data-type="taskList"] {
@@ -963,32 +984,69 @@ button:disabled {
 
 .arcana-doc .arcana-toggle,
 .arcana-doc details {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
   margin: 2px 0;
-  padding: 2px 0;
+  padding: 1px 0;
+}
+
+.arcana-doc .arcana-toggle > button {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.arcana-doc .arcana-toggle > button:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+.arcana-doc .arcana-toggle > button::before {
+  content: "▸";
+  font-size: 12px;
+  line-height: 1;
+}
+
+.arcana-doc .arcana-toggle.is-open > button::before {
+  content: "▾";
+}
+
+.arcana-doc .arcana-toggle > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .arcana-doc [data-type="detailsSummary"],
 .arcana-doc summary {
-  cursor: pointer;
+  display: block;
+  min-height: 1.65em;
+  padding: 3px 0;
   font-weight: 510;
   list-style: none;
+  cursor: text;
 }
 
-.arcana-doc [data-type="detailsSummary"]::before,
-.arcana-doc summary::before {
-  display: inline-block;
-  width: 1.1em;
-  color: var(--color-muted);
-  content: "▸";
-}
-
-.arcana-doc .arcana-toggle.is-open > [data-type="detailsSummary"]::before,
-.arcana-doc details[open] > summary::before {
-  content: "▾";
+.arcana-doc [data-type="detailsSummary"]::-webkit-details-marker,
+.arcana-doc summary::-webkit-details-marker {
+  display: none;
 }
 
 .arcana-doc [data-type="detailsContent"] {
-  padding: 2px 0 4px 1.2em;
+  padding: 2px 0 4px;
+}
+
+.arcana-doc [data-type="detailsContent"][hidden] {
+  display: none;
 }
 
 .arcana-doc mark {

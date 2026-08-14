@@ -229,7 +229,23 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
       aliases: ["toggle", "トグル", "details", "折りたたみ"],
       group: "basic",
       icon: ChevronRight,
-      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setDetails().run(),
+      command: ({ editor, range }) => {
+        const insertAt = range.from;
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: "details",
+            attrs: { open: true },
+            content: [
+              { type: "detailsSummary" },
+              { type: "detailsContent", content: [{ type: "paragraph" }] },
+            ],
+          })
+          .setTextSelection(insertAt + 2)
+          .run();
+      },
     },
     {
       title: "データベース – インライン",
