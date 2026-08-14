@@ -575,7 +575,13 @@ export function CanvasEditor({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      <div className="jam-dots" />
+      <div
+        className="jam-dots"
+        style={{
+          backgroundSize: `${28 * cam.z}px ${28 * cam.z}px`,
+          backgroundPosition: `${cam.x}px ${cam.y}px`,
+        }}
+      />
       <div className="jam-world" style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})` }}>
         <svg className="jam-svg" aria-hidden>
           {nodes.map((n) => {
