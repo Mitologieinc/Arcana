@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { createAuth, getMembership, getSessionUser } from "../auth";
@@ -355,6 +355,159 @@ workspaceRoutes.get("/api/members", async (c) => {
     membership.role === "guest" ? members.map((m) => ({ ...m, email: "" })) : members;
 
   return c.json({ members: publicMembers, invites: pending, seatLimit: null });
+});
+
+const ASSIGNABLE: schema.MemberRole[] = ["admin", "member", "guest"];
+
+async function memberRow(
+  db: ReturnType<typeof createDb>,
+  workspaceId: string,
+  userId: string,
+) {
+  const rows = await db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(
+      and(eq(schema.workspaceMembers.workspaceId, workspaceId), eq(schema.workspaceMembers.userId, userId)),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+async function stripMembership(
+  db: ReturnType<typeof createDb>,
+  workspaceId: string,
+  userId: string,
+) {
+  await db
+    .delete(schema.workspaceMembers)
+    .where(
+      and(eq(schema.workspaceMembers.workspaceId, workspaceId), eq(schema.workspaceMembers.userId, userId)),
+    );
+  await db.delete(schema.favorites).where(eq(schema.favorites.userId, userId));
+  await db.delete(schema.notifications).where(eq(schema.notifications.userId, userId));
+  const pageRows = await db
+    .select({ id: schema.pages.id })
+    .from(schema.pages)
+    .where(eq(schema.pages.workspaceId, workspaceId));
+  const pageIds = pageRows.map((p) => p.id);
+  if (pageIds.length) {
+    await db
+      .delete(schema.pageAcl)
+      .where(
+        and(
+          eq(schema.pageAcl.principalType, "user"),
+          eq(schema.pageAcl.principalId, userId),
+          inArray(schema.pageAcl.pageId, pageIds),
+        ),
+      );
+  }
+}
+
+function canAssign(actor: schema.MemberRole, target: schema.MemberRole, next: schema.MemberRole) {
+  if (next === "owner" || !ASSIGNABLE.includes(next)) return false;
+  if (target === "owner") return false;
+  if (actor === "owner") return true;
+  if (actor === "admin") return target !== "admin" && next !== "admin";
+  return false;
+}
+
+function canRemove(actor: schema.MemberRole, target: schema.MemberRole, self: boolean) {
+  if (target === "owner") return false;
+  if (self) return actor !== "owner";
+  if (actor === "owner") return true;
+  if (actor === "admin") return target === "member" || target === "guest";
+  return false;
+}
+
+workspaceRoutes.patch("/api/members/:userId", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return c.json({ error: "ワークスペースがありません" }, 403);
+
+  const targetId = c.req.param("userId");
+  const body = await c.req.json<{ role?: schema.MemberRole }>();
+  const next = body.role;
+  if (!next || !ASSIGNABLE.includes(next)) {
+    return c.json({ error: "その役割には変更できません。オーナーは移譲してください。" }, 400);
+  }
+
+  const target = await memberRow(db, membership.workspaceId, targetId);
+  if (!target) return c.json({ error: "メンバーが見つかりません" }, 404);
+  if (!canAssign(membership.role, target.role, next)) {
+    return c.json({ error: "この人の役割は変えられません" }, 403);
+  }
+
+  await db
+    .update(schema.workspaceMembers)
+    .set({ role: next })
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, membership.workspaceId),
+        eq(schema.workspaceMembers.userId, targetId),
+      ),
+    );
+  return c.json({ ok: true, userId: targetId, role: next });
+});
+
+workspaceRoutes.delete("/api/members/:userId", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return c.json({ error: "ワークスペースがありません" }, 403);
+
+  const targetId = c.req.param("userId");
+  const target = await memberRow(db, membership.workspaceId, targetId);
+  if (!target) return c.json({ error: "メンバーが見つかりません" }, 404);
+  const self = targetId === user.id;
+  if (!canRemove(membership.role, target.role, self)) {
+    return c.json(
+      { error: self ? "オーナーは先に移譲してから退出してください" : "この人は外せません" },
+      403,
+    );
+  }
+
+  await stripMembership(db, membership.workspaceId, targetId);
+  return c.json({ ok: true, left: self });
+});
+
+workspaceRoutes.post("/api/members/:userId/transfer", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership || membership.role !== "owner") {
+    return c.json({ error: "オーナーだけが移譲できます" }, 403);
+  }
+
+  const targetId = c.req.param("userId");
+  if (targetId === user.id) return c.json({ error: "自分には移譲できません" }, 400);
+  const target = await memberRow(db, membership.workspaceId, targetId);
+  if (!target) return c.json({ error: "メンバーが見つかりません" }, 404);
+  if (target.role === "guest") return c.json({ error: "ゲストには移譲できません" }, 400);
+
+  await db
+    .update(schema.workspaceMembers)
+    .set({ role: "admin" })
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, membership.workspaceId),
+        eq(schema.workspaceMembers.userId, user.id),
+      ),
+    );
+  await db
+    .update(schema.workspaceMembers)
+    .set({ role: "owner" })
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, membership.workspaceId),
+        eq(schema.workspaceMembers.userId, targetId),
+      ),
+    );
+  return c.json({ ok: true, ownerId: targetId });
 });
 
 workspaceRoutes.patch("/api/workspace", async (c) => {

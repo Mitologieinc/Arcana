@@ -7,7 +7,36 @@ import { roleLabel } from "../lib/format";
 import { Modal } from "./Modal";
 import { Avatar } from "./Avatar";
 import { NotionImport } from "./NotionImport";
+import { ConfirmModal } from "./ConfirmModal";
 import type { Member, MemberRole, User, Workspace } from "../lib/types";
+
+type Confirm =
+  | { kind: "remove"; userId: string; name: string }
+  | { kind: "leave"; name: string }
+  | { kind: "transfer"; userId: string; name: string };
+
+const ROLE_ORDER: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2, guest: 3 };
+
+function assignableRoles(actor: MemberRole): MemberRole[] {
+  if (actor === "owner") return ["admin", "member", "guest"];
+  if (actor === "admin") return ["member", "guest"];
+  return [];
+}
+
+function canEditRole(actor: MemberRole, target: MemberRole) {
+  if (target === "owner") return false;
+  if (actor === "owner") return true;
+  if (actor === "admin") return target === "member" || target === "guest";
+  return false;
+}
+
+function canRemoveMember(actor: MemberRole, target: MemberRole, self: boolean) {
+  if (target === "owner") return false;
+  if (self) return actor !== "owner";
+  if (actor === "owner") return true;
+  if (actor === "admin") return target === "member" || target === "guest";
+  return false;
+}
 
 type PasskeyRow = {
   id: string;
@@ -48,7 +77,14 @@ export function SettingsPanel({
   const [allowedDomains, setAllowedDomains] = useState(workspace.allowedDomains ?? "");
   const [accessSaved, setAccessSaved] = useState("");
   const [accessError, setAccessError] = useState("");
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [transferId, setTransferId] = useState("");
   const canInvite = role === "owner" || role === "admin";
+  const roleOptions = assignableRoles(role);
+  const sortedMembers = [...members].sort(
+    (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name, "ja"),
+  );
+  const transferTargets = sortedMembers.filter((m) => m.userId !== user.id && m.role !== "guest");
 
   async function loadPasskeys() {
     const { data, error: err } = await authClient.passkey.listUserPasskeys();
@@ -80,6 +116,44 @@ export function SettingsPanel({
     }
   }
 
+  async function changeRole(userId: string, next: MemberRole) {
+    setError("");
+    try {
+      await api(`/api/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role: next }) });
+      toast("役割を変更しました");
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "変更できませんでした");
+    }
+  }
+
+  async function removeMember(userId: string, left: boolean) {
+    setError("");
+    try {
+      await api(`/api/members/${userId}`, { method: "DELETE" });
+      if (left) {
+        toast("ワークスペースを退出しました");
+        await onSignOut();
+        return;
+      }
+      toast("メンバーから外しました");
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "外せませんでした");
+    }
+  }
+
+  async function transferOwner(userId: string) {
+    setError("");
+    try {
+      await api(`/api/members/${userId}/transfer`, { method: "POST" });
+      toast("オーナーを移しました");
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "移譲できませんでした");
+    }
+  }
+
   async function addPasskey() {
     setPkError("");
     const { error: err } = await authClient.passkey.addPasskey({ name: "このデバイス" });
@@ -107,7 +181,8 @@ export function SettingsPanel({
   if (canInvite) tabs.push({ id: "import", label: "移行", icon: Import });
 
   return (
-    <Modal title="設定" onClose={onClose} wide flush>
+    <>
+    <Modal title="設定" onClose={() => (confirm ? setConfirm(null) : onClose())} wide flush>
       <div className="flex min-h-[420px] max-h-[min(640px,calc(100vh-6rem))]">
         <nav className="flex w-[168px] shrink-0 flex-col gap-0.5 border-r border-line p-2">
           {tabs.map((item) => {
@@ -279,19 +354,92 @@ export function SettingsPanel({
 
               <section>
                 <h3 className="mb-3 text-[13px] font-medium">メンバー</h3>
+                {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
                 <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line">
-                  {members.map((m) => (
-                    <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
-                      <Avatar name={m.name} seed={m.userId} size={26} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{m.name}</span>
-                        <span className="block truncate text-[12px] text-muted">{m.email}</span>
-                      </span>
-                      <span className="shrink-0 text-[12px] text-muted">{roleLabel(m.role)}</span>
-                    </li>
-                  ))}
+                  {sortedMembers.map((m) => {
+                    const self = m.userId === user.id;
+                    const editable = canEditRole(role, m.role);
+                    const removable = canRemoveMember(role, m.role, self);
+                    return (
+                      <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+                        <Avatar name={m.name} seed={m.userId} size={26} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">
+                            {m.name}
+                            {self ? "（あなた）" : ""}
+                          </span>
+                          <span className="block truncate text-[12px] text-muted">{m.email}</span>
+                        </span>
+                        {editable ? (
+                          <select
+                            className="input h-8 w-[7.5rem] shrink-0 text-[12px]"
+                            value={m.role}
+                            onChange={(e) => void changeRole(m.userId, e.target.value as MemberRole)}
+                          >
+                            {roleOptions.map((r) => (
+                              <option key={r} value={r}>
+                                {roleLabel(r)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="shrink-0 text-[12px] text-muted">{roleLabel(m.role)}</span>
+                        )}
+                        {removable && (
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-md p-1 text-muted hover:bg-hover hover:text-danger"
+                            title={self ? "退出" : "外す"}
+                            onClick={() =>
+                              setConfirm(
+                                self
+                                  ? { kind: "leave", name: workspace.name }
+                                  : { kind: "remove", userId: m.userId, name: m.name },
+                              )
+                            }
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
+
+              {role === "owner" && transferTargets.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="text-[13px] font-medium">オーナー移譲</h3>
+                  <p className="text-[12px] leading-relaxed text-muted">
+                    移すと、あなたは管理者になります。ゲストには移せません。
+                  </p>
+                  <div className="flex gap-2">
+                    <select
+                      className="input min-w-0 flex-1"
+                      value={transferId}
+                      onChange={(e) => setTransferId(e.target.value)}
+                    >
+                      <option value="">相手を選ぶ</option>
+                      {transferTargets.map((m) => (
+                        <option key={m.userId} value={m.userId}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary shrink-0"
+                      disabled={!transferId}
+                      onClick={() => {
+                        const m = transferTargets.find((x) => x.userId === transferId);
+                        if (m) setConfirm({ kind: "transfer", userId: m.userId, name: m.name });
+                      }}
+                    >
+                      移す
+                    </button>
+                  </div>
+                </section>
+              )}
 
               {canInvite && (
                 <section className="space-y-2">
@@ -327,5 +475,46 @@ export function SettingsPanel({
         </div>
       </div>
     </Modal>
+      {confirm?.kind === "remove" && (
+        <ConfirmModal
+          title="メンバーから外す"
+          body={`${confirm.name} はワークスペースに入れなくなります。ページの個別権限も消えます。`}
+          confirmLabel="外す"
+          danger
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            const id = confirm.userId;
+            setConfirm(null);
+            void removeMember(id, false);
+          }}
+        />
+      )}
+      {confirm?.kind === "leave" && (
+        <ConfirmModal
+          title="退出"
+          body={`${confirm.name} から退出します。招待されるまで戻れません。`}
+          confirmLabel="退出"
+          danger
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            setConfirm(null);
+            void removeMember(user.id, true);
+          }}
+        />
+      )}
+      {confirm?.kind === "transfer" && (
+        <ConfirmModal
+          title="オーナーを移す"
+          body={`${confirm.name} がオーナーになります。あなたは管理者になります。`}
+          confirmLabel="移す"
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            const id = confirm.userId;
+            setConfirm(null);
+            void transferOwner(id);
+          }}
+        />
+      )}
+    </>
   );
 }
