@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronsLeft, ChevronsRight, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, relativeTime } from "../lib/format";
 import type { Member, Page, User, Workspace } from "../lib/types";
+import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
-import { BrandLockup, BrandMark } from "../components/Brand";
-import { Avatar } from "../components/Avatar";
+import { BrandMark } from "../components/Brand";
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
@@ -22,12 +22,12 @@ export function WorkspaceApp() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("arcana.sidebar") === "1");
+  const [navOpen, setNavOpen] = useState(() => localStorage.getItem("arcana.sidebar") === "0");
 
-  function toggleSidebar() {
-    setCollapsed((v) => {
+  function toggleNav() {
+    setNavOpen((v) => {
       const next = !v;
-      localStorage.setItem("arcana.sidebar", next ? "1" : "0");
+      localStorage.setItem("arcana.sidebar", next ? "0" : "1");
       return next;
     });
   }
@@ -60,7 +60,7 @@ export function WorkspaceApp() {
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === "\\" || e.key === "¥")) {
         e.preventDefault();
-        toggleSidebar();
+        toggleNav();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -99,80 +99,43 @@ export function WorkspaceApp() {
     );
   }
 
-  const item = collapsed ? "sidebar-item justify-center px-0" : "sidebar-item";
-
   return (
     <div className="flex h-full bg-white">
-      <aside
-        className={`group/sidebar flex shrink-0 flex-col bg-sidebar py-2 transition-[width] duration-200 ease-out ${
-          collapsed ? "w-[52px] px-1.5" : "w-[240px] px-2"
-        }`}
-      >
-        <div className={`mb-3 flex items-center ${collapsed ? "justify-center" : "gap-1"}`}>
-          <button
-            className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "flex-1 justify-start px-1 py-0.5"}`}
-            onClick={() => nav("/")}
-            title="Arcana WorkSquare"
-          >
-            {collapsed ? (
-              <BrandMark className="h-7 w-7" />
-            ) : (
-              <BrandLockup className="h-8 w-auto max-w-full object-left" />
-            )}
-          </button>
-          {!collapsed && (
-            <button
-              className="btn-ghost h-7 w-7 p-0 text-muted opacity-0 group-hover/sidebar:opacity-100"
-              onClick={toggleSidebar}
-              title="サイドバーを閉じる"
-            >
-              <ChevronsLeft size={15} />
+      <AppRail
+        user={user}
+        home={!pageId}
+        navOpen={navOpen}
+        onHome={() => nav("/")}
+        onSearch={() => setSearchOpen(true)}
+        onToggleNav={toggleNav}
+        onNewPage={() => void createPage(null, "page")}
+        onSettings={() => void openSettings()}
+      />
+      {navOpen && (
+        <aside className="arcana-nav">
+          <div className="flex h-11 items-center justify-between px-3">
+            <span className="text-[12px] font-medium tracking-wide text-muted">ページ</span>
+            <button className="btn-ghost h-7 w-7 p-0 text-muted" onClick={() => void createPage(null, "page")} title="新規ページ">
+              <Plus size={15} strokeWidth={1.6} />
             </button>
-          )}
-        </div>
-        {collapsed && (
-          <button className={`${item} mb-1 text-muted`} onClick={toggleSidebar} title="サイドバーを開く">
-            <ChevronsRight size={15} />
-          </button>
-        )}
-        <button className={`${item} text-muted`} onClick={() => setSearchOpen(true)} title="検索">
-          <Search size={15} strokeWidth={1.6} />
-          {!collapsed && (
-            <>
-              検索
-              <kbd className="kbd ml-auto">⌘K</kbd>
-            </>
-          )}
-        </button>
-        <button
-          className={`${item} mb-2 text-muted`}
-          onClick={() => createPage(null, "page")}
-          title="新規ページ"
-        >
-          <Plus size={15} strokeWidth={1.6} />
-          {!collapsed && "新規ページ"}
-        </button>
-        <div className="sidebar-scroll min-h-0 flex-1 overflow-auto">
-          <SidebarTree
-            pages={pages}
-            currentId={pageId}
-            compact={collapsed}
-            onOpen={(id) => nav(`/page/${id}`)}
-            onCreateChild={(id) => createPage(id, "page")}
-            onMove={async (id, parentId, position) => {
-              await api(`/api/pages/${id}`, {
-                method: "PATCH",
-                body: JSON.stringify({ parentId, position }),
-              });
-              await refresh();
-            }}
-          />
-        </div>
-        <button className={`${item} mt-1`} onClick={openSettings} title={user.name}>
-          <Avatar name={user.name} seed={user.id} size={20} />
-          {!collapsed && <span className="min-w-0 truncate">{user.name}</span>}
-        </button>
-      </aside>
+          </div>
+          <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-2 pb-3">
+            <SidebarTree
+              pages={pages}
+              currentId={pageId}
+              onOpen={(id) => nav(`/page/${id}`)}
+              onCreateChild={(id) => createPage(id, "page")}
+              onMove={async (id, parentId, position) => {
+                await api(`/api/pages/${id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ parentId, position }),
+                });
+                await refresh();
+              }}
+            />
+          </div>
+        </aside>
+      )}
       <main className="relative min-w-0 flex-1 overflow-auto">
         {pageId ? (
           <PageEditor
@@ -181,29 +144,30 @@ export function WorkspaceApp() {
             user={user}
             pages={pages}
             fallback={current}
-            sidebarCollapsed={collapsed}
-            onExpandSidebar={toggleSidebar}
+            sidebarCollapsed={!navOpen}
+            onExpandSidebar={toggleNav}
             onPagesChanged={refresh}
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
-          <div className="mx-auto max-w-[640px] px-16 py-28">
-            {collapsed && (
-              <button
-                className="btn-ghost absolute left-2 top-1.5 h-7 w-7 p-0 text-muted"
-                onClick={toggleSidebar}
-                title="サイドバーを開く"
-              >
-                <ChevronsRight size={15} />
-              </button>
-            )}
-            <p className="text-[13px] text-muted">{greeting()}、{user.name}</p>
+          <div className="mx-auto max-w-[720px] px-10 py-20">
+            <button
+              className="flex h-11 w-full items-center gap-3 rounded-full border border-line bg-white px-4 text-left text-[14px] text-muted shadow-[0_1px_2px_rgba(15,15,15,0.04)] hover:bg-canvas"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search size={16} strokeWidth={1.6} />
+              <span className="flex-1">検索</span>
+              <kbd className="kbd">⌘K</kbd>
+            </button>
+            <p className="mt-10 text-[13px] text-muted">
+              {greeting()}、{user.name}
+            </p>
             {recent.length > 0 ? (
-              <ul className="mt-10">
+              <ul className="mt-6">
                 {recent.map((p) => (
                   <li key={p.id}>
                     <button
-                      className="flex w-full items-center gap-3 rounded-[6px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
+                      className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
                       onClick={() => nav(`/page/${p.id}`)}
                     >
                       <span className="text-[15px]">{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
@@ -216,7 +180,7 @@ export function WorkspaceApp() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-10 text-[14px] text-muted">⌘K で探すか、左の ＋ から書いてください。</p>
+              <p className="mt-8 text-[14px] text-muted">⌘K で探すか、左の ＋ から書いてください。</p>
             )}
           </div>
         )}
