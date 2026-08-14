@@ -138,7 +138,9 @@ html[data-theme="dark"] .arcana-nav {
 }
 
 .page-link {
-  display: inline;
+  display: inline-flex;
+  vertical-align: baseline;
+  align-items: baseline;
   border-radius: 4px;
   padding: 1px 5px;
   background: rgba(55, 53, 47, 0.08);
@@ -146,6 +148,11 @@ html[data-theme="dark"] .arcana-nav {
   text-decoration: none;
   font-weight: 510;
   cursor: pointer;
+  line-height: 1.45;
+}
+
+.arcana-doc [data-node-view-wrapper].page-link {
+  display: inline-flex;
 }
 
 .page-link:hover {

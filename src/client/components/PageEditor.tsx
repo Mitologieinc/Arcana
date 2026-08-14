@@ -310,7 +310,7 @@ export function PageEditor({
         )}
       </header>
       {page.coverR2Key && (
-        <div className="group/cover relative h-[30vh] min-h-[140px] max-h-[280px] w-full overflow-hidden bg-canvas">
+        <div className="group/cover relative h-48 w-full overflow-hidden bg-canvas">
           <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-full w-full object-cover" />
           {editable && (
             <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
@@ -333,13 +333,17 @@ export function PageEditor({
       <div
         className={
           page.type === "database"
-            ? `group pb-32 ${page.coverR2Key ? "pt-2" : "pt-12"}`
+            ? `group pb-32 ${page.coverR2Key ? "pt-0" : "pt-12"}`
             : `group mx-auto max-w-[900px] pb-40 ${page.coverR2Key ? "pt-0" : "pt-20"}`
         }
       >
         <div className="relative mb-1 px-24 max-[860px]:px-6">
           {editable && (
-            <div className={`mb-2 flex flex-wrap gap-1 ${iconOpen ? "" : "opacity-0 group-hover:opacity-100"}`}>
+            <div
+              className={`pointer-events-none absolute left-24 z-[3] flex flex-wrap gap-1 max-[860px]:left-6 ${
+                page.coverR2Key ? "top-3" : "top-0"
+              } ${iconOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"}`}
+            >
               {!page.icon && (
                 <button
                   className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
@@ -369,15 +373,17 @@ export function PageEditor({
           )}
           {page.icon ? (
             <button
-              className={`mb-1 rounded-xl text-[78px] leading-none transition hover:bg-hover ${
-                page.coverR2Key ? "relative z-[1] -mt-[46px]" : ""
+              className={`block rounded-xl text-[78px] leading-none transition hover:bg-hover ${
+                page.coverR2Key ? "relative z-[1] -mt-[42px] mb-2" : "mb-1"
               }`}
               onClick={() => editable && setIconOpen((v) => !v)}
               disabled={!editable}
             >
               {page.icon}
             </button>
-          ) : null}
+          ) : (
+            editable && <div className={page.coverR2Key ? "h-12" : "h-8"} />
+          )}
           {iconOpen && (
             <div className="menu-panel absolute left-24 top-[5.5rem] z-20 w-72 p-2 max-[860px]:left-6" onClick={(e) => e.stopPropagation()}>
               <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
