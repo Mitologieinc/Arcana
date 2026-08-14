@@ -28,11 +28,13 @@ export function NotionImport({
   variant = "settings",
   onSkip,
   onContinue,
+  replaceStarters = [],
 }: {
   onChanged: () => Promise<unknown>;
   variant?: "settings" | "setup";
   onSkip?: () => void;
   onContinue?: (rootId: string) => void;
+  replaceStarters?: string[];
 }) {
   const [token, setToken] = useState("");
   const [status, setStatus] = useState("");
@@ -67,16 +69,42 @@ export function NotionImport({
       const total = pages.length + databases.length;
       if (!total) throw new Error("共有されているページがありません。Notion でコネクションにページを追加してください。");
 
-      setStatus("受け皿のページを作っています…");
-      const root = await api<{ id: string }>("/api/import/notion/root", { method: "POST", body: JSON.stringify({}) });
+      const setup = variant === "setup";
+      let fallbackParent: string | null = null;
+      if (!setup) {
+        setStatus("受け皿のページを作っています…");
+        const root = await api<{ id: string }>("/api/import/notion/root", { method: "POST", body: JSON.stringify({}) });
+        fallbackParent = root.id;
+      }
       const idMap: Record<string, string> = {};
       const dbKeys: Record<string, Record<string, string>> = {};
       const createdPages: { notionId: string; id: string }[] = [];
+      let homeId: string | null = fallbackParent;
 
       const parentIdFor = (item: SearchItem) => {
-        if (item.parent.type === "page_id") return lookup(idMap, item.parent.page_id) ?? root.id;
-        return root.id;
+        if (item.parent.type === "page_id") return lookup(idMap, item.parent.page_id) ?? fallbackParent;
+        return fallbackParent;
       };
+
+      async function createItem(item: SearchItem, parentId: string | null) {
+        if (item.object === "database") {
+          const created = await api<{ id: string; keyMap: Record<string, string> }>("/api/import/notion/database", {
+            method: "POST",
+            body: JSON.stringify({ token: key, notionId: item.id, parentId }),
+          });
+          remember(idMap, item.id, created.id);
+          dbKeys[item.id] = created.keyMap;
+          if (!homeId) homeId = created.id;
+        } else {
+          const created = await api<{ id: string }>("/api/import/notion/page", {
+            method: "POST",
+            body: JSON.stringify({ token: key, notionId: item.id, parentId }),
+          });
+          remember(idMap, item.id, created.id);
+          createdPages.push({ notionId: item.id, id: created.id });
+          if (!homeId) homeId = created.id;
+        }
+      }
 
       let remaining = [...databases, ...pages];
       let guard = 0;
@@ -88,43 +116,13 @@ export function NotionImport({
             next.push(item);
             continue;
           }
-          const parentId = parentIdFor(item);
           setStatus(`取り込んでいます（${Object.keys(idMap).length / 2 + 1} / ${total}）… ${item.title}`);
-          if (item.object === "database") {
-            const created = await api<{ id: string; keyMap: Record<string, string> }>("/api/import/notion/database", {
-              method: "POST",
-              body: JSON.stringify({ token: key, notionId: item.id, parentId }),
-            });
-            remember(idMap, item.id, created.id);
-            dbKeys[item.id] = created.keyMap;
-          } else {
-            const created = await api<{ id: string }>("/api/import/notion/page", {
-              method: "POST",
-              body: JSON.stringify({ token: key, notionId: item.id, parentId }),
-            });
-            remember(idMap, item.id, created.id);
-            createdPages.push({ notionId: item.id, id: created.id });
-          }
+          await createItem(item, parentIdFor(item));
           await sleep(150);
         }
         if (next.length === remaining.length) {
           for (const item of next) {
-            const parentId = root.id;
-            if (item.object === "database") {
-              const created = await api<{ id: string; keyMap: Record<string, string> }>("/api/import/notion/database", {
-                method: "POST",
-                body: JSON.stringify({ token: key, notionId: item.id, parentId }),
-              });
-              remember(idMap, item.id, created.id);
-              dbKeys[item.id] = created.keyMap;
-            } else {
-              const created = await api<{ id: string }>("/api/import/notion/page", {
-                method: "POST",
-                body: JSON.stringify({ token: key, notionId: item.id, parentId }),
-              });
-              remember(idMap, item.id, created.id);
-              createdPages.push({ notionId: item.id, id: created.id });
-            }
+            await createItem(item, fallbackParent);
           }
           break;
         }
@@ -185,8 +183,19 @@ export function NotionImport({
       }
 
       await onChanged();
-      setDoneId(root.id);
-      setStatus(`完了しました。${createdPages.length} ページを「Notion から」に入れました。`);
+      if (setup) {
+        for (const id of replaceStarters) {
+          try {
+            await api(`/api/pages/${id}`, { method: "DELETE" });
+          } catch {
+            /* サンプルページがなければそのまま */
+          }
+        }
+      }
+      const done = homeId ?? createdPages[0]?.id ?? fallbackParent;
+      if (!done) throw new Error("ページを取り込みできませんでした");
+      setDoneId(done);
+      setStatus(setup ? `完了しました。${createdPages.length} ページをワークスペースに入れました。` : `完了しました。${createdPages.length} ページを「Notion から」に入れました。`);
       setToken("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "取り込みに失敗しました");

@@ -313,6 +313,7 @@ export function SetupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [welcomeId, setWelcomeId] = useState<string | null>(null);
+  const [starterIds, setStarterIds] = useState<string[]>([]);
   const [importId, setImportId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -342,7 +343,7 @@ export function SetupPage() {
     }
     setBusy(true);
     try {
-      const d = await api<{ welcomeId?: string }>("/api/setup", {
+      const d = await api<{ welcomeId?: string; starterIds?: string[] }>("/api/setup", {
         method: "POST",
         body: JSON.stringify({
           name,
@@ -354,6 +355,7 @@ export function SetupPage() {
         }),
       });
       setWelcomeId(d.welcomeId ?? null);
+      setStarterIds(d.starterIds ?? (d.welcomeId ? [d.welcomeId] : []));
       setStep("import");
     } catch (err) {
       setError(err instanceof Error ? err.message : "失敗しました");
@@ -481,6 +483,7 @@ export function SetupPage() {
       >
         <NotionImport
           variant="setup"
+          replaceStarters={starterIds}
           onChanged={() => Promise.resolve()}
           onSkip={() => setStep("passkey")}
           onContinue={(rootId) => {

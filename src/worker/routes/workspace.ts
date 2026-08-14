@@ -186,7 +186,7 @@ async function bootstrapWorkspace(
   await env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
     .bind(tasksId, "タスク", "")
     .run();
-  return { workspaceId, welcomeId };
+  return { workspaceId, welcomeId, starterIds: [welcomeId, tasksId] };
 }
 
 function withSession(cookieResponse: Response, extra: Record<string, unknown>) {

@@ -55,6 +55,18 @@ function readToken(body: { token?: string }) {
   return token;
 }
 
+async function canCreateUnder(
+  ctx: Exclude<Awaited<ReturnType<typeof importer>>, { error: Response }>,
+  parentId: string | null | undefined,
+) {
+  if (!parentId) return true;
+  const { permission } = await resolvePagePermission(ctx.db, {
+    pageId: parentId,
+    userId: ctx.user.id,
+  });
+  return canEdit(permission);
+}
+
 async function nextPosition(db: ReturnType<typeof createDb>, workspaceId: string, parentId: string | null) {
   const siblings = await db
     .select({ position: schema.pages.position })
@@ -188,20 +200,16 @@ importRoutes.post("/api/import/notion/database", async (c) => {
   const ctx = await importer(c);
   if ("error" in ctx) return ctx.error;
   try {
-    const body = await c.req.json<{ token?: string; notionId: string; parentId: string }>();
+    const body = await c.req.json<{ token?: string; notionId: string; parentId?: string | null }>();
     const token = readToken(body);
-    const { permission } = await resolvePagePermission(ctx.db, {
-      pageId: body.parentId,
-      userId: ctx.user.id,
-    });
-    if (!canEdit(permission)) return c.json({ error: "作成権限がありません" }, 403);
+    if (!(await canCreateUnder(ctx, body.parentId))) return c.json({ error: "作成権限がありません" }, 403);
     const dbObj = await notionDatabase(token, body.notionId);
     const title = Array.isArray(dbObj.title) ? richPlain(dbObj.title) : "無題のデータベース";
     const icon = emojiIcon(dbObj.icon as { type?: string; emoji?: string }, "🗃️");
     const { properties, keyMap } = mapDatabaseSchema((dbObj.properties as Record<string, unknown>) ?? {});
     const id = await insertPage(c.env, ctx.db, {
       workspaceId: ctx.membership.workspaceId,
-      parentId: body.parentId,
+      parentId: body.parentId ?? null,
       userId: ctx.user.id,
       type: "database",
       title: title || "無題のデータベース",
@@ -324,13 +332,9 @@ importRoutes.post("/api/import/notion/page", async (c) => {
   const ctx = await importer(c);
   if ("error" in ctx) return ctx.error;
   try {
-    const body = await c.req.json<{ token?: string; notionId: string; parentId: string }>();
+    const body = await c.req.json<{ token?: string; notionId: string; parentId?: string | null }>();
     const token = readToken(body);
-    const { permission } = await resolvePagePermission(ctx.db, {
-      pageId: body.parentId,
-      userId: ctx.user.id,
-    });
-    if (!canEdit(permission)) return c.json({ error: "作成権限がありません" }, 403);
+    if (!(await canCreateUnder(ctx, body.parentId))) return c.json({ error: "作成権限がありません" }, 403);
     const page = await notionPage(token, body.notionId);
     const props = (page.properties as Record<string, { type?: string; title?: unknown }>) ?? {};
     const titleProp = Object.values(props).find((p) => p.type === "title");
@@ -338,7 +342,7 @@ importRoutes.post("/api/import/notion/page", async (c) => {
     const icon = emojiIcon(page.icon as { type?: string; emoji?: string }, "📄");
     const id = await insertPage(c.env, ctx.db, {
       workspaceId: ctx.membership.workspaceId,
-      parentId: body.parentId,
+      parentId: body.parentId ?? null,
       userId: ctx.user.id,
       type: "page",
       title,
