@@ -245,6 +245,7 @@ export function WorkspaceApp() {
       )}
       {settingsOpen && (
         <SettingsPanel
+          user={user}
           members={members}
           workspace={workspace}
           role={workspace.role}

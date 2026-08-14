@@ -84,8 +84,21 @@ html[data-theme="dark"] .page-link:hover {
 
 html[data-theme="dark"] .page-title,
 html[data-theme="dark"] input,
-html[data-theme="dark"] textarea {
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
   color: var(--color-ink);
+}
+
+html[data-theme="dark"] .btn-secondary {
+  background: #2a2a28;
+  border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field select,
+html[data-theme="dark"] .input {
+  background: #191919;
+  border-color: #3a3a37;
 }
 
 html[data-theme="dark"] .arcana-rail {
