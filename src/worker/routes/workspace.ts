@@ -1,0 +1,316 @@
+import { Hono } from "hono";
+import { and, eq } from "drizzle-orm";
+import { createDb } from "../db/client";
+import * as schema from "../db/schema";
+import { createAuth, getMembership, getSessionUser } from "../auth";
+import type { AppEnv } from "../types";
+
+const DEFAULT_DB_PROPERTIES = [
+  { id: "title", type: "title", name: "名前" },
+  {
+    id: "status",
+    type: "select",
+    name: "ステータス",
+    options: [
+      { id: "todo", name: "未着手", color: "gray" },
+      { id: "doing", name: "進行中", color: "blue" },
+      { id: "done", name: "完了", color: "green" },
+    ],
+  },
+];
+
+export const workspaceRoutes = new Hono<AppEnv>();
+
+workspaceRoutes.get("/api/bootstrap", async (c) => {
+  const db = createDb(c.env.DB);
+  const existing = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).limit(1);
+  return c.json({ needsSetup: existing.length === 0 });
+});
+
+workspaceRoutes.post("/api/setup", async (c) => {
+  const db = createDb(c.env.DB);
+  const existingWs = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).limit(1);
+  if (existingWs.length > 0) {
+    return c.json({ error: "すでにセットアップ済みです" }, 400);
+  }
+
+  const body = await c.req.json<{
+    name: string;
+    email: string;
+    password: string;
+    workspaceName: string;
+  }>();
+
+  if (!body.email || !body.password || !body.name || !body.workspaceName) {
+    return c.json({ error: "必須項目が不足しています" }, 400);
+  }
+
+  const auth = createAuth(c.env, c.req.raw);
+  const email = body.email.trim().toLowerCase();
+  const found = await db.select().from(schema.user).where(eq(schema.user.email, email)).limit(1);
+
+  let cookieResponse: Response;
+  let userId = found[0]?.id;
+
+  if (userId) {
+    cookieResponse = await auth.api.signInEmail({
+      body: { email, password: body.password },
+      headers: c.req.raw.headers,
+      asResponse: true,
+    });
+  } else {
+    cookieResponse = await auth.api.signUpEmail({
+      body: { email, password: body.password, name: body.name },
+      headers: c.req.raw.headers,
+      asResponse: true,
+    });
+  }
+
+  if (!cookieResponse.ok) {
+    const err = (await cookieResponse.json().catch(() => ({}))) as { message?: string };
+    return c.json({ error: err.message || "認証に失敗しました" }, 400);
+  }
+
+  const payload = (await cookieResponse.clone().json()) as { user?: { id: string } };
+  userId = payload.user?.id ?? userId;
+  if (!userId) {
+    return c.json({ error: "ユーザー作成に失敗しました" }, 500);
+  }
+
+  const now = new Date();
+  const workspaceId = crypto.randomUUID();
+  await db.insert(schema.workspaces).values({
+    id: workspaceId,
+    name: body.workspaceName,
+    createdAt: now,
+  });
+  await db.insert(schema.workspaceMembers).values({
+    workspaceId,
+    userId,
+    role: "owner",
+    createdAt: now,
+  });
+
+  const welcomeId = crypto.randomUUID();
+  await db.insert(schema.pages).values({
+    id: welcomeId,
+    workspaceId,
+    parentId: null,
+    type: "page",
+    title: "はじめにお読みください",
+    icon: "📖",
+    position: 1,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await c.env.DB.prepare(
+    "INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)",
+  )
+    .bind(welcomeId, "はじめにお読みください", "")
+    .run();
+
+  const headers = new Headers(cookieResponse.headers);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ok: true, workspaceId, welcomeId }), {
+    status: 200,
+    headers,
+  });
+});
+
+workspaceRoutes.get("/api/me", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ user: null, workspace: null }, 200);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return c.json({ user, workspace: null });
+  const ws = await db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, membership.workspaceId))
+    .limit(1);
+  return c.json({
+    user,
+    workspace: ws[0] ? { ...ws[0], role: membership.role } : null,
+  });
+});
+
+workspaceRoutes.get("/api/members", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return c.json({ error: "ワークスペースがありません" }, 403);
+
+  const members = await db
+    .select({
+      userId: schema.workspaceMembers.userId,
+      role: schema.workspaceMembers.role,
+      name: schema.user.name,
+      email: schema.user.email,
+    })
+    .from(schema.workspaceMembers)
+    .innerJoin(schema.user, eq(schema.user.id, schema.workspaceMembers.userId))
+    .where(eq(schema.workspaceMembers.workspaceId, membership.workspaceId));
+
+  const pending = await db
+    .select()
+    .from(schema.invites)
+    .where(eq(schema.invites.workspaceId, membership.workspaceId));
+
+  return c.json({ members, invites: pending, seatLimit: null });
+});
+
+workspaceRoutes.post("/api/invites", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+    return c.json({ error: "招待する権限がありません" }, 403);
+  }
+
+  const body = await c.req.json<{ email: string; role?: schema.MemberRole }>();
+  const email = body.email?.trim().toLowerCase();
+  if (!email) return c.json({ error: "メールアドレスが必要です" }, 400);
+  const role = body.role && ["admin", "member", "guest"].includes(body.role) ? body.role : "member";
+
+  const token = crypto.randomUUID().replaceAll("-", "");
+  const now = new Date();
+  const id = crypto.randomUUID();
+  await db.insert(schema.invites).values({
+    id,
+    workspaceId: membership.workspaceId,
+    email,
+    role,
+    token,
+    expiresAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+    createdBy: user.id,
+    createdAt: now,
+  });
+
+  const origin = new URL(c.req.url).origin;
+  return c.json({
+    id,
+    token,
+    url: `${origin}/invite/${token}`,
+    email,
+    role,
+  });
+});
+
+workspaceRoutes.get("/api/invites/:token", async (c) => {
+  const db = createDb(c.env.DB);
+  const token = c.req.param("token");
+  const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
+  const invite = rows[0];
+  if (!invite || invite.expiresAt.getTime() < Date.now()) {
+    return c.json({ error: "招待が無効です" }, 404);
+  }
+  const ws = await db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, invite.workspaceId))
+    .limit(1);
+  return c.json({
+    email: invite.email,
+    role: invite.role,
+    workspaceName: ws[0]?.name ?? "",
+  });
+});
+
+workspaceRoutes.post("/api/invites/:token/accept", async (c) => {
+  const db = createDb(c.env.DB);
+  const token = c.req.param("token");
+  const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
+  const invite = rows[0];
+  if (!invite || invite.expiresAt.getTime() < Date.now()) {
+    return c.json({ error: "招待が無効です" }, 404);
+  }
+
+  const body = await c.req.json<{ name: string; password: string; email?: string }>();
+  const email = (body.email ?? invite.email).trim().toLowerCase();
+  if (!body.name || !body.password) {
+    return c.json({ error: "名前とパスワードが必要です" }, 400);
+  }
+
+  const existing = await db.select().from(schema.user).where(eq(schema.user.email, email)).limit(1);
+  let userId = existing[0]?.id;
+
+  const auth = createAuth(c.env, c.req.raw);
+  let cookieResponse: Response | null = null;
+
+  if (!userId) {
+    const users = await db.select({ id: schema.user.id }).from(schema.user).limit(1);
+    if (users.length > 0) {
+      const hashed = await import("better-auth/crypto").then((m) => m.hashPassword(body.password));
+      userId = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(schema.user).values({
+        id: userId,
+        name: body.name,
+        email,
+        emailVerified: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await db.insert(schema.account).values({
+        id: crypto.randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: hashed,
+        createdAt: now,
+        updatedAt: now,
+      });
+      cookieResponse = await auth.api.signInEmail({
+        body: { email, password: body.password },
+        headers: c.req.raw.headers,
+        asResponse: true,
+      });
+    } else {
+      cookieResponse = await auth.api.signUpEmail({
+        body: { email, password: body.password, name: body.name },
+        headers: c.req.raw.headers,
+        asResponse: true,
+      });
+      const session = await auth.api.getSession({ headers: new Headers(cookieResponse.headers) });
+      userId = session?.user?.id;
+    }
+  } else {
+    cookieResponse = await auth.api.signInEmail({
+      body: { email, password: body.password },
+      headers: c.req.raw.headers,
+      asResponse: true,
+    });
+  }
+
+  if (!userId) return c.json({ error: "参加に失敗しました" }, 500);
+
+  const already = await db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, invite.workspaceId),
+        eq(schema.workspaceMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (already.length === 0) {
+    await db.insert(schema.workspaceMembers).values({
+      workspaceId: invite.workspaceId,
+      userId,
+      role: invite.role,
+      createdAt: new Date(),
+    });
+  }
+
+  await db.delete(schema.invites).where(eq(schema.invites.id, invite.id));
+
+  const headers = new Headers(cookieResponse?.headers);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+});
+
+export const DEFAULT_DB_PROPERTIES_JSON = JSON.stringify(DEFAULT_DB_PROPERTIES);

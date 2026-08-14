@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cf-bible",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cf-bible",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "cf-bible-files",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "Y_DURABLE_OBJECTS",
+        "class_name": "PageRoom",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PageRoom"],
+    },
+  ],
+}
