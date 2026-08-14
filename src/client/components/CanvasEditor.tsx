@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import {
@@ -20,6 +20,18 @@ import type { PresenceUser } from "./PresencePile";
 
 const ORIGIN = "arcana-jam";
 const CLIP = { nodes: [] as JamNode[], n: 0 };
+const ZMIN = 0.2;
+const ZMAX = 3.5;
+
+function clampZ(z: number) {
+  return Math.min(ZMAX, Math.max(ZMIN, z));
+}
+
+function zoomAround(c: { x: number; y: number; z: number }, sx: number, sy: number, nextZ: number) {
+  const z = clampZ(nextZ);
+  if (z === c.z) return c;
+  return { z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z };
+}
 
 function snapshot(list: JamNode[], ids: string[]) {
   const set = new Set(ids);
@@ -143,6 +155,9 @@ export function CanvasEditor({
   const nodesRef = useRef<JamNode[]>([]);
   const awareRaf = useRef<number | null>(null);
   const camSync = useRef<number | null>(null);
+  const camAnim = useRef<number | null>(null);
+  const wheelRaf = useRef<number | null>(null);
+  const wheelAcc = useRef({ x: 0, y: 0, factor: 1, sx: 0, sy: 0, zoom: false });
   const cursorBuf = useRef({ x: 0, y: 0 });
   const drag = useRef<null | {
     mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape" | "resize" | "port";
@@ -234,9 +249,16 @@ export function CanvasEditor({
     }, ORIGIN);
   }
 
+  function stopCamAnim() {
+    if (camAnim.current != null) {
+      cancelAnimationFrame(camAnim.current);
+      camAnim.current = null;
+    }
+  }
+
   function paintCam(c: { x: number; y: number; z: number }, commit = false) {
     camRef.current = c;
-    if (worldRef.current) worldRef.current.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.z})`;
+    if (worldRef.current) worldRef.current.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.z})`;
     if (dotsRef.current) {
       dotsRef.current.style.backgroundSize = `${24 * c.z}px ${24 * c.z}px`;
       dotsRef.current.style.backgroundPosition = `${c.x}px ${c.y}px`;
@@ -517,21 +539,53 @@ export function CanvasEditor({
   useEffect(() => {
     const el = boardRef.current;
     if (!el) return;
+    const flush = () => {
+      wheelRaf.current = null;
+      const acc = wheelAcc.current;
+      const c = camRef.current;
+      let next = c;
+      if (acc.zoom && acc.factor !== 1) next = zoomAround(next, acc.sx, acc.sy, next.z * acc.factor);
+      if (acc.x || acc.y) next = { ...next, x: next.x - acc.x, y: next.y - acc.y };
+      acc.x = 0;
+      acc.y = 0;
+      acc.factor = 1;
+      acc.zoom = false;
+      if (next !== c) paintCam(next);
+    };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const c = camRef.current;
+      if (camAnim.current != null) {
+        cancelAnimationFrame(camAnim.current);
+        camAnim.current = null;
+      }
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+      const dx = e.deltaX * unit;
+      const dy = e.deltaY * unit;
+      const acc = wheelAcc.current;
       if (e.ctrlKey || e.metaKey) {
         const r = el.getBoundingClientRect();
-        const sx = e.clientX - r.left;
-        const sy = e.clientY - r.top;
-        const z = Math.min(3.5, Math.max(0.2, c.z * (e.deltaY > 0 ? 0.92 : 1.08)));
-        paintCam({ z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z });
-        return;
+        acc.zoom = true;
+        acc.sx = e.clientX - r.left;
+        acc.sy = e.clientY - r.top;
+        acc.factor *= Math.exp(-Math.max(-80, Math.min(80, dy)) * 0.001);
+      } else {
+        acc.x += dx;
+        acc.y += dy;
       }
-      paintCam({ ...c, x: c.x - e.deltaX, y: c.y - e.deltaY });
+      if (wheelRaf.current == null) wheelRaf.current = requestAnimationFrame(flush);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (wheelRaf.current != null) cancelAnimationFrame(wheelRaf.current);
+      wheelRaf.current = null;
+      if (camAnim.current != null) cancelAnimationFrame(camAnim.current);
+      if (camSync.current) window.clearTimeout(camSync.current);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    paintCam(camRef.current);
   }, []);
 
   function overUi(t: EventTarget | null) {
@@ -701,6 +755,7 @@ export function CanvasEditor({
     else if (!d) paintGhost(null);
     if (!d) return;
     if (d.mode === "pan") {
+      stopCamAnim();
       paintCam({ x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y), z: camRef.current.z });
       return;
     }
@@ -922,17 +977,24 @@ export function CanvasEditor({
   }, [editing, editable, selected, collab]);
 
   function zoomBy(factor: number) {
+    stopCamAnim();
     const el = boardRef.current;
-    const c = camRef.current;
-    if (!el) {
-      paintCam({ ...c, z: Math.min(3.5, Math.max(0.2, c.z * factor)) }, true);
-      return;
-    }
-    const r = el.getBoundingClientRect();
-    const sx = r.width / 2;
-    const sy = r.height / 2;
-    const z = Math.min(3.5, Math.max(0.2, c.z * factor));
-    paintCam({ z, x: sx - ((sx - c.x) / c.z) * z, y: sy - ((sy - c.y) / c.z) * z }, true);
+    const from = { ...camRef.current };
+    const r = el?.getBoundingClientRect();
+    const sx = r ? r.width / 2 : 0;
+    const sy = r ? r.height / 2 : 0;
+    const targetZ = clampZ(from.z * factor);
+    if (targetZ === from.z) return;
+    const t0 = performance.now();
+    const dur = 180;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const ease = 1 - (1 - t) ** 3;
+      paintCam(zoomAround(from, sx, sy, from.z + (targetZ - from.z) * ease), t >= 1);
+      if (t < 1) camAnim.current = requestAnimationFrame(tick);
+      else camAnim.current = null;
+    };
+    camAnim.current = requestAnimationFrame(tick);
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -955,15 +1017,8 @@ export function CanvasEditor({
         onPointerCancel={onPointerUp}
         onPointerLeave={() => paintGhost(null)}
       >
-      <div
-        ref={dotsRef}
-        className="jam-dots"
-        style={{
-          backgroundSize: `${24 * cam.z}px ${24 * cam.z}px`,
-          backgroundPosition: `${cam.x}px ${cam.y}px`,
-        }}
-      />
-      <div ref={worldRef} className="jam-world" style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})` }}>
+      <div ref={dotsRef} className="jam-dots" />
+      <div ref={worldRef} className="jam-world">
         <svg className="jam-svg" aria-hidden>
           {nodes.map((n) => {
             if (n.kind === "pen" && n.points && n.points.length > 1) {
