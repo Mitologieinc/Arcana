@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { api } from "../lib/api";
+import { Modal } from "./Modal";
 
 type Result = { id: string; title: string; icon: string | null; type: string; snippet: string };
 
@@ -28,44 +29,36 @@ export function SearchModal({
   }, [q]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 pt-24" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-xl bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 border-b border-line px-3">
-          <Search size={16} className="text-muted" />
-          <input
-            autoFocus
-            className="flex-1 border-none py-3 outline-none"
-            placeholder="ページを検索"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button onClick={onClose}>
-            <X size={16} />
-          </button>
-        </div>
-        <ul className="max-h-80 overflow-auto p-2">
-          {results.map((r) => (
-            <li key={r.id}>
-              <button
-                className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar"
-                onClick={() => onOpen(r.id)}
-              >
-                <span>{r.icon || "📄"}</span>
-                <span>
-                  <span className="block text-sm">{r.title || "無題"}</span>
-                  {r.snippet && <span className="block text-xs text-muted">{r.snippet}</span>}
-                </span>
-              </button>
-            </li>
-          ))}
-          {q && results.length === 0 && (
-            <li className="px-2 py-6 text-center text-sm text-muted">見つかりませんでした</li>
-          )}
-        </ul>
+    <Modal title="検索" onClose={onClose} wide>
+      <div className="mb-3 flex items-center gap-2 border border-line px-3">
+        <Search size={14} className="text-muted" />
+        <input
+          autoFocus
+          className="h-10 flex-1 border-none bg-transparent text-[14px] outline-none"
+          placeholder="ページ名または本文"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
-    </div>
+      <ul className="max-h-80 overflow-auto">
+        {results.map((r) => (
+          <li key={r.id}>
+            <button
+              className="flex w-full items-start gap-2 px-2 py-2 text-left text-[13px] hover:bg-canvas"
+              onClick={() => onOpen(r.id)}
+            >
+              <span>{r.icon || "▪"}</span>
+              <span>
+                <span className="block font-medium">{r.title || "無題"}</span>
+                {r.snippet && <span className="block text-[12px] text-muted">{r.snippet}</span>}
+              </span>
+            </button>
+          </li>
+        ))}
+        {q && results.length === 0 && (
+          <li className="px-2 py-8 text-center text-[13px] text-muted">見つかりませんでした</li>
+        )}
+      </ul>
+    </Modal>
   );
 }

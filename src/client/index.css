@@ -4,12 +4,15 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
-  --color-sidebar: #f7f6f3;
-  --color-ink: #37352f;
-  --color-muted: #787774;
-  --color-line: #e8e7e4;
-  --color-accent: #2383e2;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-cf: #f6821f;
+  --color-cf-hover: #e67516;
+  --color-ink: #1a1a1a;
+  --color-muted: #6e6e6e;
+  --color-line: #e6e6e6;
+  --color-canvas: #f4f4f4;
+  --color-sidebar: #fafafa;
+  --color-danger: #c0392b;
 }
 
 html,
@@ -20,6 +23,8 @@ body,
   color: var(--color-ink);
   background: #fff;
   font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -33,10 +38,117 @@ textarea {
   font: inherit;
 }
 
-.bn-editor {
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: #fde6cf;
+}
+
+.bn-editor,
+.bn-container {
   background: transparent !important;
 }
 
-.bn-container {
-  background: transparent !important;
+.cf-mark {
+  width: 18px;
+  height: 18px;
+  background: var(--color-cf);
+  flex-shrink: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-primary {
+  background: var(--color-cf);
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background: var(--color-cf-hover);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+
+.btn-secondary:hover {
+  border-color: #cfcfcf;
+  background: var(--color-canvas);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  background: var(--color-canvas);
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.field span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.field input,
+.field select,
+.input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: #fff;
+  outline: none;
+}
+
+.field input:focus,
+.input:focus,
+.field select:focus {
+  border-color: var(--color-ink);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-line);
 }

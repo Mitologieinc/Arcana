@@ -92,7 +92,7 @@ export function DatabaseView({
         {views.map((v) => (
           <button
             key={v.id}
-            className={`rounded-md px-3 py-1 text-sm ${v.id === view.id ? "bg-sidebar font-medium" : "hover:bg-sidebar"}`}
+            className={`h-8 px-3 text-[13px] ${v.id === view.id ? "border-b-2 border-cf font-medium" : "text-muted hover:text-ink"}`}
             onClick={() => setViewId(v.id)}
           >
             {v.name}
@@ -116,7 +116,7 @@ export function DatabaseView({
           onChange={(e) => setFilterValue(e.target.value)}
         />
         {editable && (
-          <button className="ml-auto rounded-md bg-ink px-3 py-1 text-sm text-white" onClick={addRow}>
+          <button className="btn btn-primary ml-auto h-8 px-3 text-[12px]" onClick={addRow}>
             行を追加
           </button>
         )}
@@ -127,14 +127,14 @@ export function DatabaseView({
           {(statusProp.options ?? []).map((opt) => {
             const colRows = filtered.filter((r) => String(parseProps(r)[statusProp.id] ?? "todo") === opt.id);
             return (
-              <div key={opt.id} className="min-w-56 rounded-lg bg-sidebar p-2">
+              <div key={opt.id} className="min-w-56 border border-line bg-canvas p-2">
                 <div className="mb-2 px-1 text-xs font-medium text-muted">
                   {opt.name} · {colRows.length}
                 </div>
                 {colRows.map((row) => (
                   <button
                     key={row.id}
-                    className="mb-2 w-full rounded-md bg-white p-2 text-left text-sm shadow-sm"
+                    className="mb-2 w-full border border-line bg-white p-2 text-left text-[13px]"
                     onClick={() => onOpenRow(row.id)}
                   >
                     {row.icon} {row.title || "無題"}
@@ -147,7 +147,7 @@ export function DatabaseView({
       ) : (
         <div className="overflow-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-sidebar text-left text-muted">
+            <thead className="bg-canvas text-left text-[12px] text-muted">
               <tr>
                 {schema.map((p) => (
                   <th key={p.id} className="px-3 py-2 font-medium">

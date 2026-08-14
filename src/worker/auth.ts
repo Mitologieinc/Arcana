@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware, APIError } from "better-auth/api";
+import { passkey } from "@better-auth/passkey";
 import { createDb } from "./db/client";
 import * as schema from "./db/schema";
 import { count, eq } from "drizzle-orm";
@@ -9,6 +10,7 @@ export function createAuth(env: Env, request: Request) {
   const url = new URL(request.url);
   const baseURL = `${url.protocol}//${url.host}`;
   const db = createDb(env.DB);
+  const rpID = url.hostname;
 
   return betterAuth({
     appName: "CF Bible",
@@ -24,6 +26,13 @@ export function createAuth(env: Env, request: Request) {
       enabled: true,
       disableSignUp: false,
     },
+    plugins: [
+      passkey({
+        rpID,
+        rpName: "CF Bible",
+        origin: baseURL,
+      }),
+    ],
     trustedOrigins: [baseURL],
     advanced: {
       defaultCookieAttributes: {

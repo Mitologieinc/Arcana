@@ -155,25 +155,22 @@ export function PageEditor({
 
   return (
     <div className="min-h-full">
-      <div className="flex items-center justify-end gap-2 px-6 py-3">
+      <header className="flex h-12 items-center justify-end gap-1 border-b border-line px-4">
         {editable && !shareToken && (
           <>
-            <button
-              className="flex items-center gap-1 rounded-md px-3 py-1 text-sm hover:bg-sidebar"
-              onClick={() => setShareOpen(true)}
-            >
-              <Share2 size={14} />
+            <button className="btn btn-secondary h-8 px-3 text-[12px]" onClick={() => setShareOpen(true)}>
+              <Share2 size={13} />
               共有
             </button>
-            <button className="rounded-md p-1 text-muted hover:bg-sidebar" onClick={remove}>
+            <button className="btn-ghost p-2 text-muted" onClick={remove} title="削除">
               <Trash2 size={14} />
             </button>
           </>
         )}
-      </div>
-      <div className="mx-auto max-w-3xl px-6 pb-24">
+      </header>
+      <div className="mx-auto max-w-3xl px-10 pb-24 pt-10">
         <input
-          className="w-full border-none bg-transparent text-4xl font-bold outline-none placeholder:text-line"
+          className="w-full border-none bg-transparent text-[40px] font-semibold tracking-tight outline-none placeholder:text-line"
           value={title}
           placeholder="無題"
           readOnly={!editable}

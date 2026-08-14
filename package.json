@@ -13,6 +13,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.28",
     "@blocknote/core": "^0.54.0",
     "@blocknote/mantine": "^0.54.0",
     "@blocknote/react": "^0.54.0",

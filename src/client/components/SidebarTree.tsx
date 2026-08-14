@@ -11,17 +11,14 @@ type Props = {
 
 export function SidebarTree({ pages, currentId, onOpen, onCreateChild }: Props) {
   const roots = useMemo(
-    () =>
-      pages
-        .filter((p) => !p.parentId)
-        .sort((a, b) => a.position - b.position),
+    () => pages.filter((p) => !p.parentId).sort((a, b) => a.position - b.position),
     [pages],
   );
 
   return (
     <div>
       {roots.length === 0 && (
-        <p className="px-2 py-4 text-xs text-muted">ページはまだありません</p>
+        <p className="px-2 py-6 text-center text-[12px] text-muted">ページはまだありません</p>
       )}
       {roots.map((p) => (
         <TreeNode
@@ -53,31 +50,25 @@ function TreeNode({
   onOpen: (id: string) => void;
   onCreateChild: (parentId: string) => void;
 }) {
-  const children = pages
-    .filter((p) => p.parentId === page.id)
-    .sort((a, b) => a.position - b.position);
+  const children = pages.filter((p) => p.parentId === page.id).sort((a, b) => a.position - b.position);
   const [open, setOpen] = useState(true);
   const active = currentId === page.id;
 
   return (
     <div>
       <div
-        className={`group flex items-center rounded-md pr-1 text-sm ${active ? "bg-line" : "hover:bg-line/70"}`}
-        style={{ paddingLeft: 8 + depth * 12 }}
+        className={`group flex items-center pr-1 text-[13px] ${active ? "bg-white shadow-[inset_2px_0_0_#f6821f]" : "hover:bg-white/80"}`}
+        style={{ paddingLeft: 6 + depth * 12 }}
       >
-        <button
-          className="p-0.5 text-muted"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="展開"
-        >
-          <ChevronRight size={14} className={open && children.length ? "rotate-90" : ""} />
+        <button className="p-1 text-muted" onClick={() => setOpen((v) => !v)} aria-label="展開">
+          <ChevronRight size={12} className={open && children.length ? "rotate-90" : ""} />
         </button>
-        <button className="flex min-w-0 flex-1 items-center gap-1 py-1 text-left" onClick={() => onOpen(page.id)}>
-          <span>{page.icon || (page.type === "database" ? "🗃️" : "📄")}</span>
+        <button className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left" onClick={() => onOpen(page.id)}>
+          <span className="text-[12px]">{page.icon || (page.type === "database" ? "▦" : "▪")}</span>
           <span className="truncate">{page.title || "無題"}</span>
         </button>
         <button
-          className="hidden rounded p-0.5 text-muted group-hover:block"
+          className="hidden rounded p-1 text-muted group-hover:block"
           onClick={() => onCreateChild(page.id)}
           title="子ページ"
         >
