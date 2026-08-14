@@ -11,14 +11,11 @@ import { shareRoutes } from "./routes/share";
 import { searchRoutes } from "./routes/search";
 import { fileRoutes } from "./routes/files";
 import { extraRoutes } from "./routes/extras";
-import { cloudflareAccess } from "./lib/access-jwt";
 import type { AppEnv } from "./types";
 
 export class PageRoom extends YDurableObjects<AppEnv> {}
 
 const app = new Hono<AppEnv>();
-
-app.use("/api/*", cloudflareAccess());
 
 app.get("/api/health", (c) =>
   c.json({ ok: true, name: "arcana", seatBilling: false }),

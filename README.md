@@ -35,7 +35,7 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 - すでにワークスペースがある → `/signup` から member として参加する
 - 設定から発行した招待リンク（`/signup?invite=<token>`）は、メールと役割を先に決める任意の近道
 
-インスタンスをインターネットに出す場合は、[Cloudflare Access](#cloudflare-access) で手前を守ってください。
+インスタンスをインターネットに出す場合は、Cloudflare Access などで手前を守ってください。
 
 ## 必要環境
 
@@ -72,51 +72,6 @@ npm run deploy:production
 ```
 
 任意で本番 URL を `BETTER_AUTH_URL` にしても構いません（未設定ならリクエストの Origin を使います）。
-
-## Cloudflare Access
-
-Arcana のログイン（パスキー）は「誰が Wiki のユーザーか」です。Cloudflare Access は「誰がこのインスタンスに届くか」の手前の門です。置き換えず、両方使います。
-
-`TEAM_DOMAIN` と `POLICY_AUD` が両方あるときだけ、Worker が `/api/*` の Access JWT を検証します。ローカル（`npm run dev`）や未設定のデプロイでは検証しません。
-
-### ダッシュボード
-
-1. [Zero Trust](https://one.dash.cloudflare.com/) → **Access controls** → **Applications** → **Create new application**
-2. **Self-hosted** を選ぶ
-3. **公開ホスト名**を指定する（カスタムドメイン、または `*.workers.dev`）。[self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/) の手順です
-4. Allow ポリシーを付ける（会社のメールドメイン、IdP グループなど）
-5. アプリの **Application Audience (AUD)** タグを控える
-6. チームドメインは `https://<team-name>.cloudflareaccess.com`（Zero Trust のチーム名）
-
-**Workers の「Enable Cloudflare Access」は使わない。** Worker を destination にした Access アプリは、同時編集の WebSocket アップグレードを 403 にします。公開ホスト名を対象にした self-hosted アプリにしてください。
-
-`*.workers.dev` も残すなら、そちらにも Access を付けるか、Workers の設定で無効にしてください。
-
-### Worker に AUD を渡す
-
-両方セットすると API の JWT 検証が有効になります。値は秘密ではないですが、`wrangler.jsonc` の `vars` に空文字を書くとデプロイで上書きされるので、ダッシュボードか secret で入れます。
-
-```bash
-npx wrangler secret put TEAM_DOMAIN
-# 値: https://your-team.cloudflareaccess.com
-
-npx wrangler secret put POLICY_AUD
-# 値: Access アプリの AUD タグ
-```
-
-staging / 名前付き production なら `--env staging` または `--env production` を付けます。
-
-検証の仕様は [Validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/) に従います。
-
-### 共有リンク
-
-推奨はホスト名全体を Access のままにすることです。共有リンクは Access を通った人だけが開けます（社内共有）。
-
-社外の Bypass はパス単位でしか切れず、HTML・JS・`/api/pages` などまで広げると穴になります。やるならメインアプリより具体的な Access アプリを別途作り、**Bypass + Everyone** を付けます。Worker は次を JWT 検証から外しています。
-
-- `GET /api/health`
-- `GET /api/share/:token`
-- `?token=` 付きの `/api/pages/*`・`/api/files/*`・`/api/collab/*`
 
 ## 構成
 
