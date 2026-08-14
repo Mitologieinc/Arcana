@@ -248,12 +248,14 @@ export function WorkspaceApp() {
       {settingsOpen && (
         <SettingsPanel
           members={members}
+          workspace={workspace}
           role={workspace.role}
           onClose={() => {
             setSettingsOpen(false);
             void refresh();
           }}
           onChanged={async () => {
+            await refresh();
             const data = await api<{ members: Member[] }>("/api/members");
             setMembers(data.members);
           }}

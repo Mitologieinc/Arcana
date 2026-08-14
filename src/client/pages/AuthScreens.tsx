@@ -13,6 +13,7 @@ function Field({
   autoComplete,
   placeholder,
   minLength,
+  required = true,
 }: {
   label: string;
   type?: string;
@@ -21,6 +22,7 @@ function Field({
   autoComplete?: string;
   placeholder?: string;
   minLength?: number;
+  required?: boolean;
 }) {
   return (
     <label className="field">
@@ -31,7 +33,7 @@ function Field({
         autoComplete={autoComplete}
         placeholder={placeholder}
         minLength={minLength}
-        required
+        required={required}
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
@@ -83,11 +85,15 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [inviteOnly, setInviteOnly] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ needsSetup: boolean }>("/api/bootstrap")
-      .then((d) => setNeedsSetup(d.needsSetup))
+    api<{ needsSetup: boolean; inviteOnly?: boolean }>("/api/bootstrap")
+      .then((d) => {
+        setNeedsSetup(d.needsSetup);
+        setInviteOnly(Boolean(d.inviteOnly));
+      })
       .catch(() => setNeedsSetup(false));
   }, []);
 
@@ -158,10 +164,16 @@ export function LoginPage() {
         </button>
       </form>
       <p className="mt-8 text-center text-[13px] text-muted">
-        アカウントがない場合{" "}
-        <Link className="underline underline-offset-2" to="/signup">
-          作成
-        </Link>
+        {inviteOnly ? (
+          "参加は招待リンクから行います。"
+        ) : (
+          <>
+            アカウントがない場合{" "}
+            <Link className="underline underline-offset-2" to="/signup">
+              作成
+            </Link>
+          </>
+        )}
       </p>
     </AuthLayout>
   );
@@ -173,6 +185,8 @@ export function SignupPage() {
   const inviteFromUrl = params.get("invite") ?? "";
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const [allowedDomains, setAllowedDomains] = useState("");
   const [inviteInfo, setInviteInfo] = useState<{ email: string; workspaceName: string; role: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -181,10 +195,12 @@ export function SignupPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ needsSetup: boolean; workspaceName: string | null }>("/api/bootstrap")
+    api<{ needsSetup: boolean; workspaceName: string | null; inviteOnly?: boolean; allowedDomains?: string }>("/api/bootstrap")
       .then((d) => {
         setNeedsSetup(d.needsSetup);
         if (d.workspaceName) setWorkspaceName(d.workspaceName);
+        setInviteOnly(Boolean(d.inviteOnly));
+        setAllowedDomains(d.allowedDomains ?? "");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "初期化に失敗しました"));
   }, []);
@@ -230,15 +246,29 @@ export function SignupPage() {
   }
 
   if (needsSetup && !inviteFromUrl) return <Navigate to="/setup" replace />;
+  if (!needsSetup && inviteOnly && !inviteFromUrl) {
+    return (
+      <AuthLayout title="招待が必要です" kicker="このワークスペースは招待リンクがある人だけ参加できます。">
+        <p className="text-[13px] text-muted">届いたリンクを開くか、すでにアカウントがある場合はログインしてください。</p>
+        <p className="mt-8 text-center text-[13px] text-muted">
+          <Link className="underline underline-offset-2" to="/login">
+            ログイン
+          </Link>
+        </p>
+      </AuthLayout>
+    );
+  }
 
   const kicker =
     needsSetup === null
       ? "環境を確認しています。"
       : inviteInfo
         ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
-        : workspaceName
-          ? `「${workspaceName}」に参加します。`
-          : "この環境のワークスペースに参加します。";
+        : allowedDomains
+          ? `「${workspaceName}」に参加します。使えるメールは ${allowedDomains} です。`
+          : workspaceName
+            ? `「${workspaceName}」に参加します。`
+            : "この環境のワークスペースに参加します。";
 
   return (
     <AuthLayout title="アカウントを作成" kicker={kicker}>
@@ -267,6 +297,8 @@ export function SetupPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [ready, setReady] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const [allowedDomains, setAllowedDomains] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -306,6 +338,8 @@ export function SetupPage() {
           email,
           password,
           workspaceName,
+          inviteOnly,
+          allowedDomains,
         }),
       });
       setWelcomeId(d.welcomeId ?? null);
@@ -371,6 +405,34 @@ export function SetupPage() {
             autoComplete="organization"
             placeholder="例: 社名"
           />
+          <p className="mb-2 mt-1 text-[12px] font-medium text-muted">参加の仕方</p>
+          <div className="mb-3 grid gap-2">
+            {(
+              [
+                [false, "この URL を知っていれば参加できる"],
+                [true, "招待リンクがある人だけ"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={String(value)}
+                type="button"
+                className={`btn btn-secondary h-auto min-h-9 w-full justify-start py-2 text-left text-[13px] ${
+                  inviteOnly === value ? "ring-1 ring-ink" : ""
+                }`}
+                onClick={() => setInviteOnly(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Field
+            label="許可するメールドメイン（任意）"
+            value={allowedDomains}
+            onChange={setAllowedDomains}
+            placeholder="example.com"
+            required={false}
+          />
+          <p className="mb-3 -mt-1 text-[12px] text-muted">カンマ区切り。空ならドメインは制限しません。ゲスト招待は対象外です。</p>
           {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
           <button type="submit" className="btn btn-primary w-full">
             続ける

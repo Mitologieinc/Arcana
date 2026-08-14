@@ -5,6 +5,7 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { createAuth, getMembership, getSessionUser } from "../auth";
 import type { AppEnv } from "../types";
+import { emailAllowed, normalizeDomains } from "../lib/access";
 
 const DEFAULT_DB_PROPERTIES = [
   { id: "title", type: "title", name: "名前" },
@@ -28,6 +29,8 @@ workspaceRoutes.get("/api/bootstrap", async (c) => {
   return c.json({
     needsSetup: existing.length === 0,
     workspaceName: existing[0]?.name ?? null,
+    inviteOnly: existing[0]?.inviteOnly ?? false,
+    allowedDomains: existing[0]?.allowedDomains ?? "",
     environment: c.env.ENVIRONMENT ?? "local",
   });
 });
@@ -111,13 +114,15 @@ async function createCredentialUser(
 async function bootstrapWorkspace(
   env: Env,
   db: ReturnType<typeof createDb>,
-  input: { workspaceName: string; userId: string },
+  input: { workspaceName: string; userId: string; inviteOnly?: boolean; allowedDomains?: string },
 ) {
   const now = new Date();
   const workspaceId = crypto.randomUUID();
   await db.insert(schema.workspaces).values({
     id: workspaceId,
     name: input.workspaceName,
+    inviteOnly: Boolean(input.inviteOnly),
+    allowedDomains: normalizeDomains(input.allowedDomains),
     createdAt: now,
   });
   await db.insert(schema.workspaceMembers).values({
@@ -190,6 +195,8 @@ async function registerHandler(c: Context<AppEnv>) {
     password: string;
     workspaceName?: string;
     inviteToken?: string;
+    inviteOnly?: boolean;
+    allowedDomains?: string;
   }>();
 
   if (!body.email || !body.password || !body.name) {
@@ -212,6 +219,8 @@ async function registerHandler(c: Context<AppEnv>) {
     const boot = await bootstrapWorkspace(c.env, db, {
       workspaceName: body.workspaceName.trim(),
       userId: created.userId,
+      inviteOnly: body.inviteOnly,
+      allowedDomains: body.allowedDomains,
     });
     const headers = new Headers(created.cookieResponse.headers);
     headers.set("Content-Type", "application/json");
@@ -225,6 +234,10 @@ async function registerHandler(c: Context<AppEnv>) {
   let consumedInviteId: string | null = null;
   const token = parseInviteToken(body.inviteToken);
 
+  if (workspace.inviteOnly && !token) {
+    return c.json({ error: "招待リンクが必要です" }, 403);
+  }
+
   if (token) {
     const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
     const invite = rows[0];
@@ -235,6 +248,11 @@ async function registerHandler(c: Context<AppEnv>) {
     role = invite.role;
     joinEmail = (invite.email || email).toLowerCase();
     consumedInviteId = invite.id;
+  }
+
+  if (role !== "guest" && !emailAllowed(joinEmail, workspace.allowedDomains)) {
+    const domains = workspace.allowedDomains || "指定ドメイン";
+    return c.json({ error: `${domains} のメールだけ参加できます` }, 403);
   }
 
   const created = await createCredentialUser(c.env, c.req.raw, db, {
@@ -317,6 +335,29 @@ workspaceRoutes.get("/api/members", async (c) => {
   return c.json({ members, invites: pending, seatLimit: null });
 });
 
+workspaceRoutes.patch("/api/workspace", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+    return c.json({ error: "変更する権限がありません" }, 403);
+  }
+  const body = await c.req.json<{ name?: string; inviteOnly?: boolean; allowedDomains?: string }>();
+  const updates: Partial<typeof schema.workspaces.$inferInsert> = {};
+  if (body.name !== undefined) {
+    const name = body.name.trim();
+    if (!name) return c.json({ error: "名前が空です" }, 400);
+    updates.name = name;
+  }
+  if (body.inviteOnly !== undefined) updates.inviteOnly = Boolean(body.inviteOnly);
+  if (body.allowedDomains !== undefined) updates.allowedDomains = normalizeDomains(body.allowedDomains);
+  if (!Object.keys(updates).length) return c.json({ error: "変更がありません" }, 400);
+  await db.update(schema.workspaces).set(updates).where(eq(schema.workspaces.id, membership.workspaceId));
+  const ws = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, membership.workspaceId)).limit(1);
+  return c.json({ workspace: ws[0] ? { ...ws[0], role: membership.role } : null });
+});
+
 workspaceRoutes.post("/api/invites", async (c) => {
   const user = await getSessionUser(c.env, c.req.raw);
   if (!user) return c.json({ error: "未ログイン" }, 401);
@@ -330,6 +371,15 @@ workspaceRoutes.post("/api/invites", async (c) => {
   const email = body.email?.trim().toLowerCase();
   if (!email) return c.json({ error: "メールアドレスが必要です" }, 400);
   const role = body.role && ["admin", "member", "guest"].includes(body.role) ? body.role : "member";
+
+  const ws = await db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, membership.workspaceId))
+    .limit(1);
+  if (role !== "guest" && ws[0] && !emailAllowed(email, ws[0].allowedDomains)) {
+    return c.json({ error: `${ws[0].allowedDomains} のメールだけ招待できます` }, 400);
+  }
 
   const token = crypto.randomUUID().replaceAll("-", "");
   const now = new Date();
@@ -388,6 +438,10 @@ workspaceRoutes.post("/api/invites/:token/accept", async (c) => {
   const email = (body.email ?? invite.email).trim().toLowerCase();
   if (!body.name || !body.password) {
     return c.json({ error: "名前とパスワードが必要です" }, 400);
+  }
+  const wsRow = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, invite.workspaceId)).limit(1);
+  if (invite.role !== "guest" && wsRow[0] && !emailAllowed(email, wsRow[0].allowedDomains)) {
+    return c.json({ error: `${wsRow[0].allowedDomains} のメールだけ参加できます` }, 403);
   }
 
   const existing = await db.select().from(schema.user).where(eq(schema.user.email, email)).limit(1);

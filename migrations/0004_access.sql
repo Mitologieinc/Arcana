@@ -1,0 +1,2 @@
+ALTER TABLE workspaces ADD COLUMN invite_only INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE workspaces ADD COLUMN allowed_domains TEXT NOT NULL DEFAULT '';

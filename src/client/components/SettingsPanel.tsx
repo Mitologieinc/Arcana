@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { roleLabel } from "../lib/format";
 import { Modal } from "./Modal";
 import { Avatar } from "./Avatar";
-import type { Member, MemberRole } from "../lib/types";
+import type { Member, MemberRole, Workspace } from "../lib/types";
 
 type PasskeyRow = {
   id: string;
@@ -17,12 +17,14 @@ type PasskeyRow = {
 
 export function SettingsPanel({
   members,
+  workspace,
   role,
   onClose,
   onChanged,
   onSignOut,
 }: {
   members: Member[];
+  workspace: Workspace;
   role: MemberRole;
   onClose: () => void;
   onChanged: () => Promise<unknown>;
@@ -36,6 +38,10 @@ export function SettingsPanel({
   const [error, setError] = useState("");
   const [passkeys, setPasskeys] = useState<PasskeyRow[]>([]);
   const [pkError, setPkError] = useState("");
+  const [inviteOnly, setInviteOnly] = useState(Boolean(workspace.inviteOnly));
+  const [allowedDomains, setAllowedDomains] = useState(workspace.allowedDomains ?? "");
+  const [accessSaved, setAccessSaved] = useState("");
+  const [accessError, setAccessError] = useState("");
   const canInvite = role === "owner" || role === "admin";
 
   async function loadPasskeys() {
@@ -163,6 +169,61 @@ export function SettingsPanel({
 
       {tab === "team" && (
         <div>
+          {canInvite && (
+            <div className="mb-6 space-y-3">
+              <p className="text-[13px] font-medium">参加</p>
+              <div className="grid gap-2">
+                {(
+                  [
+                    [false, "この URL を知っていれば参加できる"],
+                    [true, "招待リンクがある人だけ"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    className={`btn btn-secondary h-auto min-h-9 w-full justify-start py-2 text-left text-[13px] ${
+                      inviteOnly === value ? "ring-1 ring-ink" : ""
+                    }`}
+                    onClick={() => setInviteOnly(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="field">
+                <span>許可するメールドメイン（任意）</span>
+                <input
+                  value={allowedDomains}
+                  placeholder="example.com, company.co.jp"
+                  onChange={(e) => setAllowedDomains(e.target.value)}
+                />
+              </label>
+              <p className="text-[12px] text-muted">カンマ区切り。空ならドメインは制限しません。ゲスト招待は対象外です。</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={async () => {
+                  setAccessError("");
+                  setAccessSaved("");
+                  try {
+                    await api("/api/workspace", {
+                      method: "PATCH",
+                      body: JSON.stringify({ inviteOnly, allowedDomains }),
+                    });
+                    setAccessSaved("保存しました");
+                    await onChanged();
+                  } catch (e) {
+                    setAccessError(e instanceof Error ? e.message : "保存できませんでした");
+                  }
+                }}
+              >
+                参加設定を保存
+              </button>
+              {accessSaved && <p className="text-[13px] text-muted">{accessSaved}</p>}
+              {accessError && <p className="text-[13px] text-danger">{accessError}</p>}
+            </div>
+          )}
           <p className="mb-4 text-[13px] text-muted">人数に上限はありません。</p>
           <ul className="mb-4 divide-y divide-line overflow-hidden rounded-[10px] border border-line">
             {members.map((m) => (

@@ -13,6 +13,8 @@ export type Workspace = {
   id: string;
   name: string;
   role: MemberRole;
+  inviteOnly?: boolean;
+  allowedDomains?: string;
 };
 
 export type Page = {

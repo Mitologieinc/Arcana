@@ -53,6 +53,8 @@ export const verification = sqliteTable("verification", {
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  inviteOnly: integer("invite_only", { mode: "boolean" }).notNull().default(false),
+  allowedDomains: text("allowed_domains").notNull().default(""),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
