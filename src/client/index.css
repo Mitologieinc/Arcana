@@ -60,6 +60,15 @@ html[data-theme="dark"] .arcana-db-table tbody tr:hover td {
   background: #191919;
 }
 
+html[data-theme="dark"] .arcana-doc .tableWrapper th {
+  background: #202020;
+}
+
+html[data-theme="dark"] .arcana-doc .tableWrapper th,
+html[data-theme="dark"] .arcana-doc .tableWrapper td {
+  border-color: #3a3a37;
+}
+
 html[data-theme="dark"] .page-title,
 html[data-theme="dark"] input,
 html[data-theme="dark"] textarea {
@@ -709,6 +718,72 @@ button:disabled {
   border-radius: 6px;
 }
 
+.arcana-doc .tableWrapper {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.arcana-doc .tableWrapper table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.arcana-doc .tableWrapper th,
+.arcana-doc .tableWrapper td {
+  position: relative;
+  min-width: 108px;
+  padding: 7px 10px;
+  vertical-align: top;
+  border: 1px solid var(--color-line);
+}
+
+.arcana-doc .tableWrapper th {
+  background: var(--color-canvas);
+  font-weight: 500;
+  text-align: left;
+}
+
+.arcana-doc .tableWrapper .selectedCell::after {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 131, 226, 0.12);
+}
+
+.arcana-doc .tableWrapper .column-resize-handle {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: #2383e2;
+}
+
+.resize-cursor {
+  cursor: col-resize;
+}
+
+.arcana-db-embed {
+  margin: 10px 0 16px;
+  overflow-x: auto;
+}
+
+.arcana-db-embed.is-selected {
+  outline: 2px solid rgba(35, 131, 226, 0.4);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.arcana-db-embed .arcana-db-table th:first-child,
+.arcana-db-embed .arcana-db-table td:first-child {
+  padding-left: 8px;
+  min-width: 180px;
+}
+
 .arcana-doc mark {
   background: #fdecc8;
   border-radius: 2px;
@@ -727,7 +802,7 @@ button:disabled {
 .slash-menu {
   z-index: 50;
   width: 324px;
-  max-height: 380px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 6px;
 }

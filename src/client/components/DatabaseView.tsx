@@ -29,6 +29,7 @@ type Props = {
   pages?: Page[];
   members?: Member[];
   editable: boolean;
+  embedded?: boolean;
   onOpenRow: (id: string) => void;
   onChanged: () => Promise<unknown>;
 };
@@ -87,9 +88,11 @@ export function DatabaseView({
   pages = [],
   members = [],
   editable,
+  embedded = false,
   onOpenRow,
   onChanged,
 }: Props) {
+  const gutter = embedded ? "" : "px-24 max-[860px]:px-6";
   const [viewId, setViewId] = useState(views[0]?.id);
   const view = views.find((v) => v.id === viewId) ?? views[0];
   const [filterMenu, setFilterMenu] = useState<DOMRect | null>(null);
@@ -178,7 +181,7 @@ export function DatabaseView({
   }
 
   if (!view) {
-    return <p className="mt-6 px-24 text-muted">ビューがありません</p>;
+    return <p className={`mt-6 text-muted ${gutter}`}>ビューがありません</p>;
   }
 
   const statusProp =
@@ -347,7 +350,7 @@ export function DatabaseView({
 
   return (
     <div className="mt-3">
-      <div className="mb-1 flex flex-wrap items-center gap-1 px-24 max-[860px]:px-6">
+      <div className={`mb-1 flex flex-wrap items-center gap-1 ${gutter}`}>
         {views.map((v) => (
           <button
             key={v.id}
@@ -413,7 +416,7 @@ export function DatabaseView({
       </div>
 
       {view.type === "gallery" ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 px-24 max-[860px]:px-6">
+        <div className={`grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 ${gutter}`}>
           {filtered.map((row) => (
             <button
               key={row.id}
@@ -433,7 +436,7 @@ export function DatabaseView({
           )}
         </div>
       ) : view.type === "calendar" ? (
-        <div className="px-24 max-[860px]:px-6">
+        <div className={gutter}>
           {(() => {
             const dateProp = schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy);
             const start = new Date(calCursor.y, calCursor.m, 1);
@@ -495,7 +498,7 @@ export function DatabaseView({
           })()}
         </div>
       ) : view.type === "board" && statusProp ? (
-        <div className="flex gap-3 overflow-x-auto px-24 pb-2 max-[860px]:px-6">
+        <div className={`flex gap-3 overflow-x-auto pb-2 ${gutter}`}>
           {(() => {
             const options = statusProp.options ?? [];
             const known = new Set(options.map((o) => o.id));

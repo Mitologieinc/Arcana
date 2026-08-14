@@ -11,9 +11,28 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
-import { Bold, Italic, Strikethrough, Code, Underline as UnderlineIcon, Heading1, Heading2, Heading3 } from "lucide-react";
+import { TableKit } from "@tiptap/extension-table";
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  Underline as UnderlineIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  BetweenHorizontalEnd,
+  BetweenHorizontalStart,
+  BetweenVerticalEnd,
+  BetweenVerticalStart,
+  Columns3,
+  Rows3,
+  Trash2,
+} from "lucide-react";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
+import { EditorChromeContext } from "./chrome";
+import { DatabaseEmbed } from "./databaseEmbed";
 import { SlashCommand, uploadImage } from "./slash";
 import { PageLink, PageMention } from "./pageLink";
 
@@ -32,6 +51,8 @@ export function TiptapEditor({
   editable,
   title,
   compact,
+  onOpenPage,
+  onPagesChanged,
 }: {
   pageId: string;
   user: User;
@@ -39,6 +60,8 @@ export function TiptapEditor({
   editable: boolean;
   title: string;
   compact?: boolean;
+  onOpenPage?: (id: string) => void;
+  onPagesChanged?: () => Promise<unknown>;
 }) {
   const indexTimer = useRef<number | null>(null);
   const titleRef = useRef(title);
@@ -83,7 +106,15 @@ export function TiptapEditor({
       Image.configure({ resize: { enabled: true, minWidth: 80, minHeight: 80 } }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      SlashCommand,
+      TableKit.configure({
+        table: { resizable: true },
+      }),
+      DatabaseEmbed,
+      SlashCommand.configure({
+        pageId,
+        onOpenPage,
+        onPagesChanged,
+      }),
       PageLink,
       PageMention,
       Collaboration.configure({
@@ -166,6 +197,7 @@ export function TiptapEditor({
   if (!editor) return null;
 
   return (
+    <EditorChromeContext.Provider value={{ user, editable, shareToken, onOpenPage, onPagesChanged }}>
     <div
       className={compact ? "arcana-editor" : "arcana-editor min-h-[55vh]"}
       onClick={(e) => {
@@ -173,7 +205,11 @@ export function TiptapEditor({
       }}
     >
       {editable && (
-        <BubbleMenu editor={editor} className="bubble-menu menu-panel">
+        <BubbleMenu
+          editor={editor}
+          className="bubble-menu menu-panel"
+          shouldShow={({ editor: ed, state }) => !state.selection.empty}
+        >
           <button
             type="button"
             className={editor.isActive("bold") ? "is-active" : ""}
@@ -241,7 +277,40 @@ export function TiptapEditor({
           </button>
         </BubbleMenu>
       )}
+      {editable && (
+        <BubbleMenu
+          editor={editor}
+          pluginKey="tableBubble"
+          className="bubble-menu menu-panel"
+          shouldShow={({ editor: ed, state }) => ed.isActive("table") && state.selection.empty}
+        >
+          <button type="button" title="左に列" onClick={() => editor.chain().focus().addColumnBefore().run()}>
+            <BetweenVerticalStart size={14} />
+          </button>
+          <button type="button" title="右に列" onClick={() => editor.chain().focus().addColumnAfter().run()}>
+            <BetweenVerticalEnd size={14} />
+          </button>
+          <button type="button" title="列を削除" onClick={() => editor.chain().focus().deleteColumn().run()}>
+            <Columns3 size={14} />
+          </button>
+          <span className="bubble-sep" />
+          <button type="button" title="上に行" onClick={() => editor.chain().focus().addRowBefore().run()}>
+            <BetweenHorizontalStart size={14} />
+          </button>
+          <button type="button" title="下に行" onClick={() => editor.chain().focus().addRowAfter().run()}>
+            <BetweenHorizontalEnd size={14} />
+          </button>
+          <button type="button" title="行を削除" onClick={() => editor.chain().focus().deleteRow().run()}>
+            <Rows3 size={14} />
+          </button>
+          <span className="bubble-sep" />
+          <button type="button" title="表を削除" onClick={() => editor.chain().focus().deleteTable().run()}>
+            <Trash2 size={14} />
+          </button>
+        </BubbleMenu>
+      )}
       <EditorContent editor={editor} />
     </div>
+    </EditorChromeContext.Provider>
   );
 }

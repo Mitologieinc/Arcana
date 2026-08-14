@@ -446,6 +446,8 @@ export function PageEditor({
               shareToken={shareToken}
               editable={editable}
               title={title}
+              onOpenPage={onOpenPage}
+              onPagesChanged={onPagesChanged}
             />
           </>
         )}
