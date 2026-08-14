@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search } from "lucide-react";
+import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search, StickyNote } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { greeting, modSymbol, relativeTime } from "../lib/format";
-import type { Member, Page, SavedTemplate, User, Workspace } from "../lib/types";
+import { greeting, modSymbol, pageTypeIcon, relativeTime } from "../lib/format";
+import type { Member, Page, PageType, SavedTemplate, User, Workspace } from "../lib/types";
 import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
@@ -94,7 +94,7 @@ export function WorkspaceApp() {
 
   async function createPage(
     parentId?: string | null,
-    type: "page" | "database" = "page",
+    type: PageType = "page",
     seed?: { title?: string; icon?: string; templateId?: string },
   ) {
     const res = await api<{ page: Page }>("/api/pages", {
@@ -185,7 +185,7 @@ export function WorkspaceApp() {
             />
           </div>
       </aside>
-      <main className="relative min-w-0 flex-1 overflow-auto">
+      <main className={`relative min-w-0 flex-1 ${current?.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
         {pageId ? (
           <PageEditor
             key={pageId}
@@ -210,6 +210,7 @@ export function WorkspaceApp() {
             onMemo={() => void createPage(null, "page", { title: "メモ", icon: "📝" })}
             onMeeting={() => void createPage(null, "page", { title: "会議メモ", icon: "📅" })}
             onTasks={() => void createPage(null, "database", { title: "タスク", icon: "✅" })}
+            onCanvas={() => void createPage(null, "canvas", { title: "キャンバス", icon: "🎨" })}
             onTemplate={(t) =>
               void createPage(null, "page", { title: t.title || t.name, icon: t.icon || "📄", templateId: t.id })
             }
@@ -283,6 +284,7 @@ function Home({
   onMemo,
   onMeeting,
   onTasks,
+  onCanvas,
   onTemplate,
 }: {
   userName: string;
@@ -294,6 +296,7 @@ function Home({
   onMemo: () => void;
   onMeeting: () => void;
   onTasks: () => void;
+  onCanvas: () => void;
   onTemplate: (t: SavedTemplate) => void;
 }) {
   const favIds = new Set(favorites.map((p) => p.id));
@@ -320,6 +323,7 @@ function Home({
             <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
             <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
             <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
+            <StartCard icon={<StickyNote size={18} strokeWidth={1.6} />} label="キャンバス" hint="付箋と図" onClick={onCanvas} />
             {templates.map((t) => (
               <StartCard
                 key={t.id}
@@ -416,7 +420,7 @@ function HomeRow({
         className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
         onClick={() => onOpen(page.id)}
       >
-        <PageIcon icon={page.icon} fallback={page.type === "database" ? "🗃️" : "📄"} size={15} />
+        <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={15} />
         <span className={`min-w-0 flex-1 truncate ${page.title ? "" : "text-muted"}`}>
           {page.title || "無題"}
         </span>

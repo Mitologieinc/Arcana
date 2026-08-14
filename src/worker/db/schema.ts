@@ -223,7 +223,7 @@ export const pageTemplates = sqliteTable("page_templates", {
 });
 
 export type MemberRole = "owner" | "admin" | "member" | "guest";
-export type PageType = "page" | "database";
+export type PageType = "page" | "database" | "canvas";
 export type Permission = "full" | "edit" | "view" | "none";
 
 export const PERMISSION_RANK: Record<Permission, number> = {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
@@ -20,7 +20,9 @@ import { Modal } from "./Modal";
 import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
 import { BrandMark } from "./Brand";
-import { permissionLabel } from "../lib/format";
+import { pageTypeIcon, permissionLabel } from "../lib/format";
+
+const CanvasEditor = lazy(() => import("./CanvasEditor").then((m) => ({ default: m.CanvasEditor })));
 
 type Props = {
   pageId: string;
@@ -286,7 +288,7 @@ export function PageEditor({
   }
 
   return (
-    <div className="min-h-full">
+    <div className={page.type === "canvas" ? "flex h-full min-h-0 flex-col" : "min-h-full"}>
       <header className="sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
           {shareToken ? (
@@ -310,14 +312,14 @@ export function PageEditor({
                 className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
                 onClick={() => onOpenPage(c.id)}
               >
-                {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 inline-block align-[-2px]" /> : "📄 "}
+                {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 inline-block align-[-2px]" /> : `${pageTypeIcon(c.type)} `}
                 {c.title || "無題"}
               </button>
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
           <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
-            <PageIcon icon={page.icon} size={14} className="mr-1 inline-block align-[-2px]" />
+            <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 inline-block align-[-2px]" />
             {title || "無題"}
           </span>
         </nav>
@@ -366,6 +368,7 @@ export function PageEditor({
                   <Link2 size={14} />
                   リンクをコピー
                 </button>
+                {page.type !== "canvas" && (
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
@@ -376,6 +379,8 @@ export function PageEditor({
                   <Clock size={14} />
                   履歴
                 </button>
+                )}
+                {page.type !== "canvas" && (
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={async () => {
@@ -391,7 +396,8 @@ export function PageEditor({
                   <Download size={14} />
                   Markdown
                 </button>
-                {editable && page.type !== "database" && canSaveTemplate && (
+                )}
+                {editable && page.type === "page" && canSaveTemplate && (
                   <button
                     className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                     onClick={() => {
@@ -423,7 +429,76 @@ export function PageEditor({
           )}
         </div>
       </header>
-      {page.coverR2Key && (
+      {page.type === "canvas" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+            <button
+              className="rounded-md text-[22px] leading-none hover:bg-hover"
+              onClick={() => {
+                if (!editable) return;
+                setIconOpen((v) => !v);
+              }}
+              disabled={!editable}
+            >
+              <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={22} />
+            </button>
+            <input
+              ref={titleRef}
+              className="page-title page-title-compact min-w-0 flex-1"
+              value={title}
+              placeholder="無題のキャンバス"
+              readOnly={!editable}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => saveTitle(title)}
+              onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                  void saveTitle(title);
+                }
+              }}
+            />
+            {iconOpen && (
+              <div className="menu-panel absolute left-4 top-11 z-20 w-80 p-2" onClick={(e) => e.stopPropagation()}>
+                <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
+                <EmojiPicker
+                  onPick={(emo) => {
+                    void saveIcon(emo);
+                    setIconOpen(false);
+                  }}
+                />
+                <button
+                  className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"
+                  onClick={pickIconFile}
+                >
+                  画像をアップロード
+                </button>
+                {page.icon && (
+                  <button
+                    className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"
+                    onClick={() => saveIcon(null)}
+                  >
+                    アイコンを削除
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="relative min-h-0 flex-1">
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-[13px] text-muted">読み込み中…</div>}>
+              <CanvasEditor
+                pageId={pageId}
+                user={user}
+                shareToken={shareToken}
+                editable={editable}
+                title={title}
+                onPresence={setPresence}
+              />
+            </Suspense>
+          </div>
+        </div>
+      )}
+      {page.type !== "canvas" && page.coverR2Key && (
         <div className="group/cover relative h-48 w-full bg-canvas">
           <CoverVisual cover={page.coverR2Key} className="h-48 w-full object-cover" />
           {editable && (
@@ -456,6 +531,7 @@ export function PageEditor({
           )}
         </div>
       )}
+      {page.type !== "canvas" && (
       <div
         className={
           page.type === "database" ? "group pb-32" : "group mx-auto max-w-[900px] pb-40"
@@ -521,7 +597,7 @@ export function PageEditor({
               }}
               disabled={!editable}
             >
-              <PageIcon icon={page.icon} fallback="📄" size={78} />
+              <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={78} />
             </button>
           ) : (
             editable && !page.coverR2Key && <div className="h-8" />
@@ -579,7 +655,7 @@ export function PageEditor({
               if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowDown") {
                 e.preventDefault();
                 void saveTitle(title);
-                if (page.type !== "database") {
+                if (page.type === "page") {
                   document.querySelector<HTMLElement>(".arcana-doc")?.focus();
                 } else {
                   e.currentTarget.blur();
@@ -587,7 +663,7 @@ export function PageEditor({
               }
             }}
           />
-          {editable && page.type !== "database" && editorEmpty && (
+          {editable && page.type === "page" && editorEmpty && (
             <div className="mt-3 flex flex-wrap gap-2">
               {[...PAGE_TEMPLATES, ...customTemplates.map(savedToChip)].map((t) => (
                 <button
@@ -660,6 +736,7 @@ export function PageEditor({
           </>
         )}
       </div>
+      )}
       {peekRow && (
         <RowPeek
           page={peekRow}

@@ -40,10 +40,10 @@ pageRoutes.post("/api/pages", async (c) => {
     templateId?: string;
   }>();
 
-  const type = body.type === "database" ? "database" : "page";
+  const type = body.type === "database" || body.type === "canvas" ? body.type : "page";
   let template: typeof schema.pageTemplates.$inferSelect | null = null;
   if (body.templateId) {
-    if (type !== "page") return c.json({ error: "データベースにはテンプレートを使えません" }, 400);
+    if (type !== "page") return c.json({ error: "ページ以外にはテンプレートを使えません" }, 400);
     const rows = await ctx.db
       .select()
       .from(schema.pageTemplates)
@@ -80,8 +80,11 @@ pageRoutes.post("/api/pages", async (c) => {
   const now = new Date();
   const id = crypto.randomUUID();
   const title =
-    body.title ?? template?.title ?? (type === "database" ? "無題のデータベース" : "無題");
-  const icon = body.icon ?? template?.icon ?? (type === "database" ? "🗃️" : "📄");
+    body.title ??
+    template?.title ??
+    (type === "database" ? "無題のデータベース" : type === "canvas" ? "無題のキャンバス" : "無題");
+  const icon =
+    body.icon ?? template?.icon ?? (type === "database" ? "🗃️" : type === "canvas" ? "🎨" : "📄");
 
   await ctx.db.insert(schema.pages).values({
     id,

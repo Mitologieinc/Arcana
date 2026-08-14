@@ -665,6 +665,12 @@ html[data-theme="dark"] .auth-hero-ghost {
   color: #c4c2bc;
 }
 
+.page-title-compact {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 ::selection {
   background: rgba(55, 53, 47, 0.12);
 }
@@ -1493,6 +1499,25 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
 
 html[data-theme="dark"] .arcana-presence {
   outline-color: #191919;
+}
+
+.arcana-canvas {
+  --color-primary: #00b69e;
+  --color-primary-darker: #009882;
+}
+
+.arcana-canvas .excalidraw {
+  --color-primary: #00b69e;
+  --color-primary-darker: #009882;
+  height: 100%;
+}
+
+.arcana-canvas .excalidraw .layer-ui__wrapper {
+  font-family: var(--font-sans);
+}
+
+html[data-theme="dark"] .arcana-canvas .dark-stickies {
+  background: #191919;
 }
 
 @media (max-width: 860px) {

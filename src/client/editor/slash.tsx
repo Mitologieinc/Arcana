@@ -20,11 +20,12 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  StickyNote,
   Table2,
   Text,
 } from "lucide-react";
 import { api } from "../lib/api";
-import type { Page } from "../lib/types";
+import type { Page, PageType } from "../lib/types";
 import { insertNamedTable } from "./simpleTable";
 import { twoColumns } from "./columns";
 
@@ -71,7 +72,7 @@ function pickImage(): Promise<File | null> {
   return pickFile("image/*");
 }
 
-async function createChildPage(parentId: string, type: "page" | "database" = "page") {
+async function createChildPage(parentId: string, type: PageType = "page") {
   return api<{ page: Page }>("/api/pages", {
     method: "POST",
     body: JSON.stringify({ parentId, type }),
@@ -234,6 +235,32 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
               },
             })
             .run();
+        })();
+      },
+    },
+    {
+      title: "キャンバス",
+      subtitle: "付箋や図を置く無限ボード",
+      aliases: ["canvas", "board", "miro", "ホワイトボード", "キャンバス", "ボード", "付箋"],
+      group: "basic",
+      icon: StickyNote,
+      command: ({ editor, range }) => {
+        if (!opts.pageId) return;
+        void (async () => {
+          const d = await createChildPage(opts.pageId, "canvas");
+          await opts.onPagesChanged?.();
+          if (editor.isDestroyed) return;
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: "pageLink",
+              attrs: { id: d.page.id, title: d.page.title || "無題のキャンバス" },
+            })
+            .insertContent(" ")
+            .run();
+          opts.onOpenPage?.(d.page.id);
         })();
       },
     },

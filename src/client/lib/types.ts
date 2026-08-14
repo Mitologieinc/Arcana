@@ -1,5 +1,5 @@
 export type MemberRole = "owner" | "admin" | "member" | "guest";
-export type PageType = "page" | "database";
+export type PageType = "page" | "database" | "canvas";
 export type Permission = "full" | "edit" | "view" | "none";
 
 export type User = {

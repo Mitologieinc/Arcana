@@ -2,6 +2,7 @@ import { ChevronRight, GripVertical, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { computePosition, dropZoneFromY, isDescendantOf } from "../lib/dnd";
 import type { Page } from "../lib/types";
+import { pageTypeIcon } from "../lib/format";
 import { PageIcon } from "./PageIcon";
 
 type Props = {
@@ -88,7 +89,7 @@ export function SidebarTree({ pages, currentId, onOpen, onCreateChild, onMove, c
             title={p.title || "無題"}
             onClick={() => onOpen(p.id)}
           >
-            <PageIcon icon={p.icon} fallback={p.type === "database" ? "🗃️" : "📄"} size={16} />
+            <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={16} />
           </button>
         ))}
       </div>
@@ -218,7 +219,7 @@ function TreeNode({
           <ChevronRight size={14} className={open && children.length ? "rotate-90 transition-transform" : "transition-transform"} />
         </button>
         <button className="flex min-w-0 flex-1 items-center gap-1.5 px-0.5 text-left" onClick={() => onOpen(page.id)}>
-          <PageIcon icon={page.icon} fallback={page.type === "database" ? "🗃️" : "📄"} size={15} />
+          <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={15} />
           <span className={`min-w-0 truncate ${page.title ? "text-ink" : "text-muted"}`}>{page.title || "無題"}</span>
         </button>
         <button

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { FilePlus, LayoutGrid, Search } from "lucide-react";
+import { FilePlus, LayoutGrid, Search, StickyNote } from "lucide-react";
 import { api } from "../lib/api";
-import type { Page } from "../lib/types";
+import type { Page, PageType } from "../lib/types";
+import { pageTypeIcon } from "../lib/format";
 import { Modal } from "./Modal";
 import { PageIcon } from "./PageIcon";
 
@@ -9,7 +10,7 @@ type Result = { id: string; title: string; icon: string | null; type: string; sn
 
 type Row =
   | { key: string; kind: "page"; id: string; title: string; icon: string; snippet?: string }
-  | { key: string; kind: "action"; title: string; subtitle: string; icon: "page" | "database"; run: () => void };
+  | { key: string; kind: "action"; title: string; subtitle: string; icon: PageType; run: () => void };
 
 export function SearchModal({
   pages = [],
@@ -20,7 +21,7 @@ export function SearchModal({
   pages?: Page[];
   onClose: () => void;
   onOpen: (id: string) => void;
-  onCreate: (type: "page" | "database") => void;
+  onCreate: (type: PageType) => void;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[]>([]);
@@ -67,6 +68,14 @@ export function SearchModal({
           icon: "database",
           run: () => onCreate("database"),
         },
+        {
+          key: "new-canvas",
+          kind: "action",
+          title: "新規キャンバス",
+          subtitle: "付箋と図を置く",
+          icon: "canvas",
+          run: () => onCreate("canvas"),
+        },
       ] as const satisfies readonly Row[]
     ).filter(
       (a) =>
@@ -74,7 +83,8 @@ export function SearchModal({
         a.title.toLowerCase().includes(query) ||
         a.subtitle.toLowerCase().includes(query) ||
         (a.icon === "page" && "page".includes(query)) ||
-        (a.icon === "database" && "db".includes(query)),
+        (a.icon === "database" && ("db".includes(query) || "データベース".includes(query))) ||
+        (a.icon === "canvas" && ("canvas".includes(query) || "キャンバス".includes(query) || "miro".includes(query))),
     );
 
     const pageRows: Row[] = (query ? results : recents).map((p) => ({
@@ -82,7 +92,7 @@ export function SearchModal({
       kind: "page",
       id: p.id,
       title: p.title || "無題",
-      icon: p.icon || (p.type === "database" ? "🗃️" : "📄"),
+      icon: p.icon || pageTypeIcon(p.type),
       snippet: "snippet" in p ? p.snippet : undefined,
     }));
 
@@ -136,7 +146,7 @@ export function SearchModal({
             >
               {row.kind === "action" ? (
                 <span className="flex h-6 w-6 items-center justify-center text-muted">
-                  {row.icon === "page" ? <FilePlus size={15} /> : <LayoutGrid size={15} />}
+                  {row.icon === "page" ? <FilePlus size={15} /> : row.icon === "canvas" ? <StickyNote size={15} /> : <LayoutGrid size={15} />}
                 </span>
               ) : (
                 <span className="flex h-6 w-6 items-center justify-center">

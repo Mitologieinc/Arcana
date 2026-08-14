@@ -61,3 +61,9 @@ export function expiryLabel(value: string | number | Date | null | undefined) {
   if (t < Date.now()) return "期限切れ";
   return `${new Date(t).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}まで`;
 }
+
+export function pageTypeIcon(type: string) {
+  if (type === "database") return "🗃️";
+  if (type === "canvas") return "🎨";
+  return "📄";
+}
