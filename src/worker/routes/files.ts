@@ -4,6 +4,7 @@ import { getMembership, getSessionUser } from "../auth";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { FILE_TYPES, isAllowedFileType, isImageType } from "../lib/files";
+import { shareLinkUnexpired, workspaceAllowsShareLinks } from "../lib/acl";
 import type { AppEnv } from "../types";
 
 export const fileRoutes = new Hono<AppEnv>();
@@ -46,11 +47,14 @@ fileRoutes.get("/api/files/:id", async (c) => {
   } else if (token) {
     const links = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.token, token)).limit(1);
     const link = links[0];
-    if (!link || (link.expiresAt && link.expiresAt.getTime() < Date.now())) {
+    if (!link || !shareLinkUnexpired(link)) {
       return c.json({ error: "未ログイン" }, 401);
     }
     const page = await db.select().from(schema.pages).where(eq(schema.pages.id, link.pageId)).limit(1);
-    workspaceId = page[0]?.workspaceId ?? null;
+    if (!page[0] || !(await workspaceAllowsShareLinks(db, page[0].workspaceId))) {
+      return c.json({ error: "未ログイン" }, 401);
+    }
+    workspaceId = page[0].workspaceId;
   }
   if (!workspaceId) return c.json({ error: "未ログイン" }, 401);
 

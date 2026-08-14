@@ -5,6 +5,7 @@ import {
   pages,
   shareLinks,
   workspaceMembers,
+  workspaces,
   PERMISSION_RANK,
   type Permission,
   type MemberRole,
@@ -16,6 +17,19 @@ export function canEdit(permission: Permission) {
 
 export function canView(permission: Permission) {
   return PERMISSION_RANK[permission] >= PERMISSION_RANK.view;
+}
+
+export function shareLinkUnexpired(link: { expiresAt: Date | null }) {
+  return !link.expiresAt || link.expiresAt.getTime() > Date.now();
+}
+
+export async function workspaceAllowsShareLinks(db: Database, workspaceId: string) {
+  const rows = await db
+    .select({ shareLinksEnabled: workspaces.shareLinksEnabled })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  return rows[0]?.shareLinksEnabled !== false;
 }
 
 function defaultPermission(role: MemberRole | null): Permission {
@@ -45,7 +59,7 @@ export async function resolvePagePermission(
       .where(eq(shareLinks.token, opts.shareToken))
       .limit(1);
     const link = links[0];
-    if (link && (!link.expiresAt || link.expiresAt.getTime() > Date.now())) {
+    if (link && shareLinkUnexpired(link) && (await workspaceAllowsShareLinks(db, page.workspaceId))) {
       const chain = await collectPageChain(db, page.id);
       if (chain.some((p) => p.id === link.pageId) || link.pageId === page.id) {
         const inherited = await permissionFromAncestors(db, page.id, opts.userId ?? null, null);

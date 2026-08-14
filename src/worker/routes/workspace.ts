@@ -518,7 +518,12 @@ workspaceRoutes.patch("/api/workspace", async (c) => {
   if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
     return c.json({ error: "変更する権限がありません" }, 403);
   }
-  const body = await c.req.json<{ name?: string; inviteOnly?: boolean; allowedDomains?: string }>();
+  const body = await c.req.json<{
+    name?: string;
+    inviteOnly?: boolean;
+    allowedDomains?: string;
+    shareLinksEnabled?: boolean;
+  }>();
   const updates: Partial<typeof schema.workspaces.$inferInsert> = {};
   if (body.name !== undefined) {
     const name = body.name.trim();
@@ -527,6 +532,7 @@ workspaceRoutes.patch("/api/workspace", async (c) => {
   }
   if (body.inviteOnly !== undefined) updates.inviteOnly = Boolean(body.inviteOnly);
   if (body.allowedDomains !== undefined) updates.allowedDomains = normalizeDomains(body.allowedDomains);
+  if (body.shareLinksEnabled !== undefined) updates.shareLinksEnabled = Boolean(body.shareLinksEnabled);
   if (!Object.keys(updates).length) return c.json({ error: "変更がありません" }, 400);
   await db.update(schema.workspaces).set(updates).where(eq(schema.workspaces.id, membership.workspaceId));
   const ws = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, membership.workspaceId)).limit(1);

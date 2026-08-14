@@ -53,3 +53,11 @@ export function permissionLabel(permission: string) {
       return permission;
   }
 }
+
+export function expiryLabel(value: string | number | Date | null | undefined) {
+  if (!value) return "無期限";
+  const t = new Date(value).getTime();
+  if (Number.isNaN(t)) return "無期限";
+  if (t < Date.now()) return "期限切れ";
+  return `${new Date(t).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}まで`;
+}

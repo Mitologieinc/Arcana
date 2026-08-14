@@ -75,8 +75,11 @@ export function SettingsPanel({
   const [pkError, setPkError] = useState("");
   const [inviteOnly, setInviteOnly] = useState(Boolean(workspace.inviteOnly));
   const [allowedDomains, setAllowedDomains] = useState(workspace.allowedDomains ?? "");
+  const [shareLinksEnabled, setShareLinksEnabled] = useState(workspace.shareLinksEnabled !== false);
   const [accessSaved, setAccessSaved] = useState("");
   const [accessError, setAccessError] = useState("");
+  const [shareSaved, setShareSaved] = useState("");
+  const [shareError, setShareError] = useState("");
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [transferId, setTransferId] = useState("");
   const canInvite = role === "owner" || role === "admin";
@@ -98,6 +101,12 @@ export function SettingsPanel({
   useEffect(() => {
     void loadPasskeys();
   }, []);
+
+  useEffect(() => {
+    setInviteOnly(Boolean(workspace.inviteOnly));
+    setAllowedDomains(workspace.allowedDomains ?? "");
+    setShareLinksEnabled(workspace.shareLinksEnabled !== false);
+  }, [workspace.inviteOnly, workspace.allowedDomains, workspace.shareLinksEnabled]);
 
   async function invite() {
     setError("");
@@ -349,6 +358,56 @@ export function SettingsPanel({
                   </button>
                   {accessSaved && <p className="text-[13px] text-muted">{accessSaved}</p>}
                   {accessError && <p className="text-[13px] text-danger">{accessError}</p>}
+                </section>
+              )}
+
+              {canInvite && (
+                <section className="space-y-3">
+                  <h3 className="text-[13px] font-medium">公開リンク</h3>
+                  <p className="text-[12px] text-muted">
+                    オフにすると、ページの共有リンクは新規発行できず、既存のものも開けなくなります。
+                  </p>
+                  <div className="grid gap-2">
+                    {(
+                      [
+                        [true, "ページごとに発行できる"],
+                        [false, "すべて無効（外部から開けない）"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={String(value)}
+                        type="button"
+                        className={`btn btn-secondary h-auto min-h-9 w-full justify-start py-2 text-left text-[13px] ${
+                          shareLinksEnabled === value ? "ring-1 ring-ink" : ""
+                        }`}
+                        onClick={() => setShareLinksEnabled(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      setShareError("");
+                      setShareSaved("");
+                      try {
+                        await api("/api/workspace", {
+                          method: "PATCH",
+                          body: JSON.stringify({ shareLinksEnabled }),
+                        });
+                        setShareSaved("保存しました");
+                        await onChanged();
+                      } catch (e) {
+                        setShareError(e instanceof Error ? e.message : "保存できませんでした");
+                      }
+                    }}
+                  >
+                    公開リンク設定を保存
+                  </button>
+                  {shareSaved && <p className="text-[13px] text-muted">{shareSaved}</p>}
+                  {shareError && <p className="text-[13px] text-danger">{shareError}</p>}
                 </section>
               )}
 

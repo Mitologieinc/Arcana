@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getSessionUser } from "../auth";
-import { canEdit, resolvePagePermission } from "../lib/acl";
+import { canEdit, resolvePagePermission, shareLinkUnexpired, workspaceAllowsShareLinks } from "../lib/acl";
 import type { AppEnv } from "../types";
 
 export const shareRoutes = new Hono<AppEnv>();
@@ -13,11 +13,12 @@ shareRoutes.get("/api/pages/:id/acl", async (c) => {
   if (!user) return c.json({ error: "未ログイン" }, 401);
   const db = createDb(c.env.DB);
   const id = c.req.param("id");
-  const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
+  const { permission, workspaceId } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (!canEdit(permission)) return c.json({ error: "閲覧できません" }, 403);
   const acls = await db.select().from(schema.pageAcl).where(eq(schema.pageAcl.pageId, id));
   const links = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.pageId, id));
-  return c.json({ acls, links, permission });
+  const shareLinksEnabled = workspaceId ? await workspaceAllowsShareLinks(db, workspaceId) : true;
+  return c.json({ acls, links, permission, shareLinksEnabled });
 });
 
 shareRoutes.put("/api/pages/:id/acl", async (c) => {
@@ -51,20 +52,30 @@ shareRoutes.post("/api/pages/:id/share-links", async (c) => {
   if (!user) return c.json({ error: "未ログイン" }, 401);
   const db = createDb(c.env.DB);
   const id = c.req.param("id");
-  const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
+  const { permission, workspaceId } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (!canEdit(permission)) return c.json({ error: "共有できません" }, 403);
-  const body = await c.req.json<{ permission?: schema.Permission }>();
+  if (!workspaceId || !(await workspaceAllowsShareLinks(db, workspaceId))) {
+    return c.json({ error: "公開リンクはオフです" }, 403);
+  }
+  const body = await c.req.json<{ permission?: schema.Permission; expiresIn?: "7d" | "30d" | "never" }>();
   const perm = body.permission === "edit" ? "edit" : "view";
   const token = crypto.randomUUID().replaceAll("-", "");
+  const expiresAt =
+    body.expiresIn === "7d"
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      : body.expiresIn === "30d"
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        : null;
   await db.insert(schema.shareLinks).values({
     id: crypto.randomUUID(),
     pageId: id,
     token,
     permission: perm,
+    expiresAt,
     createdAt: new Date(),
   });
   const origin = new URL(c.req.url).origin;
-  return c.json({ token, url: `${origin}/share/${token}`, permission: perm });
+  return c.json({ token, url: `${origin}/share/${token}`, permission: perm, expiresAt });
 });
 
 shareRoutes.delete("/api/share-links/:id", async (c) => {
@@ -81,14 +92,28 @@ shareRoutes.delete("/api/share-links/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+shareRoutes.delete("/api/pages/:id/share-links", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
+  if (permission !== "full") return c.json({ error: "削除できません" }, 403);
+  await db.delete(schema.shareLinks).where(eq(schema.shareLinks.pageId, id));
+  return c.json({ ok: true });
+});
+
 shareRoutes.get("/api/share/:token", async (c) => {
   const db = createDb(c.env.DB);
   const token = c.req.param("token");
   const links = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.token, token)).limit(1);
   const link = links[0];
-  if (!link || (link.expiresAt && link.expiresAt.getTime() < Date.now())) {
+  if (!link || !shareLinkUnexpired(link)) {
     return c.json({ error: "リンクが無効です" }, 404);
   }
   const page = await db.select().from(schema.pages).where(eq(schema.pages.id, link.pageId)).limit(1);
+  if (!page[0] || !(await workspaceAllowsShareLinks(db, page[0].workspaceId))) {
+    return c.json({ error: "リンクが無効です" }, 404);
+  }
   return c.json({ page: page[0], permission: link.permission, token });
 });

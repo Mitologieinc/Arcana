@@ -15,6 +15,7 @@ export type Workspace = {
   role: MemberRole;
   inviteOnly?: boolean;
   allowedDomains?: string;
+  shareLinksEnabled?: boolean;
 };
 
 export type Page = {
