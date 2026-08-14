@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { Page, Permission, User } from "../lib/types";
 import { PageEditor } from "../components/PageEditor";
-import { BrandLockup, BrandMark } from "../components/Brand";
+import { BrandLockup, hideBootSplash } from "../components/Brand";
 
 export function SharePage() {
   const { token } = useParams();
@@ -21,6 +21,10 @@ export function SharePage() {
       .catch((e) => setError(e.message));
   }, [token]);
 
+  useLayoutEffect(() => {
+    if (page || error) hideBootSplash();
+  }, [page, error]);
+
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-white px-6 text-center">
@@ -29,13 +33,7 @@ export function SharePage() {
       </div>
     );
   }
-  if (!page || !token) {
-    return (
-      <div className="flex h-full items-center justify-center bg-white">
-        <BrandMark className="h-14 w-auto" animate />
-      </div>
-    );
-  }
+  if (!page || !token) return null;
 
   const guest: User = { id: "guest", name: "ゲスト", email: "" };
 

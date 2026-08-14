@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { BrandLockup } from "../components/Brand";
+import { BrandLockup, hideBootSplash } from "../components/Brand";
 
 function Field({
   label,
@@ -53,6 +53,9 @@ function AuthLayout({
   steps?: number;
   children: React.ReactNode;
 }) {
+  useLayoutEffect(() => {
+    hideBootSplash();
+  }, []);
   return (
     <div className="flex min-h-full items-center justify-center bg-white px-6">
       <div className="w-full max-w-[320px] py-24">
@@ -134,13 +137,7 @@ export function LoginPage() {
   }
 
   if (needsSetup === true) return <Navigate to="/setup" replace />;
-  if (needsSetup === null) {
-    return (
-      <div className="flex h-full items-center justify-center bg-white">
-        <BrandLockup className="h-12 w-auto" />
-      </div>
-    );
-  }
+  if (needsSetup === null) return null;
 
   return (
     <AuthLayout title="ログイン">
@@ -250,6 +247,7 @@ export function SignupPage() {
     }
   }
 
+  if (needsSetup === null) return null;
   if (needsSetup && !inviteFromUrl) return <Navigate to="/setup" replace />;
   if (!needsSetup && inviteOnly && !inviteFromUrl) {
     return (
@@ -378,11 +376,7 @@ export function SetupPage() {
         </AuthLayout>
       );
     }
-    return (
-      <div className="flex h-full items-center justify-center bg-white">
-        <BrandLockup className="h-12 w-auto" />
-      </div>
-    );
+    return null;
   }
 
   if (step === "workspace") {

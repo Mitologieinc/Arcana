@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { authClient } from "../lib/auth-client";
@@ -12,7 +12,7 @@ import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { TrashPanel } from "../components/TrashPanel";
 import { NotifPanel } from "../components/NotifPanel";
-import { BrandMark } from "../components/Brand";
+import { hideBootSplash } from "../components/Brand";
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
@@ -101,13 +101,11 @@ export function WorkspaceApp() {
     setSettingsOpen(true);
   }
 
-  if (!ready || !user || !workspace) {
-    return (
-      <div className="flex h-full items-center justify-center bg-white">
-        <BrandMark className="h-14 w-auto" animate />
-      </div>
-    );
-  }
+  useLayoutEffect(() => {
+    if (ready) hideBootSplash();
+  }, [ready]);
+
+  if (!ready || !user || !workspace) return null;
 
   return (
     <div className="flex h-full bg-white">

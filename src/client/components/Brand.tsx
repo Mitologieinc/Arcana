@@ -12,25 +12,28 @@ const DELAY = [0, 2, 4, 1, 3, 5];
 function ArcanaMark({
   className,
   animate = false,
+  loop = false,
   hoverAnimate = false,
   label = "Arcana",
 }: {
   className?: string;
   animate?: boolean;
+  loop?: boolean;
   hoverAnimate?: boolean;
   label?: string;
 }) {
+  const motion = loop ? "is-loop" : animate ? "is-in" : "";
   return (
     <svg
       viewBox="0 0 412 263"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`arcana-logo ${animate ? "is-in" : ""} ${hoverAnimate ? "is-hover" : ""} ${className ?? ""}`}
+      className={`arcana-logo ${motion} ${hoverAnimate ? "is-hover" : ""} ${className ?? ""}`}
       role="img"
       aria-label={label}
     >
       {DIAMONDS.map((d, i) => (
-        <g key={i} className="arcana-logo-d" style={{ animationDelay: `${DELAY[i] * 70}ms` }}>
+        <g key={i} className="arcana-logo-d" style={{ ["--d" as string]: DELAY[i] }}>
           <rect
             x={d.x}
             y={d.y}
@@ -45,16 +48,22 @@ function ArcanaMark({
   );
 }
 
+export function hideBootSplash() {
+  document.getElementById("boot-splash")?.remove();
+}
+
 export function BrandMark({
   className = "h-8 w-auto",
   animate = false,
+  loop = false,
   hoverAnimate = false,
 }: {
   className?: string;
   animate?: boolean;
+  loop?: boolean;
   hoverAnimate?: boolean;
 }) {
-  return <ArcanaMark className={className} animate={animate} hoverAnimate={hoverAnimate} />;
+  return <ArcanaMark className={className} animate={animate} loop={loop} hoverAnimate={hoverAnimate} />;
 }
 
 export function BrandLockup({
