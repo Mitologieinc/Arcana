@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -29,6 +29,83 @@ function colorFor(id: string) {
   let n = 0;
   for (const ch of id) n += ch.charCodeAt(0);
   return COLORS[n % COLORS.length];
+}
+
+function CollabEditor({
+  pageId,
+  user,
+  shareToken,
+  editable,
+  title,
+}: {
+  pageId: string;
+  user: User;
+  shareToken?: string;
+  editable: boolean;
+  title: string;
+}) {
+  const indexTimer = useRef<number | null>(null);
+
+  const collab = useMemo(() => {
+    const doc = new Y.Doc();
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const params: Record<string, string> = {};
+    if (shareToken) params.token = shareToken;
+    const provider = new WebsocketProvider(`${proto}//${location.host}/api/collab`, pageId, doc, {
+      params,
+    });
+    return { doc, provider };
+  }, [pageId, shareToken]);
+
+  useEffect(() => {
+    return () => {
+      collab.provider.destroy();
+      collab.doc.destroy();
+    };
+  }, [collab]);
+
+  const editor = useCreateBlockNote(
+    withCollaboration({
+      dictionary: ja,
+      trailingBlock: true,
+      animations: true,
+      uploadFile: async (file) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/files", { method: "POST", body: fd });
+        const data = (await res.json()) as { url: string };
+        return data.url;
+      },
+      collaboration: {
+        fragment: collab.doc.getXmlFragment("document-store"),
+        provider: collab.provider,
+        user: { name: user.name || "ゲスト", color: colorFor(user.id) },
+      },
+    }),
+  );
+
+  function scheduleIndex() {
+    if (!editable) return;
+    if (indexTimer.current) window.clearTimeout(indexTimer.current);
+    indexTimer.current = window.setTimeout(() => {
+      const bodyText = blocksToText(editor.document as unknown[]);
+      void api(`/api/pages/${pageId}/index`, {
+        method: "POST",
+        body: JSON.stringify({ title, bodyText }),
+      });
+    }, 1500);
+  }
+
+  return (
+    <div
+      className="min-h-[55vh]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) editor.focus();
+      }}
+    >
+      <BlockNoteView editor={editor} editable={editable} theme="light" slashMenu sideMenu formattingToolbar onChange={scheduleIndex} />
+    </div>
+  );
 }
 
 function blocksToText(blocks: unknown[]): string {
@@ -64,7 +141,6 @@ export function PageEditor({
   const [shareOpen, setShareOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
   const [title, setTitle] = useState(fallback?.title ?? "");
-  const indexTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
@@ -87,54 +163,6 @@ export function PageEditor({
 
   const editable = permission === "full" || permission === "edit";
 
-  const collab = useMemo(() => {
-    const doc = new Y.Doc();
-    const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const params: Record<string, string> = {};
-    if (shareToken) params.token = shareToken;
-    const provider = new WebsocketProvider(`${proto}//${location.host}/api/collab`, pageId, doc, {
-      params,
-    });
-    return { doc, provider };
-  }, [pageId, shareToken]);
-
-  useEffect(() => {
-    return () => {
-      collab.provider.destroy();
-      collab.doc.destroy();
-    };
-  }, [collab]);
-
-  const editor = useCreateBlockNote(
-    withCollaboration({
-      dictionary: ja,
-      uploadFile: async (file) => {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/files", { method: "POST", body: fd });
-        const data = (await res.json()) as { url: string };
-        return data.url;
-      },
-      collaboration: {
-        fragment: collab.doc.getXmlFragment("document-store"),
-        provider: collab.provider,
-        user: { name: user.name || "ゲスト", color: colorFor(user.id) },
-      },
-    }),
-  );
-
-  function scheduleIndex() {
-    if (!editable) return;
-    if (indexTimer.current) window.clearTimeout(indexTimer.current);
-    indexTimer.current = window.setTimeout(() => {
-      const bodyText = blocksToText(editor.document as unknown[]);
-      void api(`/api/pages/${pageId}/index`, {
-        method: "POST",
-        body: JSON.stringify({ title, bodyText }),
-      });
-    }, 1500);
-  }
-
   async function saveTitle(next: string) {
     setTitle(next);
     if (!editable) return;
@@ -143,7 +171,6 @@ export function PageEditor({
       body: JSON.stringify({ title: next }),
     });
     await onPagesChanged();
-    scheduleIndex();
   }
 
   async function saveIcon(icon: string | null) {
@@ -182,7 +209,7 @@ export function PageEditor({
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-10 flex h-11 items-center justify-between bg-white/90 px-3 backdrop-blur-sm">
+      <header className="sticky top-0 z-[5] flex h-11 items-center justify-between bg-white/90 px-3 backdrop-blur-sm">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
           {crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
@@ -209,8 +236,8 @@ export function PageEditor({
           </div>
         )}
       </header>
-      <div className="group mx-auto max-w-[720px] px-12 pb-32 pt-16">
-        <div className="relative mb-1">
+      <div className="group mx-auto max-w-[900px] pb-40 pt-16">
+        <div className="relative mb-1 px-[54px]">
           {page.icon ? (
             <button
               className="mb-2 text-[72px] leading-none"
@@ -231,7 +258,7 @@ export function PageEditor({
             )
           )}
           {iconOpen && (
-            <div className="absolute left-0 top-20 z-20 w-64 rounded-lg border border-line bg-white p-2 shadow-[0_4px_18px_rgba(0,0,0,0.12)]">
+            <div className="absolute left-[54px] top-20 z-20 w-64 rounded-lg border border-line bg-white p-2 shadow-[0_4px_18px_rgba(0,0,0,0.12)]">
               <div className="grid grid-cols-8 gap-1">
                 {PAGE_ICONS.map((emo) => (
                   <button
@@ -251,15 +278,25 @@ export function PageEditor({
             </div>
           )}
         </div>
-        <input
-          className="page-title"
-          value={title}
-          placeholder="無題"
-          readOnly={!editable}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => saveTitle(title)}
-        />
+        <div className="px-[54px]">
+          <input
+            className="page-title"
+            value={title}
+            placeholder="無題"
+            readOnly={!editable}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => saveTitle(title)}
+            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void saveTitle(title);
+                document.querySelector<HTMLElement>(".bn-editor")?.focus();
+              }
+            }}
+          />
+        </div>
         {page.type === "database" ? (
+          <div className="mt-6 px-[54px]">
           <DatabaseView
             pageId={pageId}
             schema={dbSchema}
@@ -279,10 +316,15 @@ export function PageEditor({
               await onPagesChanged();
             }}
           />
-        ) : (
-          <div className="mt-4" onKeyUp={scheduleIndex}>
-            <BlockNoteView editor={editor} editable={editable} theme="light" />
           </div>
+        ) : (
+          <CollabEditor
+            pageId={pageId}
+            user={user}
+            shareToken={shareToken}
+            editable={editable}
+            title={title}
+          />
         )}
       </div>
       {shareOpen && page && (
