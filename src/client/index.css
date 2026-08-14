@@ -61,21 +61,6 @@ button {
   line-height: 1.6;
 }
 
-.cf-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: #2383e2;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
 .btn {
   display: inline-flex;
   align-items: center;

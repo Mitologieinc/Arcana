@@ -13,7 +13,7 @@ export function createAuth(env: Env, request: Request) {
   const rpID = url.hostname;
 
   return betterAuth({
-    appName: "CF Bible",
+    appName: "Arcana",
     baseURL,
     basePath: "/api/auth",
     secret: env.BETTER_AUTH_SECRET,
@@ -29,7 +29,7 @@ export function createAuth(env: Env, request: Request) {
     plugins: [
       passkey({
         rpID,
-        rpName: "CF Bible",
+        rpName: "Arcana",
         origin: baseURL,
       }),
     ],

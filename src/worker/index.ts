@@ -17,7 +17,7 @@ export class PageRoom extends YDurableObjects<AppEnv> {}
 const app = new Hono<AppEnv>();
 
 app.get("/api/health", (c) =>
-  c.json({ ok: true, name: "cf-bible", seatBilling: false }),
+  c.json({ ok: true, name: "arcana", seatBilling: false }),
 );
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => {

@@ -8,6 +8,7 @@ import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
+import { BrandMark } from "../components/Brand";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -86,14 +87,14 @@ export function WorkspaceApp() {
   return (
     <div className="flex h-full bg-white">
       <aside className="flex w-[240px] shrink-0 flex-col bg-sidebar px-1.5 py-2">
+        <button className="mb-1.5 overflow-hidden rounded-[6px] bg-black px-2 py-1.5" onClick={() => nav("/")} title="Arcana">
+          <BrandMark className="h-7 w-full object-contain" />
+        </button>
         <button
-          className="sidebar-item mb-1.5 h-10 px-2 font-medium"
+          className="sidebar-item mb-1.5 h-8 px-2 font-medium"
           onClick={() => nav("/")}
           title={workspace.name}
         >
-          <span className="cf-mark" style={{ width: 22, height: 22, fontSize: 12 }}>
-            {workspace.name.slice(0, 1)}
-          </span>
           <span className="min-w-0 truncate">{workspace.name}</span>
         </button>
         <button className="sidebar-item text-muted" onClick={() => setSearchOpen(true)}>

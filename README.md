@@ -1,4 +1,4 @@
-# CF Bible
+# Arcana
 
 Notion の席課金なしで、自社の Cloudflare アカウントに載せるチーム Wiki。人数が増えてもアプリ側の課金は増えません。払うのは Workers / D1 / Durable Objects / R2 の従量だけです。
 

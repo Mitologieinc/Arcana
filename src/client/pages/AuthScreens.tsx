@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { Brand } from "../components/Brand";
+import { BrandMark } from "../components/Brand";
 
 function Field({
   label,
@@ -39,7 +39,7 @@ function AuthLayout({
     <div className="flex min-h-full items-center justify-center bg-white px-6 py-16">
       <div className="w-full max-w-[320px]">
         <div className="mb-8 flex justify-center">
-          <Brand compact />
+          <BrandMark className="h-12 w-auto rounded-[8px]" />
         </div>
         <h1 className="text-center text-[22px] font-semibold tracking-tight">{title}</h1>
         {kicker && <p className="mt-2 text-center text-[14px] leading-relaxed text-muted">{kicker}</p>}
