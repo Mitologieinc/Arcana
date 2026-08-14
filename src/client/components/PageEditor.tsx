@@ -9,9 +9,10 @@ import { RowPeek } from "./RowPeek";
 import { ShareDialog } from "./ShareDialog";
 import { CommentsPanel } from "./CommentsPanel";
 import { HistoryPanel } from "./HistoryPanel";
-import { TiptapEditor } from "../editor/TiptapEditor";
+import { TiptapEditor, type TiptapHandle } from "../editor/TiptapEditor";
 import { uploadImage } from "../editor/slash";
 import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
+import { PAGE_TEMPLATES, type PageTemplate } from "../lib/page-templates";
 import { PageIcon } from "./PageIcon";
 import { EmojiPicker } from "./EmojiPicker";
 import { ConfirmModal } from "./ConfirmModal";
@@ -63,6 +64,8 @@ export function PageEditor({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editorGen, setEditorGen] = useState(0);
+  const [editorEmpty, setEditorEmpty] = useState(true);
+  const editorRef = useRef<TiptapHandle | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
@@ -88,6 +91,7 @@ export function PageEditor({
 
   useEffect(() => {
     setPeekId(null);
+    setEditorEmpty(true);
     reloadPage().catch(console.error);
     api<{ pages: Page[] }>("/api/favorites")
       .then((d) => setFavorited(d.pages.some((p) => p.id === pageId)))
@@ -128,6 +132,13 @@ export function PageEditor({
       body: JSON.stringify({ title: next }),
     });
     await onPagesChanged();
+  }
+
+  async function applyTemplate(t: PageTemplate) {
+    if (!editable) return;
+    if (!title.trim()) await saveTitle(t.title);
+    if (!page?.icon) await saveIcon(t.icon);
+    editorRef.current?.applyDoc(t.doc);
   }
 
   async function saveCoverKey(key: string | null) {
@@ -518,6 +529,22 @@ export function PageEditor({
               }
             }}
           />
+          {editable && page.type !== "database" && editorEmpty && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {PAGE_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-muted hover:bg-hover hover:text-ink"
+                  title={t.hint}
+                  onClick={() => void applyTemplate(t)}
+                >
+                  <span>{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {page.type === "database" ? (
             <DatabaseView
@@ -561,6 +588,7 @@ export function PageEditor({
             )}
             <TiptapEditor
               key={`${pageId}:${editorGen}`}
+              ref={editorRef}
               pageId={pageId}
               user={user}
               shareToken={shareToken}
@@ -569,6 +597,7 @@ export function PageEditor({
               onOpenPage={onOpenPage}
               onPagesChanged={onPagesChanged}
               onPresence={setPresence}
+              onEmptyChange={setEditorEmpty}
             />
           </>
         )}

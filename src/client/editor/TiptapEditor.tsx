@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -69,27 +69,40 @@ function colorFor(id: string) {
   return COLORS[n % COLORS.length];
 }
 
-export function TiptapEditor({
-  pageId,
-  user,
-  shareToken,
-  editable,
-  title,
-  compact,
-  onOpenPage,
-  onPagesChanged,
-  onPresence,
-}: {
-  pageId: string;
-  user: User;
-  shareToken?: string;
-  editable: boolean;
-  title: string;
-  compact?: boolean;
-  onOpenPage?: (id: string) => void;
-  onPagesChanged?: () => Promise<unknown>;
-  onPresence?: (users: PresenceUser[]) => void;
-}) {
+export type TiptapHandle = {
+  isEmpty: () => boolean;
+  applyDoc: (doc: object) => void;
+};
+
+export const TiptapEditor = forwardRef<
+  TiptapHandle,
+  {
+    pageId: string;
+    user: User;
+    shareToken?: string;
+    editable: boolean;
+    title: string;
+    compact?: boolean;
+    onOpenPage?: (id: string) => void;
+    onPagesChanged?: () => Promise<unknown>;
+    onPresence?: (users: PresenceUser[]) => void;
+    onEmptyChange?: (empty: boolean) => void;
+  }
+>(function TiptapEditor(
+  {
+    pageId,
+    user,
+    shareToken,
+    editable,
+    title,
+    compact,
+    onOpenPage,
+    onPagesChanged,
+    onPresence,
+    onEmptyChange,
+  },
+  ref,
+) {
   const indexTimer = useRef<number | null>(null);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -271,7 +284,11 @@ export function TiptapEditor({
         return false;
       },
     },
+    onCreate: ({ editor: ed }) => {
+      onEmptyChange?.(ed.isEmpty);
+    },
     onUpdate: ({ editor: ed }) => {
+      onEmptyChange?.(ed.isEmpty);
       if (!editable) return;
       if (indexTimer.current) window.clearTimeout(indexTimer.current);
       indexTimer.current = window.setTimeout(() => {
@@ -283,9 +300,32 @@ export function TiptapEditor({
     },
   });
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      isEmpty: () => editor?.isEmpty ?? true,
+      applyDoc: (doc) => {
+        if (!editor) return;
+        editor.chain().focus().setContent(doc).run();
+        onEmptyChange?.(editor.isEmpty);
+      },
+    }),
+    [editor, onEmptyChange],
+  );
+
   useEffect(() => {
     editor?.setEditable(editable);
   }, [editor, editable]);
+
+  useEffect(() => {
+    if (!editor || !onEmptyChange) return;
+    const report = () => onEmptyChange(editor.isEmpty);
+    report();
+    collab.provider.on("sync", report);
+    return () => {
+      collab.provider.off("sync", report);
+    };
+  }, [editor, collab, onEmptyChange]);
 
   if (!editor) return null;
 
@@ -406,4 +446,4 @@ export function TiptapEditor({
     </div>
     </EditorChromeContext.Provider>
   );
-}
+});
