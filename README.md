@@ -2,11 +2,15 @@
 
 Notion の席課金なしで、自社の Cloudflare アカウントに載せるチーム Wiki。人数が増えてもアプリ側の課金は増えません。払うのは Workers / D1 / Durable Objects / R2 の従量だけです。
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Mitologieinc/CF_bible)
+
+ボタンを押すと、Git 連携・D1・R2・Durable Objects の作成・マイグレーション・デプロイまでまとめて走ります。認証用の `BETTER_AUTH_SECRET` も初回デプロイで自動発行します。終わったら `*.workers.dev` を開き、初期設定画面からオーナーを作ってください。
+
 ## できること
 
 - ページ・ネスト・ブロック編集（見出し、リスト、ToDo、コード、画像）
 - サイドバーのページツリーと全文検索
-- データベース（テーブル / カンバン、フィルタ）
+- データベース（テーブル / カンバン / カレンダー / ギャラリー）
 - 同時編集（Yjs + Durable Objects）
 - メンバー登録、ページ権限、リンク共有
 - パスキー（WebAuthn）ログイン
@@ -18,21 +22,20 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 
 | 環境 | Worker | D1 | R2 |
 | --- | --- | --- | --- |
+| ワンタップ / デフォルト | `cf-bible` | `cf-bible` | `cf-bible-files` |
 | ローカル（`npm run dev`） | `cf-bible` | `cf-bible` | `cf-bible-files` |
 | staging | `cf-bible-staging` | `cf-bible-staging` | `cf-bible-files-staging` |
-| production | `cf-bible-production` | `cf-bible-production` | `cf-bible-files-production` |
-
-`wrangler.jsonc` の `database_id` はプレースホルダです。実デプロイ前に各環境の ID へ差し替えてください。
+| production（名前付き env） | `cf-bible-production` | `cf-bible-production` | `cf-bible-files-production` |
 
 ## アカウント
 
-1 環境は 1 社なので、その URL に届いた人は `/signup` からそのまま登録できます。招待コードは不要です。
+1 環境は 1 社です。空の環境は `/setup` でワークスペースとオーナーを作ります。招待コードは不要です。
 
-- ワークスペースがまだない → 最初のユーザーがオーナーになり、ワークスペースを作る
-- すでにワークスペースがある → 新しいアカウントは member として参加する
+- ワークスペースがまだない → `/setup` で最初の人がオーナーになる
+- すでにワークスペースがある → `/signup` から member として参加する
 - 設定から発行した招待リンク（`/signup?invite=<token>`）は、メールと役割を先に決める任意の近道
 
-古い `/setup` と `/invite/:token` は `/signup` にリダイレクトします。インスタンスをインターネットに出す場合は、Cloudflare Access などで手前を守ってください。
+インスタンスをインターネットに出す場合は、Cloudflare Access などで手前を守ってください。
 
 ## 必要環境
 
@@ -50,29 +53,25 @@ npm run db:migrate:local
 npm run dev
 ```
 
-ブラウザで http://localhost:5173 を開き、ログイン画面の「アカウントを作成」から始めます。
+ブラウザで http://localhost:5173 を開き、初期設定画面から始めます。
 
-## デプロイ
+## CLI から出す場合
 
-環境ごとにリソースを作り、返ってきた D1 の `database_id` を `wrangler.jsonc` の該当 `env` に書きます。
+ワンタップと同じく、リソース作成・秘密鍵・マイグレーションは `npm run deploy` がやります。
 
 ```bash
-# staging
-npx wrangler d1 create cf-bible-staging
-npx wrangler r2 bucket create cf-bible-files-staging
-npx wrangler secret put BETTER_AUTH_SECRET --env staging
-npm run db:migrate:staging
-npm run deploy:staging
+npx wrangler login
+npm run deploy
+```
 
-# production
-npx wrangler d1 create cf-bible-production
-npx wrangler r2 bucket create cf-bible-files-production
-npx wrangler secret put BETTER_AUTH_SECRET --env production
-npm run db:migrate:production
+staging / 名前付き production に出すときだけ:
+
+```bash
+npm run deploy:staging
 npm run deploy:production
 ```
 
-`npm run deploy` は production 向けです。任意で本番 URL を `BETTER_AUTH_URL` にしても構いません（未設定ならリクエストの Origin を使います）。
+任意で本番 URL を `BETTER_AUTH_URL` にしても構いません（未設定ならリクエストの Origin を使います）。
 
 ## 構成
 
