@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { DbProperty, Member, Page, SelectOption } from "../lib/types";
 import { FloatMenu } from "./FloatMenu";
+import { Avatar } from "./Avatar";
 
 const PILL: Record<string, string> = {
   gray: "bg-[#e3e2de] text-[#37352f]",
@@ -138,7 +139,14 @@ export function PropertyValue({
             openMenu(e.currentTarget);
           }}
         >
-          {current ? current.name : <span className="text-transparent">空</span>}
+          {current ? (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Avatar name={current.name} seed={current.userId} size={18} />
+              <span className="truncate">{current.name}</span>
+            </span>
+          ) : (
+            <span className="text-transparent">空</span>
+          )}
         </button>
         {open && anchor && (
           <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={220}>
@@ -146,7 +154,8 @@ export function PropertyValue({
               空
             </button>
             {members.map((m) => (
-              <button key={m.userId} className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover" onClick={() => { onChange(m.userId); setOpen(false); }}>
+              <button key={m.userId} className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover" onClick={() => { onChange(m.userId); setOpen(false); }}>
+                <Avatar name={m.name} seed={m.userId} size={18} />
                 {m.name}
               </button>
             ))}

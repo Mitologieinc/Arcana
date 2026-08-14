@@ -1,17 +1,3 @@
-const AVATAR_TONES = ["#ead4d4", "#d3e5ef", "#eee0da", "#dbeddb", "#f5e0c7", "#e8deee", "#f5e8c7", "#d4e8e2"];
-
-export function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const s = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
-  return (s || name.slice(0, 1) || "?").toUpperCase();
-}
-
-export function avatarTone(seed: string) {
-  let n = 0;
-  for (const ch of seed) n += ch.charCodeAt(0);
-  return AVATAR_TONES[n % AVATAR_TONES.length];
-}
-
 export function greeting() {
   const h = new Date().getHours();
   if (h < 5 || h >= 18) return "こんばんは";

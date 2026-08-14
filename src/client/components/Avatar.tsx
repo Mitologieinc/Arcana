@@ -1,4 +1,6 @@
-import { avatarTone, initials } from "../lib/format";
+import BoringAvatar from "boring-avatars";
+
+const COLORS = ["#e85d04", "#f4a261", "#264653", "#2a9d8f", "#e9c46a"];
 
 export function Avatar({
   name,
@@ -9,18 +11,13 @@ export function Avatar({
   seed?: string;
   size?: number;
 }) {
-  const px = `${size}px`;
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-ink"
-      style={{
-        width: px,
-        height: px,
-        fontSize: Math.max(9, size * 0.42),
-        background: avatarTone(seed || name),
-      }}
+      className="inline-flex shrink-0 overflow-hidden rounded-full [&>svg]:block"
+      style={{ width: size, height: size }}
+      title={name}
     >
-      {initials(name)}
+      <BoringAvatar name={seed || name || "?"} size={size} variant="marble" colors={COLORS} />
     </span>
   );
 }

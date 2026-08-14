@@ -40,6 +40,7 @@
     "@tiptap/suggestion": "^3.30.1",
     "@tiptap/y-tiptap": "^3.0.8",
     "better-auth": "^1.6.28",
+    "boring-avatars": "^2.0.4",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.2",
     "lucide-react": "^1.31.0",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { relativeTime } from "../lib/format";
+import { Avatar } from "./Avatar";
 
 type Comment = {
   id: string;
@@ -39,7 +40,9 @@ export function CommentsPanel({
         <div className="min-h-0 flex-1 overflow-auto px-4 py-2">
           {rows.length === 0 && <p className="py-6 text-[13px] text-muted">まだありません</p>}
           {rows.map((r) => (
-            <div key={r.id} className="mb-3">
+            <div key={r.id} className="mb-3 flex gap-2">
+              <Avatar name={r.name} seed={r.userId} size={22} />
+              <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[13px] font-medium">{r.name}</span>
                 <span className="text-[11px] text-muted">{relativeTime(r.createdAt)}</span>
@@ -56,6 +59,7 @@ export function CommentsPanel({
                   削除
                 </button>
               )}
+              </div>
             </div>
           ))}
         </div>
