@@ -36,7 +36,7 @@ function parseInviteToken(raw?: string) {
   if (!raw?.trim()) return "";
   const v = raw.trim();
   try {
-    const u = new URL(v, "https://bible.local");
+    const u = new URL(v, "https://arcana.local");
     return u.searchParams.get("invite") ?? v.split("/").filter(Boolean).at(-1) ?? v;
   } catch {
     return v;

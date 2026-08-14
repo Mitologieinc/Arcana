@@ -2,7 +2,7 @@
 
 Notion の席課金なしで、自社の Cloudflare アカウントに載せるチーム Wiki。人数が増えてもアプリ側の課金は増えません。払うのは Workers / D1 / Durable Objects / R2 の従量だけです。
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Mitologieinc/CF_bible)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Mitologieinc/Arcana)
 
 ボタンを押すと、Git 連携・D1・R2・Durable Objects の作成・マイグレーション・デプロイまでまとめて走ります。認証用の `BETTER_AUTH_SECRET` も初回デプロイで自動発行します。終わったら `*.workers.dev` を開き、初期設定画面からオーナーを作ってください。
 
@@ -22,10 +22,10 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 
 | 環境 | Worker | D1 | R2 |
 | --- | --- | --- | --- |
-| ワンタップ / デフォルト | `cf-bible` | `cf-bible` | `cf-bible-files` |
-| ローカル（`npm run dev`） | `cf-bible` | `cf-bible` | `cf-bible-files` |
-| staging | `cf-bible-staging` | `cf-bible-staging` | `cf-bible-files-staging` |
-| production（名前付き env） | `cf-bible-production` | `cf-bible-production` | `cf-bible-files-production` |
+| ワンタップ / デフォルト | `arcana` | `arcana` | `arcana-files` |
+| ローカル（`npm run dev`） | `arcana` | `arcana` | `arcana-files` |
+| staging | `arcana-staging` | `arcana-staging` | `arcana-files-staging` |
+| production（名前付き env） | `arcana-production` | `arcana-production` | `arcana-files-production` |
 
 ## アカウント
 

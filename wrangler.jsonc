@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "cf-bible",
+  "name": "arcana",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-08-14",
   "compatibility_flags": ["nodejs_compat"],
@@ -18,14 +18,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "cf-bible",
+      "database_name": "arcana",
       "migrations_dir": "migrations",
     },
   ],
   "r2_buckets": [
     {
       "binding": "FILES",
-      "bucket_name": "cf-bible-files",
+      "bucket_name": "arcana-files",
     },
   ],
   "durable_objects": {
@@ -45,19 +45,19 @@
   // 1環境 = 1 Worker + 1 D1 + 1 R2 + 1 DO 名前空間。staging と production は混ぜない。
   "env": {
     "staging": {
-      "name": "cf-bible-staging",
+      "name": "arcana-staging",
       "vars": { "ENVIRONMENT": "staging" },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "cf-bible-staging",
+          "database_name": "arcana-staging",
           "migrations_dir": "migrations",
         },
       ],
       "r2_buckets": [
         {
           "binding": "FILES",
-          "bucket_name": "cf-bible-files-staging",
+          "bucket_name": "arcana-files-staging",
         },
       ],
       "durable_objects": {
@@ -70,19 +70,19 @@
       },
     },
     "production": {
-      "name": "cf-bible-production",
+      "name": "arcana-production",
       "vars": { "ENVIRONMENT": "production" },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "cf-bible-production",
+          "database_name": "arcana-production",
           "migrations_dir": "migrations",
         },
       ],
       "r2_buckets": [
         {
           "binding": "FILES",
-          "bucket_name": "cf-bible-files-production",
+          "bucket_name": "arcana-files-production",
         },
       ],
       "durable_objects": {
