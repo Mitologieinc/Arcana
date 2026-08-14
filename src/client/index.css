@@ -184,7 +184,7 @@ html[data-theme="dark"] .arcana-nav {
   }
 
   .arcana-doc {
-    padding-left: 16px;
+    padding-left: 48px;
     padding-right: 16px;
   }
 
@@ -502,6 +502,52 @@ button:disabled {
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 14px 40px rgba(15, 15, 15, 0.12), 0 0 0 1px rgba(15, 15, 15, 0.02);
+}
+
+.arcana-editor {
+  position: relative;
+}
+
+.arcana-block-handle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding-top: 3px;
+  padding-right: 2px;
+  user-select: none;
+}
+
+.arcana-block-handle button,
+.arcana-block-handle .arcana-block-plus,
+.arcana-block-handle .arcana-block-grip {
+  display: flex;
+  height: 24px;
+  width: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.arcana-block-handle .arcana-block-plus {
+  cursor: pointer;
+}
+
+.arcana-block-handle .arcana-block-grip {
+  cursor: grab;
+}
+
+.arcana-block-handle .arcana-block-grip:active {
+  cursor: grabbing;
+}
+
+.arcana-block-handle button:hover,
+.arcana-block-handle .arcana-block-plus:hover,
+.arcana-block-handle .arcana-block-grip:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
 }
 
 .arcana-doc {
@@ -1042,7 +1088,7 @@ button:disabled {
 
 @media (max-width: 860px) {
   .arcana-doc {
-    padding-left: 24px;
+    padding-left: 52px;
     padding-right: 24px;
   }
 }

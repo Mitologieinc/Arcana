@@ -15,6 +15,7 @@ import { TableKit } from "@tiptap/extension-table";
 import { TextStyleKit } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
+import { NodeRange } from "@tiptap/extension-node-range";
 import {
   Bold,
   Italic,
@@ -37,6 +38,7 @@ import type { User } from "../lib/types";
 import { EditorChromeContext } from "./chrome";
 import { DatabaseEmbed } from "./databaseEmbed";
 import { Callout } from "./callout";
+import { BlockHandle } from "./BlockHandle";
 import { ColorButton, LinkButton } from "./FormatMenu";
 import { SlashCommand, uploadImage } from "./slash";
 import { PageBlock, PageLink, PageMention } from "./pageLink";
@@ -151,6 +153,11 @@ export function TiptapEditor({
       PageLink,
       PageBlock,
       PageMention,
+      NodeRange.extend({
+        addKeyboardShortcuts() {
+          return {};
+        },
+      }),
       Collaboration.configure({
         document: collab.doc,
         field: "prosemirror",
@@ -238,6 +245,7 @@ export function TiptapEditor({
         if (e.target === e.currentTarget) editor.chain().focus("end").run();
       }}
     >
+      {editable && !compact && <BlockHandle editor={editor} />}
       {editable && (
         <BubbleMenu editor={editor} className="bubble-menu menu-panel" shouldShow={showTextBubble}>
           <button
