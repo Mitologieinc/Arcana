@@ -33,7 +33,7 @@ workspaceRoutes.get("/api/bootstrap", async (c) => {
     workspaceName: existing[0]?.name ?? null,
     inviteOnly: existing[0]?.inviteOnly ?? false,
     allowedDomains: existing[0]?.allowedDomains ?? "",
-    emailVerification: Boolean(existing[0]?.mailFrom),
+    emailVerification: mailReady(c.env, existing[0]?.mailFrom),
     environment: c.env.ENVIRONMENT ?? "local",
   });
 });

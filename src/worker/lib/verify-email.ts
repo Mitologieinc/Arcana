@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
-import { mailReady, sendVerificationMail } from "./mail";
+import { mailReady, resolveMailFrom, sendVerificationMail } from "./mail";
 
 const OTP_TTL_MS = 15 * 60 * 1000;
 const RESEND_GAP_MS = 60 * 1000;
@@ -27,6 +27,7 @@ export async function issueEmailOtp(
   if (!mailReady(env, input.mailFrom)) {
     return { ok: false, error: "確認メールの送信元が設定されていません。", status: 400 };
   }
+  const from = resolveMailFrom(env, input.mailFrom);
   const email = input.email.trim().toLowerCase();
   const db = createDb(env.DB);
   const identifier = otpIdentifier(email);
@@ -55,7 +56,7 @@ export async function issueEmailOtp(
   });
 
   const sent = await sendVerificationMail(env, {
-    from: input.mailFrom,
+    from,
     to: email,
     code,
     workspaceName: input.workspaceName,

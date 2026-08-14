@@ -40,13 +40,16 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 
 ## 登録時のメール確認
 
-招待メールの一斉送信はしません。代わりに、登録したアドレスへ 6 桁の確認コードを送ります。
+招待メールの一斉送信はしません。代わりに、登録したアドレスへ 6 桁の確認コードを送ります。送信は **Resend** を使います。ドメインを Cloudflare に置く必要はありません。
 
-1. 独自ドメインを Cloudflare Email Sending に載せる: `npx wrangler email sending enable yourdomain.com`
-2. 初期設定または 設定 → チーム で送信元（例: `noreply@yourdomain.com`）を入れる
-3. 以降の新規登録は、届いたコードを入力するまでワークスペースに入れません
+1. [Resend](https://resend.com) で API キーを作り、送信ドメインを認証する（DNS はどこでもよい）
+2. `npx wrangler secret put RESEND_API_KEY`
+3. 初期設定または 設定 → チーム で送信元（例: `noreply@yourdomain.com`）を入れる。あるいは `MAIL_FROM` を vars / `.dev.vars` に書く
+4. 以降の新規登録は、届いたコードを入力するまでワークスペースに入れません
 
-`workers.dev` からは送れません。送信元が空のときは確認コードを送らず、従来どおりすぐ参加できます。オーナー初回セットアップで送信に失敗した場合は、閉じ込めないよう確認をスキップします。
+ローカルは `.dev.vars` に `RESEND_API_KEY` と任意で `MAIL_FROM` を足します。
+
+`workers.dev` からは送れません。送信元が空のときは確認コードを送らず、従来どおりすぐ参加できます。オーナー初回セットアップで送信に失敗した場合は、閉じ込めないよう確認をスキップします。Cloudflare Email Sending が残っていれば、Resend が無いときの予備として使います。
 
 ## 必要環境
 

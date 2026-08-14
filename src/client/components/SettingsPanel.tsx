@@ -210,7 +210,7 @@ export function SettingsPanel({
                 />
               </label>
               <p className="text-[12px] text-muted">
-                入れると新規登録で確認コードを送ります。Cloudflare Email Sending に登録したドメインのアドレスにしてください。空なら確認はしません。
+                入れると新規登録で確認コードを送ります。Resend で認証したアドレスで構いません。Cloudflare にドメインを置く必要はありません。空なら確認はしません。
               </p>
               <button
                 type="button"

@@ -1,22 +1,82 @@
 export function normalizeMailFrom(raw: string | null | undefined): string {
-  const v = (raw ?? "").trim().toLowerCase();
+  const v = (raw ?? "").trim();
   if (!v) return "";
-  const email = v.includes("@") ? v : `noreply@${v}`;
+  const angle = v.match(/<([^>]+)>/);
+  const email = (angle?.[1] ?? (v.includes("@") ? v : `noreply@${v}`)).trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("送信元メールの形式が正しくありません");
   }
   const domain = email.split("@")[1] ?? "";
   if (domain === "workers.dev" || domain.endsWith(".workers.dev")) {
-    throw new Error("workers.dev からは送れません。独自ドメインを Cloudflare Email Sending に登録してください。");
+    throw new Error("workers.dev からは送れません。Resend か、独自ドメインの送信元を使ってください。");
   }
   return email;
 }
 
-export function mailReady(env: Env, mailFrom: string | null | undefined): boolean {
-  return Boolean(mailFrom?.trim()) && typeof env.EMAIL?.send === "function";
+function hasResend(env: Env) {
+  return Boolean(env.RESEND_API_KEY?.trim());
 }
 
-export async function sendMail(
+export function resolveMailFrom(env: Env, mailFrom?: string | null) {
+  try {
+    const fromWs = mailFrom?.trim() ? normalizeMailFrom(mailFrom) : "";
+    if (fromWs) return fromWs;
+  } catch {
+    /* ワークスペースの値が壊れていても env 側を見る */
+  }
+  const fromEnv = env.MAIL_FROM?.trim();
+  if (fromEnv) return normalizeMailFrom(fromEnv);
+  return "";
+}
+
+export function mailReady(env: Env, mailFrom?: string | null): boolean {
+  const from = (() => {
+    try {
+      return resolveMailFrom(env, mailFrom);
+    } catch {
+      return "";
+    }
+  })();
+  if (!from) return false;
+  return hasResend(env) || typeof env.EMAIL?.send === "function";
+}
+
+function formatFrom(email: string, name?: string) {
+  if (email.includes("<")) return email;
+  return name ? `${name} <${email}>` : email;
+}
+
+async function sendViaResend(
+  env: Env,
+  input: { from: string; to: string; subject: string; text: string; html: string; fromName?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const key = env.RESEND_API_KEY?.trim();
+  if (!key) return { ok: false, error: "RESEND_API_KEY がありません。" };
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: formatFrom(input.from, input.fromName),
+      to: [input.to],
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    return {
+      ok: false,
+      error: body.message || `Resend が ${res.status} を返しました。送信元ドメインを Resend で認証してください。`,
+    };
+  }
+  return { ok: true };
+}
+
+async function sendViaCloudflare(
   env: Env,
   input: { from: string; to: string; subject: string; text: string; html: string; fromName?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -36,11 +96,21 @@ export async function sendMail(
     const message = err instanceof Error ? err.message : String(err);
     return {
       ok: false,
-      error:
-        "確認メールを送れませんでした。送信元ドメインを Cloudflare Email Sending に登録してください。" +
-        (message ? ` (${message})` : ""),
+      error: "Cloudflare Email Sending から送れませんでした。" + (message ? ` (${message})` : ""),
     };
   }
+}
+
+export async function sendMail(
+  env: Env,
+  input: { from: string; to: string; subject: string; text: string; html: string; fromName?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (hasResend(env)) {
+    const sent = await sendViaResend(env, input);
+    if (sent.ok) return sent;
+    if (typeof env.EMAIL?.send !== "function") return sent;
+  }
+  return sendViaCloudflare(env, input);
 }
 
 export async function sendVerificationMail(
