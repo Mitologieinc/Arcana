@@ -154,6 +154,15 @@ export function plainTextFromDoc(node: unknown): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
+export type TipTapDoc = { type: "doc"; content: unknown[] };
+
+export function normalizeTipTapDoc(raw: unknown): TipTapDoc | null {
+  if (!raw || typeof raw !== "object") return null;
+  const n = raw as { type?: unknown; content?: unknown };
+  if (n.type !== "doc") return null;
+  return { type: "doc", content: Array.isArray(n.content) ? n.content : [] };
+}
+
 function walk(node: unknown, parts: string[]) {
   if (!node || typeof node !== "object") return;
   const n = node as { text?: string; content?: unknown[] };

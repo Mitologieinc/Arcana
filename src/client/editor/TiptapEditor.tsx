@@ -72,6 +72,7 @@ function colorFor(id: string) {
 export type TiptapHandle = {
   isEmpty: () => boolean;
   applyDoc: (doc: object) => void;
+  getJSON: () => { type: "doc"; content: unknown[] };
 };
 
 export const TiptapEditor = forwardRef<
@@ -308,6 +309,11 @@ export const TiptapEditor = forwardRef<
         if (!editor) return;
         editor.chain().focus().setContent(doc).run();
         onEmptyChange?.(editor.isEmpty);
+      },
+      getJSON: () => {
+        const raw = editor?.getJSON();
+        if (!raw || raw.type !== "doc") return { type: "doc", content: [] };
+        return { type: "doc", content: Array.isArray(raw.content) ? raw.content : [] };
       },
     }),
     [editor, onEmptyChange],

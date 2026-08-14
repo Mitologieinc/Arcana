@@ -13,6 +13,7 @@ import { searchRoutes } from "./routes/search";
 import { fileRoutes } from "./routes/files";
 import { extraRoutes } from "./routes/extras";
 import { importRoutes } from "./routes/import";
+import { templateRoutes } from "./routes/templates";
 import { allowAttempt, clientIp } from "./lib/rate-limit";
 import type { AppEnv } from "./types";
 
@@ -106,6 +107,7 @@ app.route("/", fileRoutes);
 
 app.route("/", extraRoutes);
 app.route("/", importRoutes);
+app.route("/", templateRoutes);
 
 app.get("/api/collab/:id", upgrade(), async (c) => {
   const pageId = c.req.param("id");

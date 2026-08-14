@@ -4,7 +4,7 @@ import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search } from "lucide
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, modSymbol, relativeTime } from "../lib/format";
-import type { Member, Page, User, Workspace } from "../lib/types";
+import type { Member, Page, SavedTemplate, User, Workspace } from "../lib/types";
 import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
@@ -30,6 +30,7 @@ export function WorkspaceApp() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [favorites, setFavorites] = useState<Page[]>([]);
   const [unread, setUnread] = useState(0);
+  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
 
   function toggleNav() {
     setNavOpen((v) => {
@@ -54,6 +55,10 @@ export function WorkspaceApp() {
     setFavorites(fav.pages);
     const notes = await api<{ unread: number }>("/api/notifications").catch(() => ({ unread: 0 }));
     setUnread(notes.unread);
+    const tpls = await api<{ templates: SavedTemplate[] }>("/api/templates").catch(() => ({
+      templates: [] as SavedTemplate[],
+    }));
+    setTemplates(tpls.templates);
     return true;
   }
 
@@ -90,14 +95,20 @@ export function WorkspaceApp() {
   async function createPage(
     parentId?: string | null,
     type: "page" | "database" = "page",
-    seed?: { title?: string; icon?: string },
+    seed?: { title?: string; icon?: string; templateId?: string },
   ) {
     const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
-      body: JSON.stringify({ parentId: parentId ?? null, type, title: seed?.title, icon: seed?.icon }),
+      body: JSON.stringify({
+        parentId: parentId ?? null,
+        type,
+        title: seed?.title,
+        icon: seed?.icon,
+        templateId: seed?.templateId,
+      }),
     });
     await refresh();
-    nav(`/page/${res.page.id}`, { state: { focusTitle: !seed?.title } });
+    nav(`/page/${res.page.id}`, { state: { focusTitle: !seed?.title && !seed?.templateId } });
   }
 
   async function openSettings() {
@@ -186,17 +197,22 @@ export function WorkspaceApp() {
             onExpandSidebar={toggleNav}
             onPagesChanged={refresh}
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
+            canSaveTemplate={workspace.role !== "guest"}
           />
         ) : (
           <Home
             userName={user.name}
             favorites={favorites}
             recent={recent}
+            templates={templates}
             onSearch={() => setSearchOpen(true)}
             onOpen={(id) => nav(`/page/${id}`)}
             onMemo={() => void createPage(null, "page", { title: "メモ", icon: "📝" })}
             onMeeting={() => void createPage(null, "page", { title: "会議メモ", icon: "📅" })}
             onTasks={() => void createPage(null, "database", { title: "タスク", icon: "✅" })}
+            onTemplate={(t) =>
+              void createPage(null, "page", { title: t.title || t.name, icon: t.icon || "📄", templateId: t.id })
+            }
           />
         )}
       </main>
@@ -261,20 +277,24 @@ function Home({
   userName,
   favorites,
   recent,
+  templates,
   onSearch,
   onOpen,
   onMemo,
   onMeeting,
   onTasks,
+  onTemplate,
 }: {
   userName: string;
   favorites: Page[];
   recent: Page[];
+  templates: SavedTemplate[];
   onSearch: () => void;
   onOpen: (id: string) => void;
   onMemo: () => void;
   onMeeting: () => void;
   onTasks: () => void;
+  onTemplate: (t: SavedTemplate) => void;
 }) {
   const favIds = new Set(favorites.map((p) => p.id));
   const continuePages = recent.filter((p) => !favIds.has(p.id)).slice(0, 8);
@@ -300,6 +320,15 @@ function Home({
             <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
             <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
             <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
+            {templates.map((t) => (
+              <StartCard
+                key={t.id}
+                icon={<span className="text-[18px] leading-none">{t.icon || "📄"}</span>}
+                label={t.name}
+                hint="テンプレート"
+                onClick={() => onTemplate(t)}
+              />
+            ))}
           </div>
         </div>
       ) : (
@@ -322,6 +351,24 @@ function Home({
                   <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
                 ))}
               </ul>
+            </section>
+          )}
+          {templates.length > 0 && (
+            <section className="mt-6">
+              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">テンプレート</p>
+              <div className="flex flex-wrap gap-2">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-muted hover:bg-hover hover:text-ink"
+                    onClick={() => onTemplate(t)}
+                  >
+                    <span>{t.icon || "📄"}</span>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
             </section>
           )}
         </>

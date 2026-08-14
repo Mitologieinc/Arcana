@@ -208,6 +208,20 @@ export const pageRevisions = sqliteTable("page_revisions", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+export const pageTemplates = sqliteTable("page_templates", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  icon: text("icon"),
+  title: text("title").notNull().default(""),
+  bodyJson: text("body_json").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export type MemberRole = "owner" | "admin" | "member" | "guest";
 export type PageType = "page" | "database";
 export type Permission = "full" | "edit" | "view" | "none";

@@ -4,7 +4,7 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, listVisiblePages, resolvePagePermission } from "../lib/acl";
-import { plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
+import { normalizeTipTapDoc, plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 import { DEFAULT_DB_PROPERTIES_JSON } from "./workspace";
 
@@ -37,9 +37,26 @@ pageRoutes.post("/api/pages", async (c) => {
     title?: string;
     icon?: string;
     properties?: Record<string, unknown>;
+    templateId?: string;
   }>();
 
   const type = body.type === "database" ? "database" : "page";
+  let template: typeof schema.pageTemplates.$inferSelect | null = null;
+  if (body.templateId) {
+    if (type !== "page") return c.json({ error: "データベースにはテンプレートを使えません" }, 400);
+    const rows = await ctx.db
+      .select()
+      .from(schema.pageTemplates)
+      .where(
+        and(
+          eq(schema.pageTemplates.id, body.templateId),
+          eq(schema.pageTemplates.workspaceId, ctx.membership.workspaceId),
+        ),
+      )
+      .limit(1);
+    if (!rows[0]) return c.json({ error: "テンプレートが見つかりません" }, 404);
+    template = rows[0];
+  }
   if (body.parentId) {
     const { permission } = await resolvePagePermission(ctx.db, {
       pageId: body.parentId,
@@ -62,14 +79,17 @@ pageRoutes.post("/api/pages", async (c) => {
   const position = siblings.reduce((m, s) => Math.max(m, s.position), 0) + 1;
   const now = new Date();
   const id = crypto.randomUUID();
+  const title =
+    body.title ?? template?.title ?? (type === "database" ? "無題のデータベース" : "無題");
+  const icon = body.icon ?? template?.icon ?? (type === "database" ? "🗃️" : "📄");
 
   await ctx.db.insert(schema.pages).values({
     id,
     workspaceId: ctx.membership.workspaceId,
     parentId: body.parentId ?? null,
     type,
-    title: body.title ?? (type === "database" ? "無題のデータベース" : "無題"),
-    icon: body.icon ?? (type === "database" ? "🗃️" : "📄"),
+    title,
+    icon,
     position,
     properties: body.properties ? JSON.stringify(body.properties) : null,
     createdBy: ctx.user.id,
@@ -100,10 +120,26 @@ pageRoutes.post("/api/pages", async (c) => {
     });
   }
 
+  let bodyText = "";
+  if (template) {
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(template.bodyJson) as unknown;
+    } catch {
+      parsed = null;
+    }
+    const doc = normalizeTipTapDoc(parsed);
+    if (doc) {
+      const stub = c.env.Y_DURABLE_OBJECTS.get(c.env.Y_DURABLE_OBJECTS.idFromName(id));
+      await stub.importYjs(tiptapJsonToUpdate(doc));
+      bodyText = plainTextFromDoc(doc);
+    }
+  }
+
   await c.env.DB.prepare(
     "INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)",
   )
-    .bind(id, body.title ?? "", "")
+    .bind(id, title, bodyText)
     .run();
 
   const created = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);

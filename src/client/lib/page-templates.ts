@@ -36,6 +36,23 @@ function todos(...items: string[]) {
   };
 }
 
+export function savedToChip(t: {
+  id: string;
+  name: string;
+  icon: string | null;
+  title: string;
+  doc: { type: "doc"; content: unknown[] };
+}): PageTemplate {
+  return {
+    id: t.id,
+    label: t.name,
+    hint: "ワークスペース",
+    icon: t.icon || "📄",
+    title: t.title || t.name,
+    doc: t.doc,
+  };
+}
+
 export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     id: "memo",

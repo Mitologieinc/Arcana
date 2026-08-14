@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, Import, KeyRound, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
+import { Fingerprint, Import, KeyRound, LayoutTemplate, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { toast } from "../lib/toast";
@@ -8,12 +8,13 @@ import { SideSheet } from "./SideSheet";
 import { Avatar } from "./Avatar";
 import { NotionImport } from "./NotionImport";
 import { ConfirmModal } from "./ConfirmModal";
-import type { Member, MemberRole, User, Workspace } from "../lib/types";
+import type { Member, MemberRole, SavedTemplate, User, Workspace } from "../lib/types";
 
 type Confirm =
   | { kind: "remove"; userId: string; name: string }
   | { kind: "leave"; name: string }
-  | { kind: "transfer"; userId: string; name: string };
+  | { kind: "transfer"; userId: string; name: string }
+  | { kind: "template"; id: string; name: string };
 
 const ROLE_ORDER: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2, guest: 3 };
 
@@ -54,7 +55,7 @@ type PasskeyRow = {
   deviceType?: string;
 };
 
-type Tab = "account" | "appearance" | "team" | "import";
+type Tab = "account" | "appearance" | "team" | "templates" | "import";
 
 export function SettingsPanel({
   user,
@@ -95,7 +96,12 @@ export function SettingsPanel({
   const [shareError, setShareError] = useState("");
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [transferId, setTransferId] = useState("");
+  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [tplError, setTplError] = useState("");
   const canInvite = role === "owner" || role === "admin";
+  const canManageTemplates = role !== "guest";
   const roleOptions = assignableRoles(role);
   const sortedMembers = [...members].sort(
     (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name, "ja"),
@@ -114,6 +120,43 @@ export function SettingsPanel({
   useEffect(() => {
     void loadPasskeys();
   }, []);
+
+  useEffect(() => {
+    if (tab !== "templates") return;
+    api<{ templates: SavedTemplate[] }>("/api/templates")
+      .then((d) => setTemplates(d.templates))
+      .catch(() => setTemplates([]));
+  }, [tab]);
+
+  async function renameTemplate(id: string) {
+    const name = renameName.trim();
+    if (!name) {
+      setRenameId(null);
+      return;
+    }
+    try {
+      const d = await api<{ template: SavedTemplate }>(`/api/templates/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      });
+      setTemplates((prev) => prev.map((t) => (t.id === id ? d.template : t)));
+      setRenameId(null);
+      setTplError("");
+    } catch (e) {
+      setTplError(e instanceof Error ? e.message : "名前を変えられませんでした");
+    }
+  }
+
+  async function deleteTemplate(id: string) {
+    try {
+      await api(`/api/templates/${id}`, { method: "DELETE" });
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      setTplError("");
+      toast("テンプレートを削除しました");
+    } catch (e) {
+      setTplError(e instanceof Error ? e.message : "削除できませんでした");
+    }
+  }
 
   useEffect(() => {
     setInviteOnly(Boolean(workspace.inviteOnly));
@@ -237,6 +280,7 @@ export function SettingsPanel({
     { id: "account", label: "アカウント", icon: Fingerprint },
     { id: "appearance", label: "表示", icon: Monitor },
     { id: "team", label: "チーム", icon: Users },
+    { id: "templates", label: "テンプレ", icon: LayoutTemplate },
   ];
   if (canInvite) tabs.push({ id: "import", label: "移行", icon: Import });
 
@@ -637,6 +681,68 @@ export function SettingsPanel({
           )}
 
           {tab === "import" && canInvite && <NotionImport onChanged={onChanged} />}
+
+          {tab === "templates" && (
+            <div className="space-y-4">
+              <section>
+                <h3 className="mb-1 text-[13px] font-medium">ページのテンプレート</h3>
+                <p className="mb-3 text-[12px] leading-relaxed text-muted">
+                  ページの「その他」から保存できます。空のページでチップとして出ます。
+                </p>
+                {tplError && <p className="mb-3 text-[13px] text-danger">{tplError}</p>}
+                <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line">
+                  {templates.length === 0 && (
+                    <li className="px-3 py-6 text-center text-[13px] text-muted">まだありません</li>
+                  )}
+                  {templates.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-[13px]">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0">{t.icon || "📄"}</span>
+                        {renameId === t.id ? (
+                          <input
+                            className="input h-7 min-w-0 flex-1 text-[13px]"
+                            autoFocus
+                            value={renameName}
+                            maxLength={80}
+                            onChange={(e) => setRenameName(e.target.value)}
+                            onBlur={() => void renameTemplate(t.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void renameTemplate(t.id);
+                              }
+                              if (e.key === "Escape") setRenameId(null);
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="min-w-0 truncate text-left font-medium"
+                            onClick={() => {
+                              if (!canManageTemplates) return;
+                              setRenameId(t.id);
+                              setRenameName(t.name);
+                            }}
+                          >
+                            {t.name}
+                          </button>
+                        )}
+                      </span>
+                      {canManageTemplates && (
+                        <button
+                          className="shrink-0 rounded-md p-1 text-muted hover:bg-hover hover:text-danger"
+                          onClick={() => setConfirm({ kind: "template", id: t.id, name: t.name })}
+                          title="削除"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          )}
         </div>
       </div>
     </SideSheet>
@@ -677,6 +783,20 @@ export function SettingsPanel({
             const id = confirm.userId;
             setConfirm(null);
             void transferOwner(id);
+          }}
+        />
+      )}
+      {confirm?.kind === "template" && (
+        <ConfirmModal
+          title="テンプレートを削除"
+          body={`${confirm.name} を消します。すでに作ったページはそのままです。`}
+          confirmLabel="削除"
+          danger
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            const id = confirm.id;
+            setConfirm(null);
+            void deleteTemplate(id);
           }}
         />
       )}

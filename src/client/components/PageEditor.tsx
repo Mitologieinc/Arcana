@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
+import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
-import type { DbProperty, DbView, Member, Page, Permission, User } from "../lib/types";
+import type { DbProperty, DbView, Member, Page, Permission, SavedTemplate, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
 import { parseProps, PropertyIcon, PropertyValue } from "./PropertyValue";
 import { RowPeek } from "./RowPeek";
@@ -12,10 +12,11 @@ import { HistoryPanel } from "./HistoryPanel";
 import { TiptapEditor, type TiptapHandle } from "../editor/TiptapEditor";
 import { uploadImage } from "../editor/slash";
 import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
-import { PAGE_TEMPLATES, type PageTemplate } from "../lib/page-templates";
+import { PAGE_TEMPLATES, savedToChip, type PageTemplate } from "../lib/page-templates";
 import { PageIcon } from "./PageIcon";
 import { EmojiPicker } from "./EmojiPicker";
 import { ConfirmModal } from "./ConfirmModal";
+import { Modal } from "./Modal";
 import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
 import { BrandMark } from "./Brand";
@@ -32,6 +33,7 @@ type Props = {
   onExpandSidebar?: () => void;
   onPagesChanged: () => Promise<unknown>;
   onOpenPage: (id: string) => void;
+  canSaveTemplate?: boolean;
 };
 
 export function PageEditor({
@@ -45,6 +47,7 @@ export function PageEditor({
   onExpandSidebar,
   onPagesChanged,
   onOpenPage,
+  canSaveTemplate,
 }: Props) {
   const location = useLocation();
   const titleRef = useRef<HTMLInputElement>(null);
@@ -69,6 +72,11 @@ export function PageEditor({
   const [members, setMembers] = useState<Member[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
+  const [customTemplates, setCustomTemplates] = useState<SavedTemplate[]>([]);
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [saveTplName, setSaveTplName] = useState("");
+  const [saveTplBusy, setSaveTplBusy] = useState(false);
+  const [saveTplError, setSaveTplError] = useState("");
 
   async function reloadPage() {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
@@ -99,6 +107,13 @@ export function PageEditor({
     api<{ members: Member[] }>("/api/members")
       .then((d) => setMembers(d.members))
       .catch(() => undefined);
+    if (!shareToken) {
+      api<{ templates: SavedTemplate[] }>("/api/templates")
+        .then((d) => setCustomTemplates(d.templates))
+        .catch(() => setCustomTemplates([]));
+    } else {
+      setCustomTemplates([]);
+    }
   }, [pageId, shareToken]);
 
   useEffect(() => {
@@ -139,6 +154,35 @@ export function PageEditor({
     if (!title.trim()) await saveTitle(t.title);
     if (!page?.icon) await saveIcon(t.icon);
     editorRef.current?.applyDoc(t.doc);
+  }
+
+  async function saveAsTemplate() {
+    const name = saveTplName.trim();
+    if (!name) {
+      setSaveTplError("名前を入力してください");
+      return;
+    }
+    setSaveTplBusy(true);
+    setSaveTplError("");
+    try {
+      const doc = editorRef.current?.getJSON() ?? { type: "doc" as const, content: [] };
+      const d = await api<{ template: SavedTemplate }>("/api/templates", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          icon: page?.icon ?? null,
+          title: title.trim(),
+          doc,
+        }),
+      });
+      setCustomTemplates((prev) => [d.template, ...prev.filter((t) => t.id !== d.template.id)]);
+      setSaveTplOpen(false);
+      toast("テンプレートに保存しました");
+    } catch (e) {
+      setSaveTplError(e instanceof Error ? e.message : "保存できませんでした");
+    } finally {
+      setSaveTplBusy(false);
+    }
   }
 
   async function saveCoverKey(key: string | null) {
@@ -311,7 +355,7 @@ export function PageEditor({
               <MoreHorizontal size={16} />
             </button>
             {moreOpen && (
-              <div className="menu-panel absolute right-0 top-9 z-20 w-48 p-1" onClick={(e) => e.stopPropagation()}>
+              <div className="menu-panel absolute right-0 top-9 z-20 w-56 p-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
@@ -347,6 +391,20 @@ export function PageEditor({
                   <Download size={14} />
                   Markdown
                 </button>
+                {editable && page.type !== "database" && canSaveTemplate && (
+                  <button
+                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setSaveTplName(title.trim() || "無題のテンプレート");
+                      setSaveTplError("");
+                      setSaveTplOpen(true);
+                    }}
+                  >
+                    <LayoutTemplate size={14} />
+                    テンプレートとして保存
+                  </button>
+                )}
                 {editable && (
                   <button
                     className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
@@ -531,7 +589,7 @@ export function PageEditor({
           />
           {editable && page.type !== "database" && editorEmpty && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {PAGE_TEMPLATES.map((t) => (
+              {[...PAGE_TEMPLATES, ...customTemplates.map(savedToChip)].map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -669,6 +727,35 @@ export function PageEditor({
             void remove();
           }}
         />
+      )}
+      {saveTplOpen && (
+        <Modal title="テンプレートとして保存" onClose={() => !saveTplBusy && setSaveTplOpen(false)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveAsTemplate();
+            }}
+          >
+            <label className="field">
+              <span>名前</span>
+              <input
+                autoFocus
+                value={saveTplName}
+                maxLength={80}
+                onChange={(e) => setSaveTplName(e.target.value)}
+              />
+            </label>
+            {saveTplError && <p className="mb-3 text-[13px] text-danger">{saveTplError}</p>}
+            <div className="mt-1 flex justify-end gap-2">
+              <button type="button" className="btn btn-secondary" disabled={saveTplBusy} onClick={() => setSaveTplOpen(false)}>
+                キャンセル
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={saveTplBusy || !saveTplName.trim()}>
+                保存
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

@@ -69,3 +69,14 @@ export type Member = {
   name: string;
   email: string;
 };
+
+export type SavedTemplate = {
+  id: string;
+  name: string;
+  icon: string | null;
+  title: string;
+  doc: { type: "doc"; content: unknown[] };
+  createdBy: string;
+  createdAt: string | number | Date;
+  updatedAt: string | number | Date;
+};
