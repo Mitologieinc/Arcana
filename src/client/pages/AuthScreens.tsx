@@ -164,38 +164,34 @@ export function SignupPage() {
   const [params] = useSearchParams();
   const inviteFromUrl = params.get("invite") ?? "";
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [workspaceName, setWorkspaceName] = useState("");
   const [inviteInfo, setInviteInfo] = useState<{ email: string; workspaceName: string; role: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [workspaceName, setWorkspaceName] = useState("");
-  const [inviteToken, setInviteToken] = useState(inviteFromUrl);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ needsSetup: boolean }>("/api/bootstrap")
-      .then((d) => setNeedsSetup(d.needsSetup))
+    api<{ needsSetup: boolean; workspaceName: string | null }>("/api/bootstrap")
+      .then((d) => {
+        setNeedsSetup(d.needsSetup);
+        if (d.workspaceName) setWorkspaceName(d.workspaceName);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "初期化に失敗しました"));
   }, []);
 
   useEffect(() => {
-    if (needsSetup) return;
-    if (!inviteToken.trim() || inviteToken.trim().length < 16) {
-      setInviteInfo(null);
-      return;
-    }
-    api<{ email: string; workspaceName: string; role: string }>(`/api/invites/${inviteToken.trim()}`)
+    if (!inviteFromUrl) return;
+    api<{ email: string; workspaceName: string; role: string }>(`/api/invites/${inviteFromUrl}`)
       .then((info) => {
         setInviteInfo(info);
         if (info.email) setEmail(info.email);
+        if (info.workspaceName) setWorkspaceName(info.workspaceName);
         setError("");
       })
-      .catch((e) => {
-        setInviteInfo(null);
-        setError(e instanceof Error ? e.message : "招待が無効です");
-      });
-  }, [inviteToken, needsSetup]);
+      .catch((e) => setError(e instanceof Error ? e.message : "招待が無効です"));
+  }, [inviteFromUrl]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -209,7 +205,7 @@ export function SignupPage() {
           email,
           password,
           workspaceName: needsSetup ? workspaceName : undefined,
-          inviteToken: needsSetup ? undefined : inviteToken.trim(),
+          inviteToken: inviteFromUrl || undefined,
         }),
       });
       try {
@@ -232,7 +228,9 @@ export function SignupPage() {
         ? "この Cloudflare 環境の最初のアカウントがオーナーになります。人数に上限はありません。"
         : inviteInfo
           ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
-          : "既存の環境へ参加するには、招待コードが必要です。";
+          : workspaceName
+            ? `「${workspaceName}」に参加します。`
+            : "この環境のワークスペースに参加します。";
 
   return (
     <AuthLayout title="アカウントを作成" kicker={kicker}>
@@ -240,11 +238,7 @@ export function SignupPage() {
         <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
         <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-        {needsSetup ? (
-          <Field label="ワークスペース名" value={workspaceName} onChange={setWorkspaceName} />
-        ) : (
-          <Field label="招待コード" value={inviteToken} onChange={setInviteToken} />
-        )}
+        {needsSetup && <Field label="ワークスペース名" value={workspaceName} onChange={setWorkspaceName} />}
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
         <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
           {needsSetup ? "作成して始める" : "参加する"}

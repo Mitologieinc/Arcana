@@ -46,7 +46,7 @@ export function createAuth(env: Env, request: Request) {
         const workspaces = await db.select({ n: count() }).from(schema.workspaces);
         if ((workspaces[0]?.n ?? 0) === 0) return;
         throw new APIError("FORBIDDEN", {
-          message: "公開登録はできません。招待リンクから参加してください。",
+          message: "アカウント作成は登録画面から行ってください。",
         });
       }),
     },

@@ -24,9 +24,24 @@ export const workspaceRoutes = new Hono<AppEnv>();
 
 workspaceRoutes.get("/api/bootstrap", async (c) => {
   const db = createDb(c.env.DB);
-  const existing = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).limit(1);
-  return c.json({ needsSetup: existing.length === 0, environment: c.env.ENVIRONMENT ?? "local" });
+  const existing = await db.select().from(schema.workspaces).limit(1);
+  return c.json({
+    needsSetup: existing.length === 0,
+    workspaceName: existing[0]?.name ?? null,
+    environment: c.env.ENVIRONMENT ?? "local",
+  });
 });
+
+function parseInviteToken(raw?: string) {
+  if (!raw?.trim()) return "";
+  const v = raw.trim();
+  try {
+    const u = new URL(v, "https://bible.local");
+    return u.searchParams.get("invite") ?? v.split("/").filter(Boolean).at(-1) ?? v;
+  } catch {
+    return v;
+  }
+}
 
 async function createCredentialUser(
   env: Env,
@@ -166,20 +181,28 @@ async function registerHandler(c: Context<AppEnv>) {
     return new Response(JSON.stringify({ ok: true, ...boot }), { status: 200, headers });
   }
 
-  const token = body.inviteToken?.trim();
-  if (!token) {
-    return c.json({ error: "この環境は招待制です。招待コードを入力してください。" }, 403);
-  }
+  const workspace = existingWs[0];
+  let workspaceId = workspace.id;
+  let role: schema.MemberRole = "member";
+  let joinEmail = email;
+  let consumedInviteId: string | null = null;
+  const token = parseInviteToken(body.inviteToken);
 
-  const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
-  const invite = rows[0];
-  if (!invite || invite.expiresAt.getTime() < Date.now()) {
-    return c.json({ error: "招待が無効です" }, 404);
+  if (token) {
+    const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
+    const invite = rows[0];
+    if (!invite || invite.expiresAt.getTime() < Date.now()) {
+      return c.json({ error: "招待が無効です" }, 404);
+    }
+    workspaceId = invite.workspaceId;
+    role = invite.role;
+    joinEmail = (invite.email || email).toLowerCase();
+    consumedInviteId = invite.id;
   }
 
   const created = await createCredentialUser(c.env, c.req.raw, db, {
     name: body.name,
-    email: (invite.email || email).toLowerCase(),
+    email: joinEmail,
     password: body.password,
   });
   if ("error" in created) return c.json({ error: created.error }, created.status);
@@ -189,24 +212,26 @@ async function registerHandler(c: Context<AppEnv>) {
     .from(schema.workspaceMembers)
     .where(
       and(
-        eq(schema.workspaceMembers.workspaceId, invite.workspaceId),
+        eq(schema.workspaceMembers.workspaceId, workspaceId),
         eq(schema.workspaceMembers.userId, created.userId),
       ),
     )
     .limit(1);
   if (already.length === 0) {
     await db.insert(schema.workspaceMembers).values({
-      workspaceId: invite.workspaceId,
+      workspaceId,
       userId: created.userId,
-      role: invite.role,
+      role,
       createdAt: new Date(),
     });
   }
-  await db.delete(schema.invites).where(eq(schema.invites.id, invite.id));
+  if (consumedInviteId) {
+    await db.delete(schema.invites).where(eq(schema.invites.id, consumedInviteId));
+  }
 
   const headers = new Headers(created.cookieResponse.headers);
   headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ ok: true, workspaceId: invite.workspaceId }), { status: 200, headers });
+  return new Response(JSON.stringify({ ok: true, workspaceId }), { status: 200, headers });
 }
 
 workspaceRoutes.post("/api/register", registerHandler);
