@@ -4,6 +4,7 @@ import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { BrandLockup, hideBootSplash } from "../components/Brand";
+import { NotionImport } from "../components/NotionImport";
 
 function Field({
   label,
@@ -45,12 +46,14 @@ function AuthLayout({
   kicker,
   step,
   steps = 3,
+  wide,
   children,
 }: {
   title: string;
   kicker?: string;
   step?: number;
   steps?: number;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   useLayoutEffect(() => {
@@ -58,7 +61,7 @@ function AuthLayout({
   }, []);
   return (
     <div className="flex min-h-full items-center justify-center bg-white px-6">
-      <div className="w-full max-w-[320px] py-24">
+      <div className={`w-full py-24 ${wide ? "max-w-[380px]" : "max-w-[320px]"}`}>
         <div className="mb-12">
           <BrandLockup className="h-12 w-auto max-w-full" />
         </div>
@@ -301,7 +304,7 @@ export function SignupPage() {
 
 export function SetupPage() {
   const nav = useNavigate();
-  const [step, setStep] = useState<"workspace" | "owner" | "passkey">("workspace");
+  const [step, setStep] = useState<"workspace" | "owner" | "import" | "passkey">("workspace");
   const [ready, setReady] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const [inviteOnly, setInviteOnly] = useState(true);
@@ -310,6 +313,7 @@ export function SetupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [welcomeId, setWelcomeId] = useState<string | null>(null);
+  const [importId, setImportId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -326,7 +330,7 @@ export function SetupPage() {
   }, [nav]);
 
   function goHome() {
-    nav(welcomeId ? `/page/${welcomeId}` : "/", { replace: true });
+    nav(importId ? `/page/${importId}` : welcomeId ? `/page/${welcomeId}` : "/", { replace: true });
   }
 
   async function createWorkspace(e: FormEvent) {
@@ -350,7 +354,7 @@ export function SetupPage() {
         }),
       });
       setWelcomeId(d.welcomeId ?? null);
-      setStep("passkey");
+      setStep("import");
     } catch (err) {
       setError(err instanceof Error ? err.message : "失敗しました");
     } finally {
@@ -389,6 +393,7 @@ export function SetupPage() {
         title="この環境をセットアップ"
         kicker="1 URL につき 1 ワークスペースです。最初の人がオーナーになります。"
         step={1}
+        steps={4}
       >
         <form
           onSubmit={(e) => {
@@ -447,7 +452,7 @@ export function SetupPage() {
 
   if (step === "owner") {
     return (
-      <AuthLayout title="オーナーアカウント" kicker={`「${workspaceName}」の管理者になります。`} step={2}>
+      <AuthLayout title="オーナーアカウント" kicker={`「${workspaceName}」の管理者になります。`} step={2} steps={4}>
         <form onSubmit={(e) => void createWorkspace(e)}>
           <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
           <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
@@ -455,7 +460,7 @@ export function SetupPage() {
           <p className="mb-3 -mt-1 text-[12px] text-muted">8 文字以上。あとからパスキーも使えます。</p>
           {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
           <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-            作成して始める
+            作成して続ける
           </button>
           <button type="button" className="btn btn-ghost mt-2 w-full text-muted" onClick={() => setStep("workspace")}>
             戻る
@@ -465,11 +470,34 @@ export function SetupPage() {
     );
   }
 
+  if (step === "import") {
+    return (
+      <AuthLayout
+        title="Notion から引き継ぐ"
+        kicker="今あるページを持ってこれます。空のまま始めて、あとから設定でもできます。"
+        step={3}
+        steps={4}
+        wide
+      >
+        <NotionImport
+          variant="setup"
+          onChanged={() => Promise.resolve()}
+          onSkip={() => setStep("passkey")}
+          onContinue={(rootId) => {
+            setImportId(rootId);
+            setStep("passkey");
+          }}
+        />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
       title="パスキーを登録"
       kicker="指紋や顔で入れるようにできます。あとから設定でも構いません。"
-      step={3}
+      step={4}
+      steps={4}
     >
       {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
       <button type="button" className="btn btn-primary w-full" onClick={() => void addPasskey()} disabled={busy}>

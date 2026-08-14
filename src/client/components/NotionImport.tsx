@@ -23,7 +23,17 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export function NotionImport({ onChanged }: { onChanged: () => Promise<unknown> }) {
+export function NotionImport({
+  onChanged,
+  variant = "settings",
+  onSkip,
+  onContinue,
+}: {
+  onChanged: () => Promise<unknown>;
+  variant?: "settings" | "setup";
+  onSkip?: () => void;
+  onContinue?: (rootId: string) => void;
+}) {
   const [token, setToken] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -186,10 +196,12 @@ export function NotionImport({ onChanged }: { onChanged: () => Promise<unknown> 
     }
   }
 
+  const setup = variant === "setup";
+
   return (
     <div className="space-y-4">
       <section>
-        <h3 className="mb-1 text-[13px] font-medium">Notion から引き継ぐ</h3>
+        {!setup && <h3 className="mb-1 text-[13px] font-medium">Notion から引き継ぐ</h3>}
         <ol className="mb-3 list-decimal space-y-1 pl-5 text-[12px] leading-relaxed text-muted">
           <li>
             <a className="underline underline-offset-2" href="https://www.notion.so/profile/integrations" target="_blank" rel="noreferrer">
@@ -207,20 +219,32 @@ export function NotionImport({ onChanged }: { onChanged: () => Promise<unknown> 
             autoComplete="off"
             placeholder="secret_ または ntn_ で始まるキー"
             value={token}
-            disabled={busy}
+            disabled={busy || Boolean(doneId)}
             onChange={(e) => setToken(e.target.value)}
           />
         </label>
-        <button type="button" className="btn btn-primary mt-3" disabled={busy || token.trim().length < 10} onClick={() => void run()}>
-          <Import size={15} />
-          {busy ? "取り込み中…" : "取り込む"}
-        </button>
+        {!doneId && (
+          <button type="button" className="btn btn-primary mt-3 w-full" disabled={busy || token.trim().length < 10} onClick={() => void run()}>
+            <Import size={15} />
+            {busy ? "取り込み中…" : "取り込む"}
+          </button>
+        )}
         {status && <p className="mt-3 text-[13px] text-muted">{status}</p>}
         {error && <p className="mt-3 text-[13px] text-danger">{error}</p>}
-        {doneId && (
+        {doneId && setup && onContinue && (
+          <button type="button" className="btn btn-primary mt-3 w-full" onClick={() => onContinue(doneId)}>
+            続ける
+          </button>
+        )}
+        {doneId && !setup && (
           <a className="mt-3 inline-block text-[13px] underline underline-offset-2" href={`/page/${doneId}`}>
             取り込んだページを開く
           </a>
+        )}
+        {setup && onSkip && !doneId && (
+          <button type="button" className="btn btn-ghost mt-2 w-full text-muted" onClick={onSkip} disabled={busy}>
+            今はスキップ
+          </button>
         )}
       </section>
     </div>

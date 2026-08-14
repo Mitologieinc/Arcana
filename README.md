@@ -39,7 +39,7 @@ Notion の席課金なしで、自社の Cloudflare アカウントに載せる�
 
 ## Notion から移行
 
-設定 → **移行** から、Notion の Internal Integration Secret でページとデータベースを取り込みます。キーはサーバに保存しません。
+最初のセットアップ、または設定 → **移行** から、Notion の Internal Integration Secret でページとデータベースを取り込みます。キーはサーバに保存しません。
 
 1. [インテグレーション](https://www.notion.so/profile/integrations) で Internal を作る（Read 権限）
 2. 引き継ぎたい親ページの ••• → **接続を追加** で、そのインテグレーションを入れる（子も共有されます）
