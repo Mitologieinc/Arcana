@@ -6,7 +6,7 @@ export function BrandMark({ className = "h-8 w-8" }: { className?: string }) {
 }
 
 export function BrandLockup({ className = "h-10 w-auto" }: { className?: string }) {
-  return <img src={lockup} alt="Arcana WorkSquare" className={`object-contain ${className}`} />;
+  return <img src={lockup} alt="Arcana WorkSquare" className={`object-contain object-left ${className}`} />;
 }
 
 export function Brand({ compact = false, className }: { compact?: boolean; className?: string }) {

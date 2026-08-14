@@ -118,14 +118,14 @@ export function WorkspaceApp() {
       >
         <div className={`mb-3 flex items-center ${collapsed ? "justify-center" : "gap-1"}`}>
           <button
-            className={`min-w-0 ${collapsed ? "" : "flex-1 px-1 py-0.5"}`}
+            className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "flex-1 justify-start px-1 py-0.5"}`}
             onClick={() => nav("/")}
             title="Arcana WorkSquare"
           >
             {collapsed ? (
               <BrandMark className="h-7 w-7" />
             ) : (
-              <BrandLockup className="h-8 w-full" />
+              <BrandLockup className="h-8 w-auto max-w-full object-left" />
             )}
           </button>
           {!collapsed && (

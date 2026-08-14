@@ -38,8 +38,8 @@ function AuthLayout({
   return (
     <div className="flex min-h-full items-center justify-center bg-white px-6">
       <div className="w-full max-w-[320px] py-24">
-        <div className="mb-12 flex justify-center">
-          <BrandLockup className="h-10 w-auto max-w-full" />
+        <div className="mb-12">
+          <BrandLockup className="h-10 w-auto max-w-full object-left" />
         </div>
         <h1 className="text-[15px] font-medium tracking-tight">{title}</h1>
         {kicker && <p className="mt-1 text-[13px] leading-relaxed text-muted">{kicker}</p>}
