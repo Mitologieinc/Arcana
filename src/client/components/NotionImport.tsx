@@ -144,6 +144,21 @@ export function NotionImport({ onChanged }: { onChanged: () => Promise<unknown> 
         } while (rowCursor);
       }
 
+      for (const db of databases) {
+        const databaseId = lookup(idMap, db.id);
+        if (!databaseId) continue;
+        setStatus(`リレーションを繋いでいます… ${db.title}`);
+        try {
+          await api("/api/import/notion/relink", {
+            method: "POST",
+            body: JSON.stringify({ databaseId, idMap }),
+          });
+        } catch {
+          /* 対象 DB が共有されていなければ空のまま */
+        }
+        await sleep(150);
+      }
+
       let i = 0;
       for (const page of createdPages) {
         i += 1;
@@ -183,7 +198,7 @@ export function NotionImport({ onChanged }: { onChanged: () => Promise<unknown> 
             で Internal Integration を作り、Secret をコピーする
           </li>
           <li>引き継ぎたいページ（またはワークスペースの親）の ••• → 接続 → そのインテグレーションを追加する</li>
-          <li>下に Secret を貼って取り込む。キーは保存しません</li>
+          <li>下に Secret を貼って取り込む。キーは保存しません。データベース同士のリレーションも、両方共有されていれば繋がります</li>
         </ol>
         <label className="field">
           <span>Internal Integration Secret</span>

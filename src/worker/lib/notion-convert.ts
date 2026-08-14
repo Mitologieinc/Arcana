@@ -5,6 +5,7 @@ type DbProperty = {
   type: "title" | "select" | "status" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
   name: string;
   options?: { id: string; name: string; color: string }[];
+  databaseId?: string;
 };
 
 type JSONNode = {
@@ -238,6 +239,7 @@ export function mapDatabaseSchema(properties: Record<string, unknown>): {
       type?: string;
       select?: { options?: { id: string; name: string; color?: string }[] };
       status?: { options?: { id: string; name: string; color?: string }[] };
+      relation?: { database_id?: string };
     };
     const type = p.type ?? "rich_text";
     if (type === "title") {
@@ -265,7 +267,7 @@ export function mapDatabaseSchema(properties: Record<string, unknown>): {
     } else if (type === "number") props.push({ id, type: "number", name });
     else if (type === "checkbox") props.push({ id, type: "checkbox", name });
     else if (type === "date") props.push({ id, type: "date", name });
-    else if (type === "relation") props.push({ id, type: "text", name });
+    else if (type === "relation") props.push({ id, type: "relation", name, databaseId: p.relation?.database_id });
     else if (["formula", "rollup", "files", "created_time", "created_by", "last_edited_time", "last_edited_by", "unique_id", "button"].includes(type)) {
       continue;
     } else props.push({ id, type: "text", name });
@@ -297,6 +299,7 @@ export function mapRowProperties(
       email?: string | null;
       phone_number?: string | null;
       people?: { name?: string }[];
+      relation?: { id?: string }[];
     };
     const key = keyMap[p.id ?? ""] || keyMap[name];
     if (!key) continue;
@@ -316,9 +319,38 @@ export function mapRowProperties(
     else if (p.type === "email") values[key] = p.email ?? "";
     else if (p.type === "phone_number") values[key] = p.phone_number ?? "";
     else if (p.type === "people") values[key] = (p.people ?? []).map((u) => u.name).filter(Boolean).join(", ");
+    else if (p.type === "relation") values[key] = (p.relation ?? []).map((r) => r.id).filter((id): id is string => Boolean(id));
     else if (p.type === "rich_text") values[key] = richPlain(p.rich_text);
   }
   return { title, values };
+}
+
+export function remapNotionId(idMap: Record<string, string>, notionId?: string | null) {
+  if (!notionId) return undefined;
+  return idMap[notionId] || idMap[notionId.replaceAll("-", "")];
+}
+
+export function remapRelationSchema(properties: DbProperty[], idMap: Record<string, string>): DbProperty[] {
+  return properties.map((p) => {
+    if (p.type !== "relation") return p;
+    const mapped = remapNotionId(idMap, p.databaseId);
+    return { ...p, databaseId: mapped };
+  });
+}
+
+export function remapRelationValues(
+  values: Record<string, unknown>,
+  properties: DbProperty[],
+  idMap: Record<string, string>,
+): Record<string, unknown> {
+  const next = { ...values };
+  for (const p of properties) {
+    if (p.type !== "relation") continue;
+    const raw = next[p.id];
+    const ids = Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [];
+    next[p.id] = ids.map((id) => remapNotionId(idMap, id)).filter((id): id is string => Boolean(id));
+  }
+  return next;
 }
 
 export function emojiIcon(icon: { type?: string; emoji?: string } | null | undefined, fallback: string) {

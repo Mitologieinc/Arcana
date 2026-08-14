@@ -11,11 +11,19 @@ import {
   notionDatabase,
   notionPage,
   notionQueryDatabase,
+  notionRelationPageIds,
   notionSearchPage,
   notionWhoAmI,
   richPlain,
 } from "../lib/notion";
-import { blocksToDoc, emojiIcon, mapDatabaseSchema, mapRowProperties } from "../lib/notion-convert";
+import {
+  blocksToDoc,
+  emojiIcon,
+  mapDatabaseSchema,
+  mapRowProperties,
+  remapRelationSchema,
+  remapRelationValues,
+} from "../lib/notion-convert";
 import { allowAttempt, clientIp } from "../lib/rate-limit";
 import { plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
@@ -240,7 +248,15 @@ importRoutes.post("/api/import/notion/rows", async (c) => {
     const created: { notionId: string; id: string }[] = [];
     for (const row of page.results) {
       if (row.object !== "page" || row.archived) continue;
-      const mapped = mapRowProperties((row.properties as Record<string, unknown>) ?? {}, body.keyMap, dbSchema);
+      const props = (row.properties as Record<string, unknown>) ?? {};
+      const mapped = mapRowProperties(props, body.keyMap, dbSchema);
+      for (const [name, raw] of Object.entries(props)) {
+        const p = raw as { id?: string; type?: string; has_more?: boolean };
+        if (p.type !== "relation" || !p.has_more || !p.id) continue;
+        const key = body.keyMap[p.id] || body.keyMap[name];
+        if (!key) continue;
+        mapped.values[key] = await notionRelationPageIds(token, String(row.id), p.id);
+      }
       const icon = emojiIcon(row.icon as { type?: string; emoji?: string }, "📄");
       const id = await insertPage(c.env, ctx.db, {
         workspaceId: ctx.membership.workspaceId,
@@ -256,6 +272,51 @@ importRoutes.post("/api/import/notion/rows", async (c) => {
     return c.json({ created, next_cursor: page.next_cursor, has_more: page.has_more });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : "行を取り込みできませんでした" }, 400);
+  }
+});
+
+importRoutes.post("/api/import/notion/relink", async (c) => {
+  const ctx = await importer(c);
+  if ("error" in ctx) return ctx.error;
+  try {
+    const body = await c.req.json<{ databaseId: string; idMap?: Record<string, string> }>();
+    const { permission } = await resolvePagePermission(ctx.db, {
+      pageId: body.databaseId,
+      userId: ctx.user.id,
+    });
+    if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
+    const idMap = body.idMap ?? {};
+    const schemaRows = await ctx.db.select().from(schema.databaseSchemas).where(eq(schema.databaseSchemas.pageId, body.databaseId)).limit(1);
+    const dbSchema = schemaRows[0] ? (JSON.parse(schemaRows[0].properties) as Parameters<typeof remapRelationSchema>[0]) : [];
+    const remappedSchema = remapRelationSchema(dbSchema, idMap);
+    if (schemaRows[0]) {
+      await ctx.db
+        .update(schema.databaseSchemas)
+        .set({ properties: JSON.stringify(remappedSchema) })
+        .where(eq(schema.databaseSchemas.pageId, body.databaseId));
+    }
+    const rows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.parentId, body.databaseId));
+    let updated = 0;
+    for (const row of rows) {
+      let values: Record<string, unknown> = {};
+      if (row.properties) {
+        try {
+          values = JSON.parse(row.properties) as Record<string, unknown>;
+        } catch {
+          values = {};
+        }
+      }
+      const next = remapRelationValues(values, remappedSchema, idMap);
+      if (JSON.stringify(next) === JSON.stringify(values)) continue;
+      await ctx.db
+        .update(schema.pages)
+        .set({ properties: JSON.stringify(next), updatedAt: new Date() })
+        .where(eq(schema.pages.id, row.id));
+      updated += 1;
+    }
+    return c.json({ ok: true, updated });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "リレーションを繋げませんでした" }, 400);
   }
 });
 

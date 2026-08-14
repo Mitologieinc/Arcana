@@ -112,6 +112,25 @@ export async function notionPage(token: string, id: string) {
   return notionFetch<Record<string, unknown>>(token, `/pages/${id}`);
 }
 
+export async function notionRelationPageIds(token: string, pageId: string, propertyId: string) {
+  const ids: string[] = [];
+  let cursor: string | null = null;
+  do {
+    const q = new URLSearchParams({ page_size: "100" });
+    if (cursor) q.set("start_cursor", cursor);
+    const data = await notionFetch<{
+      results: { relation?: { id?: string } }[];
+      next_cursor: string | null;
+      has_more: boolean;
+    }>(token, `/pages/${pageId}/properties/${encodeURIComponent(propertyId)}?${q}`);
+    for (const item of data.results) {
+      if (item.relation?.id) ids.push(item.relation.id);
+    }
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+  return ids;
+}
+
 export async function notionBlockChildren(token: string, id: string) {
   const blocks: Record<string, unknown>[] = [];
   let cursor: string | null = null;
