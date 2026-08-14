@@ -35,6 +35,7 @@ import { EditorChromeContext } from "./chrome";
 import { DatabaseEmbed } from "./databaseEmbed";
 import { SlashCommand, uploadImage } from "./slash";
 import { PageLink, PageMention } from "./pageLink";
+import { addNamedColumn } from "./simpleTable";
 
 function showTextBubble({ state }: { state: { selection: { empty: boolean } } }) {
   return !state.selection.empty;
@@ -111,8 +112,11 @@ export function TiptapEditor({
       }),
       Placeholder.configure({
         showOnlyCurrent: true,
-        placeholder: ({ node }) => {
+        placeholder: ({ editor, node, pos }) => {
           if (node.type.name === "heading") return `見出し ${node.attrs.level}`;
+          const parent = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size)).parent;
+          if (parent.type.name === "tableHeader") return "列名";
+          if (parent.type.name === "tableCell") return "";
           return "入力するか、'/' でコマンド、'@' でページ";
         },
       }),
@@ -294,10 +298,10 @@ export function TiptapEditor({
           className="bubble-menu menu-panel"
           shouldShow={showTableBubble}
         >
-          <button type="button" title="左に列" onClick={() => editor.chain().focus().addColumnBefore().run()}>
+          <button type="button" title="左に列" onClick={() => addNamedColumn(editor, "before")}>
             <BetweenVerticalStart size={14} />
           </button>
-          <button type="button" title="右に列" onClick={() => editor.chain().focus().addColumnAfter().run()}>
+          <button type="button" title="右に列" onClick={() => addNamedColumn(editor, "after")}>
             <BetweenVerticalEnd size={14} />
           </button>
           <button type="button" title="列を削除" onClick={() => editor.chain().focus().deleteColumn().run()}>

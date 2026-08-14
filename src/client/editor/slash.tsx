@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { Page } from "../lib/types";
+import { insertNamedTable } from "./simpleTable";
 
 export type SlashOptions = {
   pageId: string;
@@ -167,12 +168,11 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
     },
     {
       title: "表",
-      subtitle: "シンプルな表",
+      subtitle: "列名つきの表",
       aliases: ["table", "表", "テーブル", "簡易"],
       group: "basic",
       icon: Table2,
-      command: ({ editor, range }) =>
-        editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run(),
+      command: ({ editor, range }) => insertNamedTable(editor, range),
     },
     {
       title: "データベース – インライン",

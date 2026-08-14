@@ -741,8 +741,17 @@ button:disabled {
 
 .arcana-doc .tableWrapper th {
   background: var(--color-canvas);
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 510;
+  color: var(--color-muted);
   text-align: left;
+  white-space: nowrap;
+}
+
+.arcana-doc .tableWrapper th p {
+  padding: 0;
+  color: var(--color-ink);
+  font-weight: 510;
 }
 
 .arcana-doc .tableWrapper .selectedCell::after {
