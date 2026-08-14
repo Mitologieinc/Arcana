@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { hc } from "hono/client";
 import { YDurableObjects, type YDurableObjectsAppType } from "y-durableobjects";
 import { upgrade } from "y-durableobjects/helpers/upgrade";
-import { applyUpdate } from "yjs";
+import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import { createAuth, getSessionUser } from "./auth";
 import { createDb } from "./db/client";
 import { canEdit, canView, resolvePagePermission } from "./lib/acl";
@@ -57,6 +57,13 @@ export class PageRoom extends YDurableObjects<AppEnv> {
   async importYjs(update: Uint8Array) {
     applyUpdate(this.doc, update);
     await this.storage.storeUpdate(update);
+  }
+
+  async replaceYjs(update: Uint8Array) {
+    const xml = this.doc.getXmlFragment("prosemirror");
+    if (xml.length > 0) xml.delete(0, xml.length);
+    applyUpdate(this.doc, update);
+    await this.storage.storeUpdate(encodeStateAsUpdate(this.doc));
   }
 }
 

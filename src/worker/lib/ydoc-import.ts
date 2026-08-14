@@ -139,6 +139,15 @@ export function tiptapJsonToUpdate(doc: unknown): Uint8Array {
   return encodeStateAsUpdate(ydoc);
 }
 
+export function plainTextToDoc(text: string) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const content = (lines.length ? lines : [""]).map((line) => ({
+    type: "paragraph" as const,
+    content: line ? [{ type: "text" as const, text: line }] : [],
+  }));
+  return { type: "doc" as const, content };
+}
+
 export function plainTextFromDoc(node: unknown): string {
   const parts: string[] = [];
   walk(node, parts);

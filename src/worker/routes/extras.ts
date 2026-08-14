@@ -4,6 +4,7 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, resolvePagePermission } from "../lib/acl";
+import { plainTextToDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 
 export const extraRoutes = new Hono<AppEnv>();
@@ -218,6 +219,34 @@ extraRoutes.get("/api/pages/:id/revisions", async (c) => {
     .orderBy(desc(schema.pageRevisions.createdAt))
     .limit(40);
   return c.json({ revisions: rows });
+});
+
+extraRoutes.post("/api/pages/:id/revisions/:revId/restore", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const revId = c.req.param("revId");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canEdit(permission)) return c.json({ error: "復元できません" }, 403);
+  const rows = await ctx.db
+    .select()
+    .from(schema.pageRevisions)
+    .where(and(eq(schema.pageRevisions.id, revId), eq(schema.pageRevisions.pageId, id)))
+    .limit(1);
+  const rev = rows[0];
+  if (!rev) return c.json({ error: "見つかりません" }, 404);
+  await ctx.db
+    .update(schema.pages)
+    .set({ title: rev.title, updatedAt: new Date() })
+    .where(eq(schema.pages.id, id));
+  const update = tiptapJsonToUpdate(plainTextToDoc(rev.bodyText));
+  const stub = c.env.Y_DURABLE_OBJECTS.get(c.env.Y_DURABLE_OBJECTS.idFromName(id));
+  await stub.replaceYjs(update);
+  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  await c.env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
+    .bind(id, rev.title, rev.bodyText)
+    .run();
+  return c.json({ ok: true, title: rev.title });
 });
 
 extraRoutes.get("/api/pages/:id/export", async (c) => {

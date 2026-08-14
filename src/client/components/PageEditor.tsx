@@ -62,6 +62,7 @@ export function PageEditor({
   const [favorited, setFavorited] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editorGen, setEditorGen] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
@@ -559,7 +560,7 @@ export function PageEditor({
               </div>
             )}
             <TiptapEditor
-              key={pageId}
+              key={`${pageId}:${editorGen}`}
               pageId={pageId}
               user={user}
               shareToken={shareToken}
@@ -600,7 +601,19 @@ export function PageEditor({
       {commentsOpen && (
         <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
       )}
-      {historyOpen && <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && (
+        <HistoryPanel
+          pageId={pageId}
+          editable={editable}
+          onClose={() => setHistoryOpen(false)}
+          onRestored={async (nextTitle) => {
+            setTitle(nextTitle);
+            setEditorGen((n) => n + 1);
+            await reloadPage();
+            await onPagesChanged();
+          }}
+        />
+      )}
       {shareToken && (
         <footer className="mx-auto flex max-w-[900px] items-center gap-2.5 px-24 pb-16 pt-10 max-[860px]:px-6">
           <BrandMark className="h-5 w-auto" />
