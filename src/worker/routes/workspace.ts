@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { and, eq } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
@@ -24,73 +25,92 @@ export const workspaceRoutes = new Hono<AppEnv>();
 workspaceRoutes.get("/api/bootstrap", async (c) => {
   const db = createDb(c.env.DB);
   const existing = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).limit(1);
-  return c.json({ needsSetup: existing.length === 0 });
+  return c.json({ needsSetup: existing.length === 0, environment: c.env.ENVIRONMENT ?? "local" });
 });
 
-workspaceRoutes.post("/api/setup", async (c) => {
-  const db = createDb(c.env.DB);
-  const existingWs = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).limit(1);
-  if (existingWs.length > 0) {
-    return c.json({ error: "すでにセットアップ済みです" }, 400);
-  }
-
-  const body = await c.req.json<{
-    name: string;
-    email: string;
-    password: string;
-    workspaceName: string;
-  }>();
-
-  if (!body.email || !body.password || !body.name || !body.workspaceName) {
-    return c.json({ error: "必須項目が不足しています" }, 400);
-  }
-
-  const auth = createAuth(c.env, c.req.raw);
-  const email = body.email.trim().toLowerCase();
-  const found = await db.select().from(schema.user).where(eq(schema.user.email, email)).limit(1);
-
-  let cookieResponse: Response;
+async function createCredentialUser(
+  env: Env,
+  request: Request,
+  db: ReturnType<typeof createDb>,
+  input: { name: string; email: string; password: string },
+) {
+  const auth = createAuth(env, request);
+  const found = await db.select().from(schema.user).where(eq(schema.user.email, input.email)).limit(1);
   let userId = found[0]?.id;
+  let cookieResponse: Response;
 
   if (userId) {
     cookieResponse = await auth.api.signInEmail({
-      body: { email, password: body.password },
-      headers: c.req.raw.headers,
+      body: { email: input.email, password: input.password },
+      headers: request.headers,
       asResponse: true,
     });
   } else {
-    cookieResponse = await auth.api.signUpEmail({
-      body: { email, password: body.password, name: body.name },
-      headers: c.req.raw.headers,
-      asResponse: true,
-    });
+    const users = await db.select({ id: schema.user.id }).from(schema.user).limit(1);
+    if (users.length > 0) {
+      const hashed = await import("better-auth/crypto").then((m) => m.hashPassword(input.password));
+      userId = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(schema.user).values({
+        id: userId,
+        name: input.name,
+        email: input.email,
+        emailVerified: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await db.insert(schema.account).values({
+        id: crypto.randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: hashed,
+        createdAt: now,
+        updatedAt: now,
+      });
+      cookieResponse = await auth.api.signInEmail({
+        body: { email: input.email, password: input.password },
+        headers: request.headers,
+        asResponse: true,
+      });
+    } else {
+      cookieResponse = await auth.api.signUpEmail({
+        body: { email: input.email, password: input.password, name: input.name },
+        headers: request.headers,
+        asResponse: true,
+      });
+    }
   }
 
   if (!cookieResponse.ok) {
     const err = (await cookieResponse.json().catch(() => ({}))) as { message?: string };
-    return c.json({ error: err.message || "認証に失敗しました" }, 400);
+    return { error: err.message || "認証に失敗しました", status: 400 as const };
   }
 
   const payload = (await cookieResponse.clone().json()) as { user?: { id: string } };
   userId = payload.user?.id ?? userId;
-  if (!userId) {
-    return c.json({ error: "ユーザー作成に失敗しました" }, 500);
-  }
+  if (!userId) return { error: "ユーザー作成に失敗しました", status: 500 as const };
+  return { userId, cookieResponse };
+}
 
+async function bootstrapWorkspace(
+  env: Env,
+  db: ReturnType<typeof createDb>,
+  input: { workspaceName: string; userId: string },
+) {
   const now = new Date();
   const workspaceId = crypto.randomUUID();
   await db.insert(schema.workspaces).values({
     id: workspaceId,
-    name: body.workspaceName,
+    name: input.workspaceName,
     createdAt: now,
   });
   await db.insert(schema.workspaceMembers).values({
     workspaceId,
-    userId,
+    userId: input.userId,
     role: "owner",
     createdAt: now,
   });
-
   const welcomeId = crypto.randomUUID();
   await db.insert(schema.pages).values({
     id: welcomeId,
@@ -100,23 +120,97 @@ workspaceRoutes.post("/api/setup", async (c) => {
     title: "はじめにお読みください",
     icon: "📖",
     position: 1,
-    createdBy: userId,
+    createdBy: input.userId,
     createdAt: now,
     updatedAt: now,
   });
-  await c.env.DB.prepare(
-    "INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)",
-  )
+  await env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
     .bind(welcomeId, "はじめにお読みください", "")
     .run();
+  return { workspaceId, welcomeId };
+}
 
-  const headers = new Headers(cookieResponse.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ ok: true, workspaceId, welcomeId }), {
-    status: 200,
-    headers,
+async function registerHandler(c: Context<AppEnv>) {
+  const db = createDb(c.env.DB);
+  const body = await c.req.json<{
+    name: string;
+    email: string;
+    password: string;
+    workspaceName?: string;
+    inviteToken?: string;
+  }>();
+
+  if (!body.email || !body.password || !body.name) {
+    return c.json({ error: "名前、メール、パスワードが必要です" }, 400);
+  }
+
+  const email = body.email.trim().toLowerCase();
+  const existingWs = await db.select().from(schema.workspaces).limit(1);
+
+  if (existingWs.length === 0) {
+    if (!body.workspaceName?.trim()) {
+      return c.json({ error: "ワークスペース名が必要です" }, 400);
+    }
+    const created = await createCredentialUser(c.env, c.req.raw, db, {
+      name: body.name,
+      email,
+      password: body.password,
+    });
+    if ("error" in created) return c.json({ error: created.error }, created.status);
+    const boot = await bootstrapWorkspace(c.env, db, {
+      workspaceName: body.workspaceName.trim(),
+      userId: created.userId,
+    });
+    const headers = new Headers(created.cookieResponse.headers);
+    headers.set("Content-Type", "application/json");
+    return new Response(JSON.stringify({ ok: true, ...boot }), { status: 200, headers });
+  }
+
+  const token = body.inviteToken?.trim();
+  if (!token) {
+    return c.json({ error: "この環境は招待制です。招待コードを入力してください。" }, 403);
+  }
+
+  const rows = await db.select().from(schema.invites).where(eq(schema.invites.token, token)).limit(1);
+  const invite = rows[0];
+  if (!invite || invite.expiresAt.getTime() < Date.now()) {
+    return c.json({ error: "招待が無効です" }, 404);
+  }
+
+  const created = await createCredentialUser(c.env, c.req.raw, db, {
+    name: body.name,
+    email: (invite.email || email).toLowerCase(),
+    password: body.password,
   });
-});
+  if ("error" in created) return c.json({ error: created.error }, created.status);
+
+  const already = await db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, invite.workspaceId),
+        eq(schema.workspaceMembers.userId, created.userId),
+      ),
+    )
+    .limit(1);
+  if (already.length === 0) {
+    await db.insert(schema.workspaceMembers).values({
+      workspaceId: invite.workspaceId,
+      userId: created.userId,
+      role: invite.role,
+      createdAt: new Date(),
+    });
+  }
+  await db.delete(schema.invites).where(eq(schema.invites.id, invite.id));
+
+  const headers = new Headers(created.cookieResponse.headers);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ok: true, workspaceId: invite.workspaceId }), { status: 200, headers });
+}
+
+workspaceRoutes.post("/api/register", registerHandler);
+workspaceRoutes.post("/api/setup", registerHandler);
 
 workspaceRoutes.get("/api/me", async (c) => {
   const user = await getSessionUser(c.env, c.req.raw);
@@ -193,7 +287,7 @@ workspaceRoutes.post("/api/invites", async (c) => {
   return c.json({
     id,
     token,
-    url: `${origin}/invite/${token}`,
+    url: `${origin}/signup?invite=${token}`,
     email,
     role,
   });
@@ -275,7 +369,7 @@ workspaceRoutes.post("/api/invites/:token/accept", async (c) => {
         asResponse: true,
       });
       const session = await auth.api.getSession({ headers: new Headers(cookieResponse.headers) });
-      userId = session?.user?.id;
+      userId = session?.user?.id ?? userId;
     }
   } else {
     cookieResponse = await auth.api.signInEmail({

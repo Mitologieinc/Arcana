@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Fingerprint } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
@@ -123,10 +123,11 @@ export function LoginPage() {
     <AuthLayout title="ログイン" kicker="パスキー、またはメールとパスワード。">
       {needsSetup && (
         <p className="mb-5 border border-line bg-white px-3 py-2.5 text-[13px]">
-          ワークスペースはまだありません。{" "}
-          <Link className="font-semibold text-cf" to="/setup">
-            初期セットアップ
+          この環境はまだ空です。最初のオーナーとして{" "}
+          <Link className="font-semibold text-cf" to="/signup">
+            アカウントを作成
           </Link>
+          してください。
         </p>
       )}
       <button type="button" className="btn btn-primary w-full" onClick={onPasskey} disabled={busy}>
@@ -148,27 +149,68 @@ export function LoginPage() {
           メールでログイン
         </button>
       </form>
+      <p className="mt-6 text-center text-[13px] text-muted">
+        アカウントをお持ちでない場合{" "}
+        <Link className="font-semibold text-cf" to="/signup">
+          アカウントを作成
+        </Link>
+      </p>
     </AuthLayout>
   );
 }
 
-export function SetupPage() {
+export function SignupPage() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const inviteFromUrl = params.get("invite") ?? "";
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; workspaceName: string; role: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [inviteToken, setInviteToken] = useState(inviteFromUrl);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<{ needsSetup: boolean }>("/api/bootstrap")
+      .then((d) => setNeedsSetup(d.needsSetup))
+      .catch((e) => setError(e instanceof Error ? e.message : "初期化に失敗しました"));
+  }, []);
+
+  useEffect(() => {
+    if (needsSetup) return;
+    if (!inviteToken.trim() || inviteToken.trim().length < 16) {
+      setInviteInfo(null);
+      return;
+    }
+    api<{ email: string; workspaceName: string; role: string }>(`/api/invites/${inviteToken.trim()}`)
+      .then((info) => {
+        setInviteInfo(info);
+        if (info.email) setEmail(info.email);
+        setError("");
+      })
+      .catch((e) => {
+        setInviteInfo(null);
+        setError(e instanceof Error ? e.message : "招待が無効です");
+      });
+  }, [inviteToken, needsSetup]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      await api("/api/setup", {
+      await api("/api/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password, workspaceName }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          workspaceName: needsSetup ? workspaceName : undefined,
+          inviteToken: needsSetup ? undefined : inviteToken.trim(),
+        }),
       });
       try {
         await authClient.passkey.addPasskey({ name: "このデバイス" });
@@ -183,79 +225,47 @@ export function SetupPage() {
     }
   }
 
+  const kicker =
+    needsSetup === null
+      ? "環境を確認しています。"
+      : needsSetup
+        ? "この Cloudflare 環境の最初のアカウントがオーナーになります。人数に上限はありません。"
+        : inviteInfo
+          ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
+          : "既存の環境へ参加するには、招待コードが必要です。";
+
   return (
-    <AuthLayout title="ワークスペースを作る" kicker="最初のアカウントがオーナーになります。人数に上限はありません。">
+    <AuthLayout title="アカウントを作成" kicker={kicker}>
       <form onSubmit={onSubmit}>
         <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
         <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-        <Field label="ワークスペース名" value={workspaceName} onChange={setWorkspaceName} />
+        {needsSetup ? (
+          <Field label="ワークスペース名" value={workspaceName} onChange={setWorkspaceName} />
+        ) : (
+          <Field label="招待コード" value={inviteToken} onChange={setInviteToken} />
+        )}
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-          作成して始める
+        <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
+          {needsSetup ? "作成して始める" : "参加する"}
         </button>
         <p className="mt-3 text-[12px] text-muted">作成後、このデバイスにパスキーを登録できます。</p>
       </form>
+      <p className="mt-6 text-center text-[13px] text-muted">
+        すでにアカウントがある場合{" "}
+        <Link className="font-semibold text-cf" to="/login">
+          ログイン
+        </Link>
+      </p>
     </AuthLayout>
   );
 }
 
+export function SetupPage() {
+  return <Navigate to="/signup" replace />;
+}
+
 export function InvitePage() {
   const { token } = useParams();
-  const nav = useNavigate();
-  const [info, setInfo] = useState<{ email: string; workspaceName: string; role: string } | null>(null);
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!token) return;
-    api<{ email: string; workspaceName: string; role: string }>(`/api/invites/${token}`)
-      .then(setInfo)
-      .catch((e) => setError(e.message));
-  }, [token]);
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!token) return;
-    setError("");
-    setBusy(true);
-    try {
-      await api(`/api/invites/${token}/accept`, {
-        method: "POST",
-        body: JSON.stringify({ name, password, email: info?.email }),
-      });
-      try {
-        await authClient.passkey.addPasskey({ name: "このデバイス" });
-      } catch {
-        /* optional */
-      }
-      nav("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "失敗しました");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <AuthLayout
-      title="招待を受け入れる"
-      kicker={
-        info
-          ? `「${info.workspaceName}」へ ${info.role} として招待されています（${info.email}）。`
-          : "招待リンクを確認しています。"
-      }
-    >
-      <form onSubmit={onSubmit}>
-        <Field label="表示名" value={name} onChange={setName} autoComplete="name" />
-        <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-        {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-          参加する
-        </button>
-      </form>
-    </AuthLayout>
-  );
+  return <Navigate to={token ? `/signup?invite=${token}` : "/signup"} replace />;
 }

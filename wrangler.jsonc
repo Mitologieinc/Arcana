@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true,
   },
+  "vars": {
+    "ENVIRONMENT": "local",
+  },
   "assets": {
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"],
@@ -39,4 +42,60 @@
       "new_sqlite_classes": ["PageRoom"],
     },
   ],
+  // 1環境 = 1 Worker + 1 D1 + 1 R2 + 1 DO 名前空間。staging と production は混ぜない。
+  // bindings / vars は継承されないので、環境ごとに全部書く。
+  "env": {
+    "staging": {
+      "name": "cf-bible-staging",
+      "vars": { "ENVIRONMENT": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cf-bible-staging",
+          "database_id": "00000000-0000-4000-8000-000000000002",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "FILES",
+          "bucket_name": "cf-bible-files-staging",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "Y_DURABLE_OBJECTS",
+            "class_name": "PageRoom",
+          },
+        ],
+      },
+    },
+    "production": {
+      "name": "cf-bible-production",
+      "vars": { "ENVIRONMENT": "production" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cf-bible-production",
+          "database_id": "00000000-0000-4000-8000-000000000003",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "FILES",
+          "bucket_name": "cf-bible-files-production",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "Y_DURABLE_OBJECTS",
+            "class_name": "PageRoom",
+          },
+        ],
+      },
+    },
+  },
 }
