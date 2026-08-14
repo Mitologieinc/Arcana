@@ -16,6 +16,9 @@ import { PageIcon } from "./PageIcon";
 import { EmojiPicker } from "./EmojiPicker";
 import { ConfirmModal } from "./ConfirmModal";
 import { toast } from "../lib/toast";
+import { PresencePile, type PresenceUser } from "./PresencePile";
+import { BrandMark } from "./Brand";
+import { permissionLabel } from "../lib/format";
 
 type Props = {
   pageId: string;
@@ -61,6 +64,7 @@ export function PageEditor({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
 
   async function reloadPage() {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
@@ -229,7 +233,12 @@ export function PageEditor({
     <div className="min-h-full">
       <header className="sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
-          {sidebarCollapsed && (
+          {shareToken ? (
+            <a href="/" className="mr-1 flex h-7 items-center px-1" title="Arcana">
+              <BrandMark className="h-5 w-auto" />
+            </a>
+          ) : (
+            sidebarCollapsed && (
             <button
               className="btn-ghost mr-1 h-7 w-7 p-0 text-muted"
               onClick={onExpandSidebar}
@@ -237,6 +246,7 @@ export function PageEditor({
             >
               <ChevronsRight size={15} />
             </button>
+            )
           )}
           {crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
@@ -255,8 +265,13 @@ export function PageEditor({
             {title || "無題"}
           </span>
         </nav>
-        {!shareToken && (
-          <div className="relative flex shrink-0 items-center gap-0.5">
+        <div className="relative flex shrink-0 items-center gap-0.5">
+          <PresencePile users={presence} />
+          {shareToken && (
+            <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
+          )}
+          {!shareToken && (
+            <>
             <button
               className={`btn-ghost h-8 w-8 p-0 ${favorited ? "text-cf" : "text-muted"}`}
               title="お気に入り"
@@ -334,8 +349,9 @@ export function PageEditor({
                 )}
               </div>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </header>
       {page.coverR2Key && (
         <div className="group/cover relative h-48 w-full bg-canvas">
@@ -551,6 +567,7 @@ export function PageEditor({
               title={title}
               onOpenPage={onOpenPage}
               onPagesChanged={onPagesChanged}
+              onPresence={setPresence}
             />
           </>
         )}
@@ -584,6 +601,12 @@ export function PageEditor({
         <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
       )}
       {historyOpen && <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />}
+      {shareToken && (
+        <footer className="mx-auto flex max-w-[900px] items-center gap-2.5 px-24 pb-16 pt-10 max-[860px]:px-6">
+          <BrandMark className="h-5 w-auto" />
+          <span className="text-[12px] text-muted">Arcana で共有されたページ</span>
+        </footer>
+      )}
       {confirmDelete && (
         <ConfirmModal
           title="ページを削除"

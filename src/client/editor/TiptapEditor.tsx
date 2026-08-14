@@ -45,6 +45,7 @@ import { ColorButton, LinkButton } from "./FormatMenu";
 import { SlashCommand, uploadImage } from "./slash";
 import { PageBlock, PageLink, PageMention } from "./pageLink";
 import { addNamedColumn } from "./simpleTable";
+import type { PresenceUser } from "../components/PresencePile";
 
 function showTextBubble({ state }: { state: { selection: { empty: boolean } } }) {
   return !state.selection.empty;
@@ -77,6 +78,7 @@ export function TiptapEditor({
   compact,
   onOpenPage,
   onPagesChanged,
+  onPresence,
 }: {
   pageId: string;
   user: User;
@@ -86,6 +88,7 @@ export function TiptapEditor({
   compact?: boolean;
   onOpenPage?: (id: string) => void;
   onPagesChanged?: () => Promise<unknown>;
+  onPresence?: (users: PresenceUser[]) => void;
 }) {
   const indexTimer = useRef<number | null>(null);
   const titleRef = useRef(title);
@@ -108,6 +111,34 @@ export function TiptapEditor({
       collab.doc.destroy();
     };
   }, [collab]);
+
+  useEffect(() => {
+    if (!onPresence) return;
+    const awareness = collab.provider.awareness;
+    const sync = () => {
+      const others: PresenceUser[] = [];
+      awareness.getStates().forEach((state, clientId) => {
+        if (clientId === awareness.clientID) return;
+        const raw = state.user as { name?: string; color?: string; id?: string } | undefined;
+        if (!raw?.name) return;
+        others.push({
+          clientId,
+          id: raw.id || String(clientId),
+          name: raw.name,
+          color: raw.color || "#37352f",
+        });
+      });
+      onPresence(others);
+    };
+    awareness.on("change", sync);
+    collab.provider.on("status", sync);
+    sync();
+    return () => {
+      awareness.off("change", sync);
+      collab.provider.off("status", sync);
+      onPresence([]);
+    };
+  }, [collab, onPresence]);
 
   const editor = useEditor({
     immediatelyRender: true,
@@ -185,7 +216,7 @@ export function TiptapEditor({
       }),
       CollaborationCaret.configure({
         provider: collab.provider,
-        user: { name: user.name || "ゲスト", color: colorFor(user.id) },
+        user: { name: user.name || "ゲスト", color: colorFor(user.id), id: user.id },
       }),
     ],
     editorProps: {

@@ -1334,6 +1334,16 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
   pointer-events: none;
 }
 
+.arcana-presence {
+  display: inline-flex;
+  border-radius: 99px;
+  outline: 2px solid #fff;
+}
+
+html[data-theme="dark"] .arcana-presence {
+  outline-color: #191919;
+}
+
 @media (max-width: 860px) {
   .arcana-doc {
     padding-left: 52px;
