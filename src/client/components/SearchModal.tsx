@@ -30,7 +30,7 @@ export function SearchModal({
 
   return (
     <Modal title="検索" onClose={onClose} wide hideHeader>
-      <div className="flex items-center gap-2 border-b border-line px-3">
+      <div className="flex items-center gap-2.5 border-b border-line px-3.5">
         <Search size={16} className="text-muted" />
         <input
           autoFocus
@@ -39,26 +39,29 @@ export function SearchModal({
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <kbd className="kbd">esc</kbd>
       </div>
-      <ul className="max-h-80 overflow-auto py-1">
+      <ul className="max-h-80 overflow-auto py-1.5">
         {results.map((r) => (
           <li key={r.id}>
             <button
-              className="flex w-full items-start gap-2 rounded-[6px] px-3 py-2 text-left text-[14px] hover:bg-hover"
+              className="flex w-full items-start gap-2.5 rounded-[6px] px-3 py-2 text-left text-[14px] hover:bg-hover"
               onClick={() => onOpen(r.id)}
             >
-              <span>{r.icon || (r.type === "database" ? "🗃️" : "📄")}</span>
-              <span>
-                <span className="block">{r.title || "無題"}</span>
-                {r.snippet && <span className="mt-0.5 block text-[12px] text-muted">{r.snippet}</span>}
+              <span className="mt-0.5 text-[15px]">{r.icon || (r.type === "database" ? "🗃️" : "📄")}</span>
+              <span className="min-w-0">
+                <span className={`block truncate ${r.title ? "" : "text-muted"}`}>{r.title || "無題"}</span>
+                {r.snippet && <span className="mt-0.5 block truncate text-[12px] text-muted">{r.snippet}</span>}
               </span>
             </button>
           </li>
         ))}
         {q && results.length === 0 && (
-          <li className="px-3 py-8 text-center text-[14px] text-muted">見つかりませんでした</li>
+          <li className="px-3 py-10 text-center text-[14px] text-muted">見つかりませんでした</li>
         )}
-        {!q && <li className="px-3 py-6 text-center text-[13px] text-muted">ページ名や本文で探せます</li>}
+        {!q && (
+          <li className="px-3 py-8 text-center text-[13px] text-muted">ページ名や本文で探せます</li>
+        )}
       </ul>
     </Modal>
   );

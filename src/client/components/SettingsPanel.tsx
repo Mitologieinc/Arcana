@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Fingerprint, Trash2 } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
+import { roleLabel } from "../lib/format";
 import { Modal } from "./Modal";
+import { Avatar } from "./Avatar";
 import type { Member, MemberRole } from "../lib/types";
 
 type PasskeyRow = {
@@ -93,7 +95,7 @@ export function SettingsPanel({
           <button
             key={id}
             className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium ${
-              tab === id ? "border-cf text-ink" : "border-transparent text-muted"
+              tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
             onClick={() => setTab(id)}
           >
@@ -112,19 +114,17 @@ export function SettingsPanel({
             パスキーを追加
           </button>
           {pkError && <p className="mb-3 text-[13px] text-danger">{pkError}</p>}
-          <ul className="divide-y divide-line overflow-hidden rounded-[8px] border border-line">
+          <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line">
             {passkeys.length === 0 && (
-              <li className="px-3 py-6 text-center text-[13px] text-muted">まだパスキーはありません</li>
+              <li className="px-3 py-8 text-center text-[13px] text-muted">まだパスキーはありません</li>
             )}
             {passkeys.map((pk) => (
               <li key={pk.id} className="flex items-center justify-between px-3 py-2.5 text-[13px]">
                 <span>
-                  <span className="font-medium">
-                    {pk.name || "Passkey"}
-                  </span>
+                  <span className="font-medium">{pk.name || "Passkey"}</span>
                   <span className="ml-2 text-muted">{pk.deviceType ?? ""}</span>
                 </span>
-                <button className="text-muted hover:text-danger" onClick={() => removePasskey(pk.id)} title="削除">
+                <button className="rounded-md p-1 text-muted hover:bg-hover hover:text-danger" onClick={() => removePasskey(pk.id)} title="削除">
                   <Trash2 size={14} />
                 </button>
               </li>
@@ -136,14 +136,15 @@ export function SettingsPanel({
       {tab === "team" && (
         <div>
           <p className="mb-4 text-[13px] text-muted">メンバー数に上限はありません。</p>
-          <ul className="mb-4 divide-y divide-line overflow-hidden rounded-[8px] border border-line">
+          <ul className="mb-4 divide-y divide-line overflow-hidden rounded-[10px] border border-line">
             {members.map((m) => (
-              <li key={m.userId} className="flex items-center justify-between px-3 py-2.5 text-[13px]">
-                <span>
-                  {m.name}
-                  <span className="ml-2 text-muted">{m.email}</span>
+              <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+                <Avatar name={m.name} seed={m.userId} size={26} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{m.name}</span>
+                  <span className="block truncate text-[12px] text-muted">{m.email}</span>
                 </span>
-                <span className="font-mono text-[11px] uppercase tracking-wide text-muted">{m.role}</span>
+                <span className="shrink-0 text-[12px] text-muted">{roleLabel(m.role)}</span>
               </li>
             ))}
           </ul>
@@ -161,9 +162,9 @@ export function SettingsPanel({
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as MemberRole)}
                 >
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                  <option value="guest">guest</option>
+                  <option value="member">メンバー</option>
+                  <option value="admin">管理者</option>
+                  <option value="guest">ゲスト</option>
                 </select>
                 <button className="btn btn-primary flex-1" onClick={invite}>
                   招待リンクを発行

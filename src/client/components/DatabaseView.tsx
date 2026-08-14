@@ -87,19 +87,19 @@ export function DatabaseView({
   const statusProp = schema.find((p) => p.id === (view.config.groupBy ?? "status")) ?? schema.find((p) => p.type === "select");
 
   return (
-    <div className="mt-6">
+    <div className="mt-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {views.map((v) => (
           <button
             key={v.id}
-            className={`h-8 px-3 text-[14px] ${v.id === view.id ? "border-b-2 border-cf font-medium" : "text-muted hover:text-ink"}`}
+            className={`h-8 rounded-md px-2.5 text-[13px] ${v.id === view.id ? "bg-hover font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink"}`}
             onClick={() => setViewId(v.id)}
           >
             {v.name}
           </button>
         ))}
         <select
-          className="ml-2 rounded border border-line px-2 py-1 text-sm"
+          className="ml-1 h-8 rounded-md border border-transparent bg-transparent px-2 text-[13px] text-muted hover:bg-hover"
           value={filterProp}
           onChange={(e) => setFilterProp(e.target.value)}
         >
@@ -110,31 +110,32 @@ export function DatabaseView({
           ))}
         </select>
         <input
-          className="rounded border border-line px-2 py-1 text-sm"
-          placeholder="含む…"
+          className="h-8 w-40 rounded-md border border-transparent bg-transparent px-2 text-[13px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
+          placeholder="フィルタ…"
           value={filterValue}
           onChange={(e) => setFilterValue(e.target.value)}
         />
         {editable && (
-          <button className="btn btn-primary ml-auto h-8 px-3 text-[12px]" onClick={addRow}>
-            行を追加
+          <button className="btn btn-ghost ml-auto h-8 px-2.5 text-[13px]" onClick={addRow}>
+            新規
           </button>
         )}
       </div>
 
       {view.type === "board" && statusProp ? (
-        <div className="grid auto-cols-fr grid-flow-col gap-3 overflow-x-auto">
+        <div className="grid auto-cols-fr grid-flow-col gap-3 overflow-x-auto pb-2">
           {(statusProp.options ?? []).map((opt) => {
             const colRows = filtered.filter((r) => String(parseProps(r)[statusProp.id] ?? "todo") === opt.id);
             return (
-              <div key={opt.id} className="min-w-56 rounded-[8px] bg-canvas p-2">
-                <div className="mb-2 px-1 text-[12px] font-medium text-muted">
-                  {opt.name} · {colRows.length}
+              <div key={opt.id} className="min-w-56 rounded-[10px] bg-canvas p-2">
+                <div className="mb-2 px-1.5 text-[12px] font-medium text-muted">
+                  {opt.name}
+                  <span className="ml-1.5 text-[#c4c2bc]">{colRows.length}</span>
                 </div>
                 {colRows.map((row) => (
                   <button
                     key={row.id}
-                    className="mb-2 w-full rounded-[6px] bg-white p-2.5 text-left text-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-[#fafafa]"
+                    className="mb-2 w-full rounded-[8px] bg-white p-2.5 text-left text-[14px] shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa]"
                     onClick={() => onOpenRow(row.id)}
                   >
                     {row.icon} {row.title || "無題"}
@@ -145,7 +146,7 @@ export function DatabaseView({
           })}
         </div>
       ) : (
-        <div className="overflow-auto rounded-[8px] border border-line">
+        <div className="overflow-auto rounded-[10px] border border-line">
           <table className="w-full text-sm">
             <thead className="bg-canvas text-left text-[12px] text-muted">
               <tr>
@@ -160,7 +161,7 @@ export function DatabaseView({
               {filtered.map((row) => {
                 const props = parseProps(row);
                 return (
-                  <tr key={row.id} className="border-t border-line">
+                  <tr key={row.id} className="border-t border-line hover:bg-[rgba(55,53,47,0.03)]">
                     {schema.map((p) => (
                       <td key={p.id} className="px-3 py-1.5">
                         {p.type === "title" ? (
@@ -170,7 +171,7 @@ export function DatabaseView({
                         ) : p.type === "select" || p.type === "status" ? (
                           <select
                             disabled={!editable}
-                            className="rounded border border-transparent bg-transparent"
+                            className="rounded-md border border-transparent bg-transparent"
                             value={String(props[p.id] ?? "")}
                             onChange={(e) =>
                               updateRow(row, { properties: { ...props, [p.id]: e.target.value } })
@@ -219,6 +220,15 @@ export function DatabaseView({
                   </tr>
                 );
               })}
+              {editable && (
+                <tr className="border-t border-line">
+                  <td colSpan={Math.max(schema.length, 1)} className="px-2 py-1">
+                    <button className="w-full rounded-md px-1 py-1.5 text-left text-[13px] text-muted hover:bg-hover" onClick={addRow}>
+                      + 新規
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

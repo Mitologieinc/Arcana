@@ -148,7 +148,7 @@ export function TiptapEditor({
       }}
     >
       {editable && (
-        <BubbleMenu editor={editor} className="bubble-menu">
+        <BubbleMenu editor={editor} className="bubble-menu menu-panel">
           <button
             type="button"
             className={editor.isActive("bold") ? "is-active" : ""}

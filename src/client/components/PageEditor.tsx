@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { Share2, Trash2, SmilePlus, ChevronRight } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Share2, SmilePlus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
@@ -36,6 +36,7 @@ export function PageEditor({
   const [dbViews, setDbViews] = useState<DbView[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [title, setTitle] = useState(fallback?.title ?? "");
 
   useEffect(() => {
@@ -56,6 +57,19 @@ export function PageEditor({
       })
       .catch(console.error);
   }, [pageId, shareToken]);
+
+  useEffect(() => {
+    if (!moreOpen && !iconOpen) return;
+    const close = () => {
+      setMoreOpen(false);
+      setIconOpen(false);
+    };
+    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("click", close);
+    };
+  }, [moreOpen, iconOpen]);
 
   const editable = permission === "full" || permission === "edit";
 
@@ -100,17 +114,25 @@ export function PageEditor({
   }, [page, pages]);
 
   if (!page) {
-    return <div className="p-10 text-muted">読み込み中…</div>;
+    return (
+      <div className="mx-auto max-w-[900px] px-24 pt-28">
+        <div className="skeleton mb-6 h-16 w-16 rounded-xl" />
+        <div className="skeleton h-10 w-2/3" />
+        <div className="skeleton mt-8 h-4 w-full" />
+        <div className="skeleton mt-3 h-4 w-5/6" />
+        <div className="skeleton mt-3 h-4 w-3/4" />
+      </div>
+    );
   }
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-[5] flex h-11 items-center justify-between bg-white/90 px-3 backdrop-blur-sm">
+      <header className="sticky top-0 z-[5] flex h-11 items-center justify-between bg-white/80 px-3 backdrop-blur-md">
         <nav className="flex min-w-0 items-center gap-0.5 text-[13px] text-muted">
           {crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
               <button
-                className="max-w-[140px] truncate rounded px-1.5 py-0.5 hover:bg-hover"
+                className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
                 onClick={() => onOpenPage(c.id)}
               >
                 {c.icon || "📄"} {c.title || "無題"}
@@ -118,25 +140,45 @@ export function PageEditor({
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
-          <span className="truncate px-1.5 text-ink">{page.icon || "📄"} {title || "無題"}</span>
+          <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
+            {page.icon || "📄"} {title || "無題"}
+          </span>
         </nav>
         {editable && !shareToken && (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button className="btn-ghost h-8 px-2.5 text-[13px]" onClick={() => setShareOpen(true)}>
+          <div className="relative flex shrink-0 items-center gap-0.5">
+            <button className="btn-ghost h-8 gap-1.5 px-2.5 text-[13px] font-medium" onClick={() => setShareOpen(true)}>
               <Share2 size={14} />
               共有
             </button>
-            <button className="btn-ghost h-8 w-8 p-0 text-muted" onClick={remove} title="削除">
-              <Trash2 size={15} />
+            <button
+              className="btn-ghost h-8 w-8 p-0 text-muted"
+              onClick={() => setMoreOpen((v) => !v)}
+              title="その他"
+            >
+              <MoreHorizontal size={16} />
             </button>
+            {moreOpen && (
+              <div className="menu-panel absolute right-0 top-9 z-20 w-44 p-1" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void remove();
+                  }}
+                >
+                  <Trash2 size={14} />
+                  ページを削除
+                </button>
+              </div>
+            )}
           </div>
         )}
       </header>
-      <div className="group mx-auto max-w-[900px] pb-40 pt-16">
-        <div className="relative mb-1 px-[54px]">
+      <div className="group mx-auto max-w-[900px] pb-40 pt-20">
+        <div className="relative mb-1 px-24 max-[860px]:px-6">
           {page.icon ? (
             <button
-              className="mb-2 text-[72px] leading-none"
+              className="mb-1 rounded-xl text-[78px] leading-none transition hover:bg-hover"
               onClick={() => editable && setIconOpen((v) => !v)}
               disabled={!editable}
             >
@@ -145,21 +187,22 @@ export function PageEditor({
           ) : (
             editable && (
               <button
-                className={`mb-2 inline-flex items-center gap-1 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover ${iconOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                className={`mb-2 inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover ${iconOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                 onClick={() => setIconOpen((v) => !v)}
               >
-                <SmilePlus size={16} />
+                <SmilePlus size={15} />
                 アイコンを追加
               </button>
             )
           )}
           {iconOpen && (
-            <div className="absolute left-[54px] top-20 z-20 w-64 rounded-lg border border-line bg-white p-2 shadow-[0_4px_18px_rgba(0,0,0,0.12)]">
-              <div className="grid grid-cols-8 gap-1">
+            <div className="menu-panel absolute left-24 top-[5.5rem] z-20 w-72 p-2 max-[860px]:left-6" onClick={(e) => e.stopPropagation()}>
+              <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
+              <div className="grid grid-cols-8 gap-0.5">
                 {PAGE_ICONS.map((emo) => (
                   <button
                     key={emo}
-                    className="rounded-[6px] p-1 text-[20px] hover:bg-hover"
+                    className="rounded-[6px] p-1.5 text-[20px] hover:bg-hover"
                     onClick={() => saveIcon(emo)}
                   >
                     {emo}
@@ -167,14 +210,17 @@ export function PageEditor({
                 ))}
               </div>
               {page.icon && (
-                <button className="mt-1 w-full rounded-[6px] px-2 py-1 text-left text-[12px] text-muted hover:bg-hover" onClick={() => saveIcon(null)}>
+                <button
+                  className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"
+                  onClick={() => saveIcon(null)}
+                >
                   アイコンを削除
                 </button>
               )}
             </div>
           )}
         </div>
-        <div className="px-[54px]">
+        <div className="px-24 max-[860px]:px-6">
           <input
             className="page-title"
             value={title}
@@ -192,26 +238,26 @@ export function PageEditor({
           />
         </div>
         {page.type === "database" ? (
-          <div className="mt-6 px-[54px]">
-          <DatabaseView
-            pageId={pageId}
-            schema={dbSchema}
-            views={dbViews}
-            rows={children}
-            editable={editable}
-            onOpenRow={onOpenPage}
-            onChanged={async () => {
-              const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
-              const d = await api<{
-                children: Page[];
-                database: { schema: DbProperty[]; views: DbView[] } | null;
-              }>(`/api/pages/${pageId}${q}`);
-              setChildren(d.children);
-              setDbSchema(d.database?.schema ?? []);
-              setDbViews(d.database?.views ?? []);
-              await onPagesChanged();
-            }}
-          />
+          <div className="mt-6 px-24 max-[860px]:px-6">
+            <DatabaseView
+              pageId={pageId}
+              schema={dbSchema}
+              views={dbViews}
+              rows={children}
+              editable={editable}
+              onOpenRow={onOpenPage}
+              onChanged={async () => {
+                const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
+                const d = await api<{
+                  children: Page[];
+                  database: { schema: DbProperty[]; views: DbView[] } | null;
+                }>(`/api/pages/${pageId}${q}`);
+                setChildren(d.children);
+                setDbSchema(d.database?.schema ?? []);
+                setDbViews(d.database?.views ?? []);
+                await onPagesChanged();
+              }}
+            />
           </div>
         ) : (
           <TiptapEditor
@@ -224,9 +270,7 @@ export function PageEditor({
           />
         )}
       </div>
-      {shareOpen && page && (
-        <ShareDialog page={page} onClose={() => setShareOpen(false)} />
-      )}
+      {shareOpen && page && <ShareDialog page={page} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }

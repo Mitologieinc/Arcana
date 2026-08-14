@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { Page, Permission, User } from "../lib/types";
 import { PageEditor } from "../components/PageEditor";
+import { BrandMark } from "../components/Brand";
 
 export function SharePage() {
   const { token } = useParams();
@@ -21,10 +22,19 @@ export function SharePage() {
   }, [token]);
 
   if (error) {
-    return <div className="flex h-full items-center justify-center text-red-600">{error}</div>;
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
+        <BrandMark className="h-10 w-auto rounded-md" />
+        <p className="text-[14px] text-danger">{error}</p>
+      </div>
+    );
   }
   if (!page || !token) {
-    return <div className="flex h-full items-center justify-center text-muted">読み込み中…</div>;
+    return (
+      <div className="flex h-full items-center justify-center bg-canvas">
+        <div className="skeleton h-2 w-24" />
+      </div>
+    );
   }
 
   const guest: User = { id: "guest", name: "ゲスト", email: "" };

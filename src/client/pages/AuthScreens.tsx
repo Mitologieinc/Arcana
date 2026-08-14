@@ -36,14 +36,16 @@ function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-white px-6 py-16">
-      <div className="w-full max-w-[320px]">
-        <div className="mb-8 flex justify-center">
-          <BrandMark className="h-12 w-auto rounded-[8px]" />
+    <div className="flex min-h-full items-center justify-center bg-canvas px-6 py-16">
+      <div className="w-full max-w-[360px]">
+        <div className="mb-10 flex justify-center">
+          <BrandMark className="h-12 w-auto rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,0.18)]" />
         </div>
-        <h1 className="text-center text-[22px] font-semibold tracking-tight">{title}</h1>
-        {kicker && <p className="mt-2 text-center text-[14px] leading-relaxed text-muted">{kicker}</p>}
-        <div className="mt-7">{children}</div>
+        <div className="rounded-[14px] border border-line bg-white px-6 py-7 shadow-[0_10px_40px_rgba(15,15,15,0.04)]">
+          <h1 className="text-center text-[20px] font-semibold tracking-tight">{title}</h1>
+          {kicker && <p className="mt-2 text-center text-[13px] leading-relaxed text-muted">{kicker}</p>}
+          <div className="mt-6">{children}</div>
+        </div>
       </div>
     </div>
   );
@@ -107,7 +109,7 @@ export function LoginPage() {
   return (
     <AuthLayout title="ログイン" kicker="パスキー、またはメールとパスワード。">
       {needsSetup && (
-        <p className="mb-5 rounded-[6px] bg-canvas px-3 py-2.5 text-[13px]">
+        <p className="mb-5 rounded-[8px] bg-canvas px-3 py-2.5 text-[13px] leading-relaxed">
           この環境はまだ空です。最初のオーナーとして{" "}
           <Link className="font-semibold text-cf" to="/signup">
             アカウントを作成
@@ -119,7 +121,7 @@ export function LoginPage() {
         <Fingerprint size={16} />
         パスキーで続ける
       </button>
-      <div className="divider">or</div>
+      <div className="divider">または</div>
       <form onSubmit={onSubmit}>
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="username webauthn" />
         <Field
@@ -134,7 +136,7 @@ export function LoginPage() {
           メールでログイン
         </button>
       </form>
-      <p className="mt-6 text-center text-[13px] text-muted">
+      <p className="mt-5 text-center text-[13px] text-muted">
         アカウントをお持ちでない場合{" "}
         <Link className="font-semibold text-cf" to="/signup">
           アカウントを作成
@@ -230,7 +232,7 @@ export function SignupPage() {
         </button>
         <p className="mt-3 text-[12px] text-muted">作成後、このデバイスにパスキーを登録できます。</p>
       </form>
-      <p className="mt-6 text-center text-[13px] text-muted">
+      <p className="mt-5 text-center text-[13px] text-muted">
         すでにアカウントがある場合{" "}
         <Link className="font-semibold text-cf" to="/login">
           ログイン

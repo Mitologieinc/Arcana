@@ -1,20 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { LogOut, Plus, Search, Settings } from "lucide-react";
+import { FilePlus, LayoutGrid, LogOut, Search, Settings } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
+import { greeting, relativeTime } from "../lib/format";
 import type { Member, Page, User, Workspace } from "../lib/types";
 import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { BrandMark } from "../components/Brand";
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const s = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
-  return (s || name.slice(0, 1) || "?").toUpperCase();
-}
+import { Avatar } from "../components/Avatar";
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
@@ -62,6 +58,13 @@ export function WorkspaceApp() {
   }, []);
 
   const current = useMemo(() => pages.find((p) => p.id === pageId) ?? null, [pages, pageId]);
+  const recent = useMemo(
+    () =>
+      [...pages]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 8),
+    [pages],
+  );
 
   async function createPage(parentId?: string | null, type: "page" | "database" = "page") {
     const res = await api<{ page: Page }>("/api/pages", {
@@ -80,38 +83,43 @@ export function WorkspaceApp() {
 
   if (!ready || !user || !workspace) {
     return (
-      <div className="flex h-full items-center justify-center bg-white text-[14px] text-muted">読み込み中…</div>
+      <div className="flex h-full items-center justify-center bg-canvas">
+        <div className="flex flex-col items-center gap-4">
+          <BrandMark className="h-10 w-auto rounded-md" />
+          <div className="skeleton h-2 w-24" />
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="flex h-full bg-white">
-      <aside className="flex w-[240px] shrink-0 flex-col bg-sidebar px-1.5 py-2">
-        <button className="mb-1.5 overflow-hidden rounded-[6px] bg-black px-2 py-1.5" onClick={() => nav("/")} title="Arcana">
-          <BrandMark className="h-7 w-full object-contain" />
-        </button>
+      <aside className="flex w-[252px] shrink-0 flex-col bg-sidebar px-1.5 py-2">
         <button
-          className="sidebar-item mb-1.5 h-8 px-2 font-medium"
+          className="mb-2 overflow-hidden rounded-[8px] bg-black px-2.5 py-2"
           onClick={() => nav("/")}
-          title={workspace.name}
+          title="Arcana"
         >
+          <BrandMark className="h-6 w-full object-contain" />
+        </button>
+        <button className="sidebar-item mb-2 h-8 px-2 font-medium" onClick={() => nav("/")} title={workspace.name}>
           <span className="min-w-0 truncate">{workspace.name}</span>
         </button>
         <button className="sidebar-item text-muted" onClick={() => setSearchOpen(true)}>
-          <Search size={16} />
+          <Search size={15} strokeWidth={1.75} />
           検索
-          <span className="ml-auto text-[11px] text-[#c4c2bc]">⌘K</span>
+          <kbd className="kbd ml-auto">⌘K</kbd>
         </button>
         <button className="sidebar-item text-muted" onClick={() => createPage(null, "page")}>
-          <Plus size={16} />
+          <FilePlus size={15} strokeWidth={1.75} />
           新規ページ
         </button>
-        <button className="sidebar-item mb-2 text-muted" onClick={() => createPage(null, "database")}>
-          <Plus size={16} />
+        <button className="sidebar-item mb-3 text-muted" onClick={() => createPage(null, "database")}>
+          <LayoutGrid size={15} strokeWidth={1.75} />
           新規データベース
         </button>
-        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-muted">ページ</div>
-        <div className="flex-1 overflow-auto px-0.5 pb-2">
+        <div className="mb-1 px-2 text-[11px] font-medium tracking-wide text-muted">ページ</div>
+        <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-0.5 pb-2">
           <SidebarTree
             pages={pages}
             currentId={pageId}
@@ -124,11 +132,9 @@ export function WorkspaceApp() {
             パスキーを追加
           </button>
         )}
-        <div className="flex items-center gap-0.5 pb-1">
+        <div className="mt-1 flex items-center gap-0.5 border-t border-transparent pt-1">
           <button className="sidebar-item min-w-0 flex-1" onClick={openSettings}>
-            <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#d3e5ef] text-[10px] font-semibold text-[#37352f]">
-              {initials(user.name)}
-            </span>
+            <Avatar name={user.name} seed={user.id} />
             <span className="min-w-0 truncate">{user.name}</span>
             <Settings size={14} className="ml-auto shrink-0 text-muted" />
           </button>
@@ -156,37 +162,40 @@ export function WorkspaceApp() {
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
-          <div className="mx-auto max-w-2xl px-16 py-28">
-            <p className="text-[32px] font-bold tracking-tight">こんにちは、{user.name}</p>
-            <p className="mt-2 text-[16px] text-muted">左のサイドバーからページを開くか、新しく書き始めてください。</p>
+          <div className="mx-auto max-w-[720px] px-16 py-24">
+            <p className="text-[13px] font-medium text-muted">{greeting()}</p>
+            <h1 className="mt-1 text-[40px] font-bold tracking-[-0.03em]">{user.name}</h1>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+              左のサイドバーからページを開くか、ここから新しく書き始めてください。
+            </p>
             <div className="mt-8 flex flex-wrap gap-2">
-              <button className="btn btn-secondary" onClick={() => createPage(null, "page")}>
-                <Plus size={16} />
+              <button className="btn btn-primary" onClick={() => createPage(null, "page")}>
+                <FilePlus size={15} />
                 新規ページ
               </button>
               <button className="btn btn-secondary" onClick={() => createPage(null, "database")}>
-                <Plus size={16} />
+                <LayoutGrid size={15} />
                 新規データベース
               </button>
             </div>
-            {pages.length > 0 && (
-              <div className="mt-12">
-                <p className="mb-2 text-[12px] font-medium text-muted">ジャンプ</p>
-                <ul>
-                  {pages
-                    .filter((p) => !p.parentId)
-                    .slice(0, 8)
-                    .map((p) => (
-                      <li key={p.id}>
-                        <button
-                          className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[14px] hover:bg-hover"
-                          onClick={() => nav(`/page/${p.id}`)}
-                        >
-                          <span>{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
-                          <span className="truncate">{p.title || "無題"}</span>
-                        </button>
-                      </li>
-                    ))}
+            {recent.length > 0 && (
+              <div className="mt-14">
+                <p className="mb-2 px-1 text-[12px] font-medium text-muted">ジャンプ</p>
+                <ul className="overflow-hidden rounded-[10px] border border-line">
+                  {recent.map((p) => (
+                    <li key={p.id} className="border-t border-line first:border-t-0">
+                      <button
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[14px] hover:bg-hover"
+                        onClick={() => nav(`/page/${p.id}`)}
+                      >
+                        <span className="text-[16px]">{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
+                        <span className={`min-w-0 flex-1 truncate ${p.title ? "" : "text-muted"}`}>
+                          {p.title || "無題"}
+                        </span>
+                        <span className="shrink-0 text-[12px] text-muted">{relativeTime(p.updatedAt)}</span>
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}

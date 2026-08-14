@@ -159,14 +159,16 @@ const SlashMenu = forwardRef<MenuHandle, SuggestionProps<SlashItem, SlashItem>>(
 
   if (items.length === 0) {
     return (
-      <div className="slash-menu">
-        <p className="px-3 py-4 text-[13px] text-muted">一致するコマンドはありません</p>
+      <div className="slash-menu menu-panel">
+        <p className="slash-kicker">一致なし</p>
+        <p className="px-2.5 pb-3 text-[13px] text-muted">一致するコマンドはありません</p>
       </div>
     );
   }
 
   return (
-    <div className="slash-menu">
+    <div className="slash-menu menu-panel">
+      <p className="slash-kicker">基本ブロック</p>
       {items.map((item, i) => {
         const Icon = item.icon;
         return (
@@ -177,11 +179,11 @@ const SlashMenu = forwardRef<MenuHandle, SuggestionProps<SlashItem, SlashItem>>(
             onMouseEnter={() => setIndex(i)}
             onClick={() => props.command(item)}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-line bg-white">
-              <Icon size={16} />
+            <span className="slash-icon">
+              <Icon size={18} />
             </span>
             <span className="min-w-0 text-left">
-              <span className="block truncate text-[14px]">{item.title}</span>
+              <span className="block truncate text-[14px] font-medium">{item.title}</span>
               <span className="block truncate text-[12px] text-muted">{item.subtitle}</span>
             </span>
           </button>

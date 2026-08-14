@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { permissionLabel } from "../lib/format";
 import type { Page, Permission } from "../lib/types";
 import { Modal } from "./Modal";
 
@@ -73,7 +74,9 @@ export function ShareDialog({ page, onClose }: Props) {
 
   return (
     <Modal title="共有" onClose={onClose}>
-      <p className="mb-4 text-[13px] text-muted">権限は親ページから継承されます。ここで上書きできます。</p>
+      <p className="mb-4 text-[13px] leading-relaxed text-muted">
+        権限は親ページから継承されます。ここで上書きできます。
+      </p>
       <label className="field">
         <span>ワークスペース成員</span>
         <select value={wsPerm} onChange={(e) => saveWsPerm(e.target.value as Permission)}>
@@ -91,16 +94,16 @@ export function ShareDialog({ page, onClose }: Props) {
           編集リンク
         </button>
       </div>
-      {copied && <p className="mb-2 break-all text-[12px] text-cf">コピーしました: {copied}</p>}
+      {copied && <p className="mb-2 break-all text-[12px] text-cf">コピーしました</p>}
       {links.length > 0 && (
-        <ul className="max-h-40 divide-y divide-line overflow-auto rounded-[8px] border border-line text-[13px]">
+        <ul className="max-h-40 divide-y divide-line overflow-auto rounded-[10px] border border-line text-[13px]">
           {links.map((l) => (
             <li key={l.id} className="flex items-center justify-between px-3 py-2">
-              <span>
-                {l.permission === "edit" ? "編集" : "閲覧"} · {l.token.slice(0, 8)}…
+              <span className="text-muted">
+                {permissionLabel(l.permission)} · {l.token.slice(0, 8)}…
               </span>
               <button
-                className="text-danger"
+                className="rounded-md px-1.5 py-0.5 text-[12px] text-danger hover:bg-hover"
                 onClick={async () => {
                   await api(`/api/share-links/${l.id}`, { method: "DELETE" });
                   await load();
