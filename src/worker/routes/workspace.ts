@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { createAuth, getMembership, getSessionUser } from "../auth";
 import type { AppEnv } from "../types";
 import { emailAllowed, normalizeDomains } from "../lib/access";
 import { allowAttempt, clientIp } from "../lib/rate-limit";
+import { setCredentialPassword, verifyCredentialPassword } from "../lib/password";
 
 const DEFAULT_DB_PROPERTIES = [
   { id: "title", type: "title", name: "名前" },
@@ -420,6 +421,14 @@ function canRemove(actor: schema.MemberRole, target: schema.MemberRole, self: bo
   return false;
 }
 
+function canResetPassword(actor: schema.MemberRole, target: schema.MemberRole, self: boolean) {
+  if (self) return false;
+  if (target === "owner") return false;
+  if (actor === "owner") return true;
+  if (actor === "admin") return target === "member" || target === "guest";
+  return false;
+}
+
 workspaceRoutes.patch("/api/members/:userId", async (c) => {
   const user = await getSessionUser(c.env, c.req.raw);
   if (!user) return c.json({ error: "未ログイン" }, 401);
@@ -508,6 +517,116 @@ workspaceRoutes.post("/api/members/:userId/transfer", async (c) => {
       ),
     );
   return c.json({ ok: true, ownerId: targetId });
+});
+
+workspaceRoutes.post("/api/account/password", async (c) => {
+  const auth = createAuth(c.env, c.req.raw);
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user) return c.json({ error: "未ログイン" }, 401);
+  if (!allowAttempt(`pw:${session.user.id}`, 10, 10 * 60 * 1000)) {
+    return c.json({ error: "少し待ってからやり直してください" }, 429);
+  }
+  const body = await c.req.json<{ currentPassword?: string; newPassword?: string }>();
+  const next = body.newPassword?.trim() ?? "";
+  if (next.length < 8) return c.json({ error: "パスワードは 8 文字以上にしてください" }, 400);
+  const db = createDb(c.env.DB);
+  const rows = await db
+    .select()
+    .from(schema.account)
+    .where(and(eq(schema.account.userId, session.user.id), eq(schema.account.providerId, "credential")))
+    .limit(1);
+  if (!rows[0]?.password) return c.json({ error: "パスワードが設定されていません" }, 400);
+  const ok = await verifyCredentialPassword(rows[0].password, body.currentPassword ?? "");
+  if (!ok) return c.json({ error: "現在のパスワードが違います" }, 400);
+  await setCredentialPassword(db, session.user.id, next);
+  const currentToken = session.session?.token;
+  if (currentToken) {
+    await db
+      .delete(schema.session)
+      .where(and(eq(schema.session.userId, session.user.id), ne(schema.session.token, currentToken)));
+  }
+  return c.json({ ok: true });
+});
+
+workspaceRoutes.post("/api/members/:userId/reset-link", async (c) => {
+  const user = await getSessionUser(c.env, c.req.raw);
+  if (!user) return c.json({ error: "未ログイン" }, 401);
+  const db = createDb(c.env.DB);
+  const membership = await getMembership(db, user.id);
+  if (!membership) return c.json({ error: "ワークスペースがありません" }, 403);
+  const targetId = c.req.param("userId");
+  const target = await memberRow(db, membership.workspaceId, targetId);
+  if (!target) return c.json({ error: "メンバーが見つかりません" }, 404);
+  if (!canResetPassword(membership.role, target.role, targetId === user.id)) {
+    return c.json({ error: "リセットリンクは発行できません" }, 403);
+  }
+  await db.delete(schema.passwordResets).where(eq(schema.passwordResets.userId, targetId));
+  const token = crypto.randomUUID().replaceAll("-", "");
+  const now = new Date();
+  await db.insert(schema.passwordResets).values({
+    id: crypto.randomUUID(),
+    userId: targetId,
+    token,
+    expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+    createdAt: now,
+  });
+  const origin = new URL(c.req.url).origin;
+  return c.json({ url: `${origin}/reset/${token}` });
+});
+
+workspaceRoutes.get("/api/password-resets/:token", async (c) => {
+  const db = createDb(c.env.DB);
+  const token = c.req.param("token");
+  const rows = await db
+    .select({
+      expiresAt: schema.passwordResets.expiresAt,
+      email: schema.user.email,
+    })
+    .from(schema.passwordResets)
+    .innerJoin(schema.user, eq(schema.user.id, schema.passwordResets.userId))
+    .where(eq(schema.passwordResets.token, token))
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.expiresAt.getTime() < Date.now()) {
+    return c.json({ error: "リンクが無効です" }, 404);
+  }
+  return c.json({ email: row.email });
+});
+
+workspaceRoutes.post("/api/password-resets/:token", async (c) => {
+  const db = createDb(c.env.DB);
+  const token = c.req.param("token");
+  if (!allowAttempt(`pw-reset:${clientIp(c.req.raw)}`, 15, 10 * 60 * 1000)) {
+    return c.json({ error: "少し待ってからやり直してください" }, 429);
+  }
+  const rows = await db
+    .select()
+    .from(schema.passwordResets)
+    .where(eq(schema.passwordResets.token, token))
+    .limit(1);
+  const reset = rows[0];
+  if (!reset || reset.expiresAt.getTime() < Date.now()) {
+    return c.json({ error: "リンクが無効です" }, 404);
+  }
+  const body = await c.req.json<{ password?: string }>();
+  const password = body.password ?? "";
+  if (password.length < 8) return c.json({ error: "パスワードは 8 文字以上にしてください" }, 400);
+  const users = await db.select().from(schema.user).where(eq(schema.user.id, reset.userId)).limit(1);
+  const target = users[0];
+  if (!target) return c.json({ error: "リンクが無効です" }, 404);
+  await setCredentialPassword(db, target.id, password);
+  await db.delete(schema.passwordResets).where(eq(schema.passwordResets.userId, target.id));
+  await db.delete(schema.session).where(eq(schema.session.userId, target.id));
+  const auth = createAuth(c.env, c.req.raw);
+  const cookieResponse = await auth.api.signInEmail({
+    body: { email: target.email, password },
+    headers: c.req.raw.headers,
+    asResponse: true,
+  });
+  if (!cookieResponse.ok) {
+    return c.json({ ok: true, needLogin: true });
+  }
+  return withSession(cookieResponse, {});
 });
 
 workspaceRoutes.patch("/api/workspace", async (c) => {

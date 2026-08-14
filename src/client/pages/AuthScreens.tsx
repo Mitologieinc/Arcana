@@ -163,6 +163,9 @@ export function LoginPage() {
           メールでログイン
         </button>
       </form>
+      <p className="mt-4 text-center text-[12px] leading-relaxed text-muted">
+        パスワードを忘れた場合は、管理者にリセットリンクを依頼するか、パスキーで入ってください。
+      </p>
       <p className="mt-8 text-center text-[13px] text-muted">
         {inviteOnly ? (
           "参加は招待リンクから行います。"
@@ -517,4 +520,89 @@ export function SetupPage() {
 export function InvitePage() {
   const { token } = useParams();
   return <Navigate to={token ? `/signup?invite=${token}` : "/signup"} replace />;
+}
+
+export function ResetPasswordPage() {
+  const { token } = useParams();
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!token) {
+      setInvalid(true);
+      return;
+    }
+    api<{ email: string }>(`/api/password-resets/${token}`)
+      .then((d) => setEmail(d.email))
+      .catch(() => setInvalid(true));
+  }, [token]);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("パスワードは 8 文字以上にしてください");
+      return;
+    }
+    if (password !== confirm) {
+      setError("確認用と一致しません");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(`/api/password-resets/${token}`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      nav("/", { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "変更できませんでした");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (invalid) {
+    return (
+      <AuthLayout title="リンクが無効です" kicker="期限切れか、すでに使われています。管理者に新しいリンクを依頼してください。">
+        <p className="text-center text-[13px] text-muted">
+          <Link className="underline underline-offset-2" to="/login">
+            ログイン
+          </Link>
+        </p>
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout title="パスワードを設定" kicker={email ? `${email} の新しいパスワードを入力してください。` : "リンクを確認しています。"}>
+      <form onSubmit={onSubmit}>
+        <Field
+          label="新しいパスワード"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          minLength={8}
+        />
+        <Field
+          label="確認"
+          type="password"
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+          minLength={8}
+        />
+        {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
+        <button type="submit" className="btn btn-primary w-full" disabled={busy || !email}>
+          設定して入る
+        </button>
+      </form>
+    </AuthLayout>
+  );
 }

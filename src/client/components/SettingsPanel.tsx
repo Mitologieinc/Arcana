@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, Import, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
+import { Fingerprint, Import, KeyRound, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { toast } from "../lib/toast";
@@ -33,6 +33,14 @@ function canEditRole(actor: MemberRole, target: MemberRole) {
 function canRemoveMember(actor: MemberRole, target: MemberRole, self: boolean) {
   if (target === "owner") return false;
   if (self) return actor !== "owner";
+  if (actor === "owner") return true;
+  if (actor === "admin") return target === "member" || target === "guest";
+  return false;
+}
+
+function canResetMemberPassword(actor: MemberRole, target: MemberRole, self: boolean) {
+  if (self) return false;
+  if (target === "owner") return false;
   if (actor === "owner") return true;
   if (actor === "admin") return target === "member" || target === "guest";
   return false;
@@ -73,6 +81,11 @@ export function SettingsPanel({
   const [error, setError] = useState("");
   const [passkeys, setPasskeys] = useState<PasskeyRow[]>([]);
   const [pkError, setPkError] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
   const [inviteOnly, setInviteOnly] = useState(Boolean(workspace.inviteOnly));
   const [allowedDomains, setAllowedDomains] = useState(workspace.allowedDomains ?? "");
   const [shareLinksEnabled, setShareLinksEnabled] = useState(workspace.shareLinksEnabled !== false);
@@ -182,6 +195,44 @@ export function SettingsPanel({
     await loadPasskeys();
   }
 
+  async function changePassword() {
+    setPwError("");
+    if (newPassword.length < 8) {
+      setPwError("パスワードは 8 文字以上にしてください");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("確認用と一致しません");
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await api("/api/account/password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast("パスワードを変更しました");
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : "変更できませんでした");
+    } finally {
+      setPwBusy(false);
+    }
+  }
+
+  async function issueReset(userId: string) {
+    setError("");
+    try {
+      const res = await api<{ url: string }>(`/api/members/${userId}/reset-link`, { method: "POST" });
+      await navigator.clipboard.writeText(res.url);
+      toast("リセットリンクをコピーしました");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "発行できませんでした");
+    }
+  }
+
   const tabs: { id: Tab; label: string; icon: typeof Monitor }[] = [
     { id: "account", label: "アカウント", icon: Fingerprint },
     { id: "appearance", label: "表示", icon: Monitor },
@@ -251,6 +302,44 @@ export function SettingsPanel({
                     </li>
                   ))}
                 </ul>
+              </section>
+
+              <section>
+                <h3 className="mb-1 text-[13px] font-medium">パスワード</h3>
+                <p className="mb-3 text-[12px] leading-relaxed text-muted">メールで入るときのパスワードです。変更すると他の端末のログインは切れます。</p>
+                <label className="field">
+                  <span>現在のパスワード</span>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>新しいパスワード</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>確認</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </label>
+                {pwError && <p className="mb-3 text-[13px] text-danger">{pwError}</p>}
+                <button type="button" className="btn btn-secondary" disabled={pwBusy} onClick={() => void changePassword()}>
+                  パスワードを変更
+                </button>
               </section>
 
               <button type="button" className="text-[13px] text-muted hover:text-ink" onClick={() => void onSignOut()}>
@@ -419,6 +508,7 @@ export function SettingsPanel({
                     const self = m.userId === user.id;
                     const editable = canEditRole(role, m.role);
                     const removable = canRemoveMember(role, m.role, self);
+                    const resettable = canResetMemberPassword(role, m.role, self);
                     return (
                       <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
                         <Avatar name={m.name} seed={m.userId} size={26} />
@@ -443,6 +533,16 @@ export function SettingsPanel({
                           </select>
                         ) : (
                           <span className="shrink-0 text-[12px] text-muted">{roleLabel(m.role)}</span>
+                        )}
+                        {resettable && (
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-md p-1 text-muted hover:bg-hover hover:text-ink"
+                            title="リセットリンク"
+                            onClick={() => void issueReset(m.userId)}
+                          >
+                            <KeyRound size={14} />
+                          </button>
                         )}
                         {removable && (
                           <button
