@@ -1526,6 +1526,13 @@ html[data-theme="dark"] .arcana-presence {
   cursor: crosshair;
 }
 
+.jam-bar,
+.jam-bar *,
+.jam-zoom,
+.jam-zoom * {
+  cursor: pointer;
+}
+
 .jam-dots {
   position: absolute;
   inset: 0;
@@ -1676,23 +1683,25 @@ html[data-theme="dark"] .jam-label textarea {
 
 .jam-bar {
   position: absolute;
-  left: 50%;
-  bottom: 18px;
-  z-index: 6;
+  left: 12px;
+  top: 50%;
+  z-index: 40;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
-  transform: translateX(-50%);
-  padding: 5px;
-  border-radius: 16px;
+  transform: translateY(-50%);
+  padding: 6px;
+  border-radius: 18px;
   background: #fff;
-  box-shadow: 0 0 0 1px rgba(30, 30, 30, 0.06), 0 10px 28px rgba(30, 30, 30, 0.12);
+  box-shadow: 0 0 0 1px rgba(30, 30, 30, 0.08), 0 12px 32px rgba(30, 30, 30, 0.16);
+  pointer-events: auto;
 }
 
 .jam-sep {
-  width: 1px;
-  height: 22px;
-  margin: 0 4px;
+  width: 22px;
+  height: 1px;
+  margin: 4px 0;
   background: #ecebe8;
 }
 
@@ -1700,10 +1709,10 @@ html[data-theme="dark"] .jam-label textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: #1e1e1e;
 }
@@ -1723,11 +1732,11 @@ html[data-theme="dark"] .jam-label textarea {
 
 .jam-pop {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
+  left: calc(100% + 10px);
+  top: 50%;
   display: flex;
   gap: 6px;
-  transform: translateX(-50%);
+  transform: translateY(-50%);
   padding: 8px;
   border-radius: 12px;
   background: #fff;
@@ -1767,7 +1776,7 @@ html[data-theme="dark"] .jam-label textarea {
   position: absolute;
   right: 14px;
   bottom: 18px;
-  z-index: 6;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: 2px;

@@ -53,7 +53,7 @@ export function PageEditor({
   const location = useLocation();
   const titleRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<Page | null>(fallback ?? null);
-  const [permission, setPermission] = useState<Permission>(forcedPermission ?? "view");
+  const [permission, setPermission] = useState<Permission>(forcedPermission ?? (shareToken ? "view" : "edit"));
   const [children, setChildren] = useState<Page[]>([]);
   const [dbSchema, setDbSchema] = useState<DbProperty[]>([]);
   const [dbViews, setDbViews] = useState<DbView[]>([]);
@@ -437,7 +437,7 @@ export function PageEditor({
         </div>
       </header>
       {page.type === "canvas" && (
-        <div className="relative min-h-0 flex-1">
+        <div className="relative h-full min-h-0 flex-1">
           <div className="jam-title" onPointerDown={(e) => e.stopPropagation()}>
             {shareToken ? (
               <a href="/" className="jam-title-icon" title="Arcana">

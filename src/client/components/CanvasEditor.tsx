@@ -678,14 +678,13 @@ export function CanvasEditor({
         </div>
       )}
 
-      {editable && (
-        <div className="jam-bar" onPointerDown={(e) => e.stopPropagation()}>
-          <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => setTool("select")} />
-          <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => setTool("hand")} />
+      <div className="jam-bar" onPointerDown={(e) => e.stopPropagation()}>
+          <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} disabled={!editable} onClick={() => setTool("select")} />
+          <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} disabled={!editable} onClick={() => setTool("hand")} />
           <span className="jam-sep" />
           <div className="jam-fly">
-            <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} onClick={() => { setTool("sticky"); setOpen(open === "sticky" ? null : "sticky"); }} />
-            {open === "sticky" && (
+            <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} disabled={!editable} onClick={() => { setTool("sticky"); setOpen(open === "sticky" ? null : "sticky"); }} />
+            {editable && open === "sticky" && (
               <div className="jam-pop">
                 {STICKY_COLORS.map((c) => (
                   <button
@@ -700,8 +699,8 @@ export function CanvasEditor({
             )}
           </div>
           <div className="jam-fly">
-            <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} onClick={() => { setTool("shape"); setOpen(open === "shape" ? null : "shape"); }} />
-            {open === "shape" && (
+            <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} disabled={!editable} onClick={() => { setTool("shape"); setOpen(open === "shape" ? null : "shape"); }} />
+            {editable && open === "shape" && (
               <div className="jam-pop">
                 <button type="button" className={shapeKind === "round" ? "is-on" : ""} onClick={() => { setShapeKind("round"); setTool("shape"); }}><Square size={16} /></button>
                 <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onClick={() => { setShapeKind("ellipse"); setTool("shape"); }}><Circle size={16} /></button>
@@ -709,11 +708,10 @@ export function CanvasEditor({
               </div>
             )}
           </div>
-          <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} onClick={() => { setTool("text"); setOpen(null); }} />
-          <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} onClick={() => { setTool("line"); setOpen(null); setLineFrom(null); }} />
-          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => { setTool("pen"); setOpen(null); }} />
+          <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} disabled={!editable} onClick={() => { setTool("text"); setOpen(null); }} />
+          <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} disabled={!editable} onClick={() => { setTool("line"); setOpen(null); setLineFrom(null); }} />
+          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} disabled={!editable} onClick={() => { setTool("pen"); setOpen(null); }} />
         </div>
-      )}
 
       <div className="jam-zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button type="button" onClick={() => zoomBy(0.9)} aria-label="縮小">
@@ -733,16 +731,18 @@ function ToolBtn({
   label,
   hot,
   on,
+  disabled,
   onClick,
 }: {
   icon: typeof MousePointer2;
   label: string;
   hot: string;
   on: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button type="button" className={`jam-tool ${on ? "is-on" : ""}`} title={`${label}（${hot}）`} onClick={onClick}>
+    <button type="button" className={`jam-tool ${on ? "is-on" : ""}`} title={`${label}（${hot}）`} disabled={disabled} onClick={onClick}>
       <Icon size={18} strokeWidth={1.8} />
     </button>
   );
