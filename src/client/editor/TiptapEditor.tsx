@@ -36,6 +36,20 @@ import { DatabaseEmbed } from "./databaseEmbed";
 import { SlashCommand, uploadImage } from "./slash";
 import { PageLink, PageMention } from "./pageLink";
 
+function showTextBubble({ state }: { state: { selection: { empty: boolean } } }) {
+  return !state.selection.empty;
+}
+
+function showTableBubble({
+  editor,
+  state,
+}: {
+  editor: { isActive: (name: string) => boolean };
+  state: { selection: { empty: boolean } };
+}) {
+  return editor.isActive("table") && state.selection.empty;
+}
+
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
 
 function colorFor(id: string) {
@@ -205,11 +219,7 @@ export function TiptapEditor({
       }}
     >
       {editable && (
-        <BubbleMenu
-          editor={editor}
-          className="bubble-menu menu-panel"
-          shouldShow={({ editor: ed, state }) => !state.selection.empty}
-        >
+        <BubbleMenu editor={editor} className="bubble-menu menu-panel" shouldShow={showTextBubble}>
           <button
             type="button"
             className={editor.isActive("bold") ? "is-active" : ""}
@@ -282,7 +292,7 @@ export function TiptapEditor({
           editor={editor}
           pluginKey="tableBubble"
           className="bubble-menu menu-panel"
-          shouldShow={({ editor: ed, state }) => ed.isActive("table") && state.selection.empty}
+          shouldShow={showTableBubble}
         >
           <button type="button" title="左に列" onClick={() => editor.chain().focus().addColumnBefore().run()}>
             <BetweenVerticalStart size={14} />
