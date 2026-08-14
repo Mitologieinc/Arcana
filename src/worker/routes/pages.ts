@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
@@ -128,7 +128,8 @@ pageRoutes.get("/api/pages/:id", async (c) => {
   const children = await db
     .select()
     .from(schema.pages)
-    .where(and(eq(schema.pages.parentId, id), isNull(schema.pages.archivedAt)));
+    .where(and(eq(schema.pages.parentId, id), isNull(schema.pages.archivedAt)))
+    .orderBy(asc(schema.pages.position));
 
   let database: { schema: unknown; views: unknown[] } | null = null;
   if (page.type === "database") {

@@ -159,6 +159,13 @@ export function WorkspaceApp() {
             compact={collapsed}
             onOpen={(id) => nav(`/page/${id}`)}
             onCreateChild={(id) => createPage(id, "page")}
+            onMove={async (id, parentId, position) => {
+              await api(`/api/pages/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ parentId, position }),
+              });
+              await refresh();
+            }}
           />
         </div>
         <button className={`${item} mt-1`} onClick={openSettings} title={user.name}>

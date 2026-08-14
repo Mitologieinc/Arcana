@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Columns3, Plus, Search, Table2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { Columns3, GripVertical, Plus, Search, Table2, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
+import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
 import type { DbFilter, DbProperty, DbView, Page } from "../lib/types";
 import { FloatMenu } from "./FloatMenu";
 import {
@@ -10,6 +11,15 @@ import {
   PropertyIcon,
   PropertyValue,
 } from "./PropertyValue";
+
+type DragKind = "row" | "card" | "col";
+type DragState = {
+  type: DragKind;
+  id: string;
+  overId: string | null;
+  edge: DropEdge;
+  overCol?: string;
+};
 
 type Props = {
   pageId: string;
@@ -35,7 +45,7 @@ function applyFilters(rows: Page[], schema: DbProperty[], filters: DbFilter[] | 
 }
 
 function applySorts(rows: Page[], schema: DbProperty[], sorts: DbView["config"]["sorts"]) {
-  if (!sorts?.length) return rows;
+  if (!sorts?.length) return [...rows].sort((a, b) => a.position - b.position);
   return [...rows].sort((a, b) => {
     for (const s of sorts) {
       const prop = schema.find((p) => p.id === s.propertyId);
@@ -88,6 +98,9 @@ export function DatabaseView({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const skipTitleBlur = useRef(false);
   const dragging = useRef(false);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  dragRef.current = drag;
 
   const filtered = useMemo(() => {
     const extra: DbFilter[] = [
@@ -134,12 +147,16 @@ export function DatabaseView({
     setEditingTitleId(res.page.id);
   }
 
-  async function updateRow(row: Page, patch: { title?: string; properties?: Record<string, unknown> }) {
+  async function updateRow(
+    row: Page,
+    patch: { title?: string; properties?: Record<string, unknown>; position?: number },
+  ) {
     await api(`/api/pages/${row.id}`, {
       method: "PATCH",
       body: JSON.stringify({
         title: patch.title ?? row.title,
         properties: patch.properties ?? parseProps(row.properties),
+        position: patch.position,
       }),
     });
     await onChanged();
@@ -159,6 +176,101 @@ export function DatabaseView({
     schema.find((p) => p.type === "select" || p.type === "status");
   const dataProps = schema.filter((p) => p.type !== "title");
   const titleProp = schema.find((p) => p.type === "title");
+  const canReorderRows = editable && !view.config.sorts?.length && !filterValue && !equalsFilter;
+
+  function beginDrag(e: DragEvent, type: DragKind, id: string) {
+    dragging.current = true;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.setData("application/x-arcana", JSON.stringify({ type, id }));
+    const next: DragState = { type, id, overId: null, edge: "before" };
+    dragRef.current = next;
+    setDrag(next);
+    const el = e.currentTarget as HTMLElement;
+    el.style.opacity = "0.4";
+  }
+
+  function hoverDrag(e: DragEvent, overId: string, overCol?: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    const current = dragRef.current;
+    if (!current || current.id === overId) return;
+    const useEdge: DropEdge =
+      current.type === "col"
+        ? e.clientX < e.currentTarget.getBoundingClientRect().left + e.currentTarget.getBoundingClientRect().width / 2
+          ? "before"
+          : "after"
+        : dropEdgeFromY(e.clientY, e.currentTarget.getBoundingClientRect());
+    if (current.overId === overId && current.edge === useEdge && current.overCol === overCol) return;
+    const next = { ...current, overId, edge: useEdge, overCol };
+    dragRef.current = next;
+    setDrag(next);
+  }
+
+  function endDrag(e?: DragEvent) {
+    if (e) (e.currentTarget as HTMLElement).style.opacity = "";
+    window.setTimeout(() => {
+      dragging.current = false;
+    }, 0);
+    dragRef.current = null;
+    setDrag(null);
+  }
+
+  async function commitCardDrop(colStatus: string | undefined) {
+    const current = dragRef.current;
+    if (!current || (current.type !== "card" && current.type !== "row") || !statusProp) {
+      endDrag();
+      return;
+    }
+    const row = rows.find((r) => r.id === current.id);
+    if (!row) {
+      endDrag();
+      return;
+    }
+    const nextProps = { ...parseProps(row.properties), [statusProp.id]: colStatus ?? "" };
+    const colRows = rows
+      .filter((r) => {
+        if (r.id === row.id) return true;
+        const raw = String(parseProps(r.properties)[statusProp.id] ?? "");
+        return colStatus ? raw === colStatus : !raw;
+      })
+      .sort((a, b) => a.position - b.position);
+    const position = computePosition(colRows, current.id, current.overId, current.overId ? current.edge : "after");
+    endDrag();
+    await updateRow(row, { properties: nextProps, position });
+  }
+
+  async function commitRowDrop() {
+    const current = dragRef.current;
+    if (!current || current.type !== "row" || !current.overId) {
+      endDrag();
+      return;
+    }
+    const row = rows.find((r) => r.id === current.id);
+    if (!row) {
+      endDrag();
+      return;
+    }
+    const ordered = [...rows].sort((a, b) => a.position - b.position);
+    const position = computePosition(ordered, current.id, current.overId, current.edge);
+    endDrag();
+    await updateRow(row, { position });
+  }
+
+  async function commitColDrop() {
+    const current = dragRef.current;
+    if (!current || current.type !== "col" || !current.overId || current.id === current.overId) {
+      endDrag();
+      return;
+    }
+    const ids = dataProps.map((p) => p.id);
+    const nextIds = reorderIds(ids, current.id, current.overId, current.edge);
+    const map = new Map(schema.map((p) => [p.id, p]));
+    const title = schema.filter((p) => p.type === "title");
+    endDrag();
+    await saveSchema([...title, ...nextIds.map((id) => map.get(id)!).filter(Boolean)]);
+  }
 
   function titleCell(row: Page) {
     const editing = editingTitleId === row.id;
@@ -292,17 +404,21 @@ export function DatabaseView({
               return (
                 <div
                   key={col.id}
-                  className="w-[260px] shrink-0 rounded-[10px] bg-canvas p-2"
-                  onDragOver={(e) => e.preventDefault()}
+                  className={`w-[260px] shrink-0 rounded-[10px] bg-canvas p-2 ${
+                    drag?.type === "card" && drag.overCol === col.id ? "arcana-drop-col" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    const current = dragRef.current;
+                    if (!current || current.type !== "card") return;
+                    if ((e.target as HTMLElement).closest("[data-card]")) return;
+                    const next = { ...current, overId: null, overCol: col.id, edge: "after" as const };
+                    dragRef.current = next;
+                    setDrag(next);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    dragging.current = false;
-                    const id = e.dataTransfer.getData("text/plain");
-                    const row = rows.find((r) => r.id === id);
-                    if (!row || !editable) return;
-                    void updateRow(row, {
-                      properties: { ...parseProps(row.properties), [statusProp.id]: col.status ?? "" },
-                    });
+                    void commitCardDrop(col.status);
                   }}
                 >
                   <div className="mb-2 flex items-center gap-1.5 px-1.5 text-[12px] font-medium text-muted">
@@ -321,22 +437,27 @@ export function DatabaseView({
                     return (
                       <div
                         key={row.id}
+                        data-card
                         draggable={editable && editingTitleId !== row.id}
-                        onDragStart={(e) => {
-                          dragging.current = true;
-                          e.dataTransfer.setData("text/plain", row.id);
+                        onDragStart={(e) => beginDrag(e, "card", row.id)}
+                        onDragOver={(e) => hoverDrag(e, row.id, col.id)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void commitCardDrop(col.status);
                         }}
-                        onDragEnd={() => {
-                          window.setTimeout(() => {
-                            dragging.current = false;
-                          }, 0);
-                        }}
-                        className="mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa]"
+                        onDragEnd={(e) => endDrag(e)}
+                        className={`relative mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa] ${
+                          drag?.id === row.id ? "opacity-40" : ""
+                        }`}
                         onClick={() => {
                           if (dragging.current || editingTitleId === row.id) return;
                           onOpenRow(row.id);
                         }}
                       >
+                        {drag?.type === "card" && drag.overId === row.id && drag.id !== row.id && (
+                          <div className={`arcana-drop-line ${drag.edge === "before" ? "top-0" : "bottom-0"}`} />
+                        )}
                         {editingTitleId === row.id ? (
                           titleCell(row)
                         ) : (
@@ -401,12 +522,29 @@ export function DatabaseView({
                   </button>
                 </th>
                 {dataProps.map((p) => (
-                  <th key={p.id} className="min-w-[140px]">
+                  <th
+                    key={p.id}
+                    className={`min-w-[140px] ${
+                      drag?.type === "col" && drag.overId === p.id
+                        ? drag.edge === "before"
+                          ? "arcana-drop-before"
+                          : "arcana-drop-after"
+                        : ""
+                    }`}
+                    draggable={editable}
+                    onDragStart={(e) => beginDrag(e, "col", p.id)}
+                    onDragOver={(e) => hoverDrag(e, p.id)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      void commitColDrop();
+                    }}
+                    onDragEnd={(e) => endDrag(e)}
+                  >
                     <button
                       type="button"
                       className="flex w-full items-center gap-1.5 text-left text-muted"
                       onClick={(e) => {
-                        if (!editable) return;
+                        if (dragging.current || !editable) return;
                         setRename(p.name);
                         setHeaderMenu({ id: p.id, rect: e.currentTarget.getBoundingClientRect() });
                       }}
@@ -434,9 +572,39 @@ export function DatabaseView({
               {filtered.map((row) => {
                 const props = parseProps(row.properties);
                 return (
-                  <tr key={row.id} className="group">
+                  <tr
+                    key={row.id}
+                    className={`group ${
+                      drag?.type === "row" && drag.id === row.id ? "opacity-40" : ""
+                    } ${
+                      drag?.type === "row" && drag.overId === row.id
+                        ? drag.edge === "before"
+                          ? "arcana-drop-before"
+                          : "arcana-drop-after"
+                        : ""
+                    }`}
+                    onDragOver={(e) => canReorderRows && hoverDrag(e, row.id)}
+                    onDrop={(e) => {
+                      if (!canReorderRows) return;
+                      e.preventDefault();
+                      void commitRowDrop();
+                    }}
+                  >
                     <td>
                       <div className="flex min-w-0 items-center gap-1">
+                        {canReorderRows && (
+                          <button
+                            type="button"
+                            className="arcana-grip absolute left-[72px] z-[2] opacity-0 group-hover:opacity-100 max-[860px]:left-1"
+                            draggable
+                            title="並べ替え"
+                            onDragStart={(e) => beginDrag(e, "row", row.id)}
+                            onDragEnd={(e) => endDrag(e)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <GripVertical size={14} />
+                          </button>
+                        )}
                         <div className="min-w-0 flex-1">{titleCell(row)}</div>
                         {editable && (
                           <button
