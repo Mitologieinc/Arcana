@@ -7,6 +7,8 @@ export function SideSheet({
   width = 400,
   extra,
   footer,
+  flush,
+  zIndex = 40,
   children,
 }: {
   title: string;
@@ -14,6 +16,8 @@ export function SideSheet({
   width?: number;
   extra?: ReactNode;
   footer?: ReactNode;
+  flush?: boolean;
+  zIndex?: number;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -25,7 +29,7 @@ export function SideSheet({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
+    <div className="fixed inset-0 flex justify-end" style={{ zIndex }}>
       <button className="flex-1 bg-[rgba(15,15,15,0.08)]" onClick={onClose} aria-label="閉じる" />
       <aside
         className="flex h-full flex-col border-l border-line bg-white"
@@ -38,7 +42,9 @@ export function SideSheet({
             <X size={16} />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+        <div className={flush ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "min-h-0 flex-1 overflow-auto"}>
+          {children}
+        </div>
         {footer}
       </aside>
     </div>

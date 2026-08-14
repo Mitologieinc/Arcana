@@ -4,7 +4,7 @@ import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { toast } from "../lib/toast";
 import { roleLabel } from "../lib/format";
-import { Modal } from "./Modal";
+import { SideSheet } from "./SideSheet";
 import { Avatar } from "./Avatar";
 import { NotionImport } from "./NotionImport";
 import { ConfirmModal } from "./ConfirmModal";
@@ -242,9 +242,15 @@ export function SettingsPanel({
 
   return (
     <>
-    <Modal title="設定" onClose={() => (confirm ? setConfirm(null) : onClose())} wide flush>
-      <div className="flex min-h-[420px] max-h-[min(640px,calc(100vh-6rem))]">
-        <nav className="flex w-[168px] shrink-0 flex-col gap-0.5 border-r border-line p-2">
+    <SideSheet
+      title="設定"
+      width={560}
+      flush
+      zIndex={50}
+      onClose={() => (confirm ? setConfirm(null) : onClose())}
+    >
+      <div className="flex min-h-0 flex-1">
+        <nav className="flex w-[148px] shrink-0 flex-col gap-0.5 overflow-auto border-r border-line p-2">
           {tabs.map((item) => {
             const Icon = item.icon;
             return (
@@ -633,7 +639,7 @@ export function SettingsPanel({
           {tab === "import" && canInvite && <NotionImport onChanged={onChanged} />}
         </div>
       </div>
-    </Modal>
+    </SideSheet>
       {confirm?.kind === "remove" && (
         <ConfirmModal
           title="メンバーから外す"
