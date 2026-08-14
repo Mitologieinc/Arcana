@@ -2,9 +2,9 @@ const DIAMONDS = [
   { x: 130.757, y: 0.385742, fill: "#B60003" },
   { x: 203.825, y: 73.4531, fill: "#B60003" },
   { x: 130.935, y: 146.343, fill: "#B60003" },
-  { x: 281.067, y: 0, fill: "#DB5825" },
-  { x: 354.134, y: 73.0674, fill: "#DB5825" },
-  { x: 281.245, y: 145.957, fill: "#DB5825" },
+  { x: 281.066, y: 0, fill: "#DB5825" },
+  { x: 354.133, y: 73.0674, fill: "#DB5825" },
+  { x: 281.244, y: 145.957, fill: "#DB5825" },
 ] as const;
 
 const DELAY = [0, 2, 4, 1, 3, 5];
@@ -39,6 +39,7 @@ function ArcanaMark({
             y={d.y}
             width="81.8374"
             height="81.8374"
+            rx="9"
             transform={`rotate(45 ${d.x} ${d.y})`}
             fill={d.fill}
           />
