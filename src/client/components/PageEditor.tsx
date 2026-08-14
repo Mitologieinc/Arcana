@@ -13,6 +13,7 @@ import { TiptapEditor } from "../editor/TiptapEditor";
 import { uploadImage } from "../editor/slash";
 import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
 import { PageIcon } from "./PageIcon";
+import { EmojiPicker } from "./EmojiPicker";
 
 type Props = {
   pageId: string;
@@ -26,8 +27,6 @@ type Props = {
   onPagesChanged: () => Promise<unknown>;
   onOpenPage: (id: string) => void;
 };
-
-const PAGE_ICONS = ["📄", "📝", "📚", "💡", "✅", "🎯", "🚀", "⭐", "🔥", "❤️", "🧩", "🗃️", "🏠", "📅", "🧠", "✨"];
 
 export function PageEditor({
   pageId,
@@ -449,23 +448,18 @@ export function PageEditor({
           )}
           {iconOpen && (
             <div
-              className={`menu-panel absolute left-24 z-20 w-72 p-2 max-[860px]:left-6 ${
+              className={`menu-panel absolute left-24 z-20 w-80 p-2 max-[860px]:left-6 ${
                 page.coverR2Key && page.icon ? "top-12" : "top-[5.5rem]"
               }`}
               onClick={(e) => e.stopPropagation()}
             >
               <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
-              <div className="grid grid-cols-8 gap-0.5">
-                {PAGE_ICONS.map((emo) => (
-                  <button
-                    key={emo}
-                    className="rounded-[6px] p-1.5 text-[20px] hover:bg-hover"
-                    onClick={() => saveIcon(emo)}
-                  >
-                    {emo}
-                  </button>
-                ))}
-              </div>
+              <EmojiPicker
+                onPick={(emo) => {
+                  void saveIcon(emo);
+                  setIconOpen(false);
+                }}
+              />
               <button
                 className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"
                 onClick={pickIconFile}

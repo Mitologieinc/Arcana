@@ -1,8 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { useState } from "react";
-
-const EMOJIS = ["💡", "✅", "⚠️", "❌", "🔥", "📝", "💬", "⭐"];
+import { EmojiPicker } from "../components/EmojiPicker";
 
 function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
   const [open, setOpen] = useState(false);
@@ -21,20 +20,17 @@ function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
         {node.attrs.emoji || "💡"}
       </button>
       {open && (
-        <div className="menu-panel arcana-callout-picker" contentEditable={false}>
-          {EMOJIS.map((emo) => (
-            <button
-              key={emo}
-              type="button"
-              className="rounded-[6px] p-1.5 text-[18px] hover:bg-hover"
-              onClick={() => {
-                updateAttributes({ emoji: emo });
-                setOpen(false);
-              }}
-            >
-              {emo}
-            </button>
-          ))}
+        <div
+          className="menu-panel arcana-callout-picker"
+          contentEditable={false}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <EmojiPicker
+            onPick={(emo) => {
+              updateAttributes({ emoji: emo });
+              setOpen(false);
+            }}
+          />
         </div>
       )}
       <NodeViewContent className="arcana-callout-body" />

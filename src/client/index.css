@@ -1031,10 +1031,8 @@ button:disabled {
   top: 40px;
   left: 8px;
   z-index: 20;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  width: 168px;
-  padding: 6px;
+  width: 320px;
+  padding: 8px;
 }
 
 .arcana-callout-body {
