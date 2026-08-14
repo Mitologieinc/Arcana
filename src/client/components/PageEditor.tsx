@@ -348,9 +348,13 @@ export function PageEditor({
         >
           {editable && (
             <div
-              className={`pointer-events-none absolute left-24 z-[3] flex flex-wrap gap-1 max-[860px]:left-6 ${
-                page.coverR2Key && page.icon ? "top-1" : "top-0"
-              } ${iconOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"}`}
+              className={`pointer-events-none absolute z-[3] flex flex-wrap gap-1 ${
+                page.icon
+                  ? "left-[182px] max-[860px]:left-[110px]"
+                  : "left-24 max-[860px]:left-6"
+              } ${page.coverR2Key && page.icon ? "top-1" : "top-0"} ${
+                iconOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
+              }`}
             >
               {!page.icon && (
                 <button
