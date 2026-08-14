@@ -132,7 +132,7 @@ async function bootstrapWorkspace(
     workspaceId,
     parentId: null,
     type: "page",
-    title: "はじめにお読みください",
+    title: "ようこそ",
     icon: "📖",
     position: 1,
     createdBy: input.userId,
@@ -140,7 +140,44 @@ async function bootstrapWorkspace(
     updatedAt: now,
   });
   await env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
-    .bind(welcomeId, "はじめにお読みください", "")
+    .bind(welcomeId, "ようこそ", "")
+    .run();
+
+  const tasksId = crypto.randomUUID();
+  await db.insert(schema.pages).values({
+    id: tasksId,
+    workspaceId,
+    parentId: null,
+    type: "database",
+    title: "タスク",
+    icon: "🗃️",
+    position: 2,
+    createdBy: input.userId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(schema.databaseSchemas).values({
+    pageId: tasksId,
+    properties: JSON.stringify(DEFAULT_DB_PROPERTIES),
+  });
+  await db.insert(schema.databaseViews).values({
+    id: crypto.randomUUID(),
+    pageId: tasksId,
+    name: "テーブル",
+    type: "table",
+    config: JSON.stringify({ filters: [], sorts: [] }),
+    position: 1,
+  });
+  await db.insert(schema.databaseViews).values({
+    id: crypto.randomUUID(),
+    pageId: tasksId,
+    name: "ボード",
+    type: "board",
+    config: JSON.stringify({ groupBy: "status", filters: [] }),
+    position: 2,
+  });
+  await env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
+    .bind(tasksId, "タスク", "")
     .run();
   return { workspaceId, welcomeId };
 }

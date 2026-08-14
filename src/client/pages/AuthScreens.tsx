@@ -11,17 +11,29 @@ function Field({
   value,
   onChange,
   autoComplete,
+  placeholder,
+  minLength,
 }: {
   label: string;
   type?: string;
   value: string;
   onChange: (v: string) => void;
   autoComplete?: string;
+  placeholder?: string;
+  minLength?: number;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} value={value} autoComplete={autoComplete} onChange={(e) => onChange(e.target.value)} />
+      <input
+        type={type}
+        value={value}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        minLength={minLength}
+        required
+        onChange={(e) => onChange(e.target.value)}
+      />
     </label>
   );
 }
@@ -29,10 +41,14 @@ function Field({
 function AuthLayout({
   title,
   kicker,
+  step,
+  steps = 3,
   children,
 }: {
   title: string;
   kicker?: string;
+  step?: number;
+  steps?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -41,6 +57,13 @@ function AuthLayout({
         <div className="mb-12">
           <BrandLockup className="h-10 w-auto max-w-full object-left" />
         </div>
+        {step != null && (
+          <div className="setup-dots" aria-hidden>
+            {Array.from({ length: steps }, (_, i) => (
+              <span key={i} className={i + 1 === step ? "is-on" : ""} />
+            ))}
+          </div>
+        )}
         <h1 className="text-[15px] font-medium tracking-tight">{title}</h1>
         {kicker && <p className="mt-1 text-[13px] leading-relaxed text-muted">{kicker}</p>}
         <div className="mt-8">{children}</div>
@@ -59,13 +82,13 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [needsSetup, setNeedsSetup] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api<{ needsSetup: boolean }>("/api/bootstrap")
       .then((d) => setNeedsSetup(d.needsSetup))
-      .catch(() => undefined);
+      .catch(() => setNeedsSetup(false));
   }, []);
 
   useEffect(() => {
@@ -104,17 +127,17 @@ export function LoginPage() {
     nav("/");
   }
 
+  if (needsSetup === true) return <Navigate to="/setup" replace />;
+  if (needsSetup === null) {
+    return (
+      <div className="flex h-full items-center justify-center bg-white">
+        <BrandLockup className="h-10 w-auto" />
+      </div>
+    );
+  }
+
   return (
     <AuthLayout title="ログイン">
-      {needsSetup && (
-        <p className="mb-6 text-[13px] leading-relaxed text-muted">
-          まだ空です。最初のオーナーとして{" "}
-          <Link className="underline underline-offset-2" to="/signup">
-            作成
-          </Link>
-          。
-        </p>
-      )}
       <button type="button" className="btn btn-primary w-full" onClick={onPasskey} disabled={busy}>
         <Fingerprint size={16} />
         パスキーで続ける
@@ -206,16 +229,16 @@ export function SignupPage() {
     }
   }
 
+  if (needsSetup && !inviteFromUrl) return <Navigate to="/setup" replace />;
+
   const kicker =
     needsSetup === null
       ? "環境を確認しています。"
-      : needsSetup
-        ? "最初のアカウントがオーナーになります。"
-        : inviteInfo
-          ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
-          : workspaceName
-            ? `「${workspaceName}」に参加します。`
-            : "この環境のワークスペースに参加します。";
+      : inviteInfo
+        ? `「${inviteInfo.workspaceName}」へ ${inviteInfo.role} として招待されています。`
+        : workspaceName
+          ? `「${workspaceName}」に参加します。`
+          : "この環境のワークスペースに参加します。";
 
   return (
     <AuthLayout title="アカウントを作成" kicker={kicker}>
@@ -223,10 +246,9 @@ export function SignupPage() {
         <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
         <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-        {needsSetup && <Field label="ワークスペース名" value={workspaceName} onChange={setWorkspaceName} />}
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
         <button type="submit" className="btn btn-primary w-full" disabled={busy || needsSetup === null}>
-          {needsSetup ? "作成して始める" : "参加する"}
+          参加する
         </button>
         <p className="mt-3 text-[12px] text-muted">あとからパスキーを追加できます。</p>
       </form>
@@ -241,7 +263,159 @@ export function SignupPage() {
 }
 
 export function SetupPage() {
-  return <Navigate to="/signup" replace />;
+  const nav = useNavigate();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [ready, setReady] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [welcomeId, setWelcomeId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<{ needsSetup: boolean }>("/api/bootstrap")
+      .then((d) => {
+        if (!d.needsSetup) {
+          nav("/login", { replace: true });
+          return;
+        }
+        setReady(true);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "初期化に失敗しました"));
+  }, [nav]);
+
+  function goHome() {
+    nav(welcomeId ? `/page/${welcomeId}` : "/", { replace: true });
+  }
+
+  async function createWorkspace(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("パスワードは 8 文字以上にしてください");
+      return;
+    }
+    setBusy(true);
+    try {
+      const d = await api<{ welcomeId?: string }>("/api/setup", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          workspaceName,
+        }),
+      });
+      setWelcomeId(d.welcomeId ?? null);
+      setStep(3);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addPasskey() {
+    setError("");
+    setBusy(true);
+    const { error: err } = await authClient.passkey.addPasskey({ name: "このデバイス" });
+    setBusy(false);
+    if (err) {
+      setError(err.message || "パスキーを登録できませんでした");
+      return;
+    }
+    goHome();
+  }
+
+  if (!ready) {
+    if (error) {
+      return (
+        <AuthLayout title="セットアップできません" kicker={error}>
+          <Link className="underline underline-offset-2 text-[13px]" to="/login">
+            ログインへ
+          </Link>
+        </AuthLayout>
+      );
+    }
+    return (
+      <div className="flex h-full items-center justify-center bg-white">
+        <BrandLockup className="h-10 w-auto" />
+      </div>
+    );
+  }
+
+  if (step === 1) {
+    return (
+      <AuthLayout
+        title="この環境をセットアップ"
+        kicker="1 URL につき 1 ワークスペースです。最初の人がオーナーになります。"
+        step={1}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!workspaceName.trim()) {
+              setError("ワークスペース名を入力してください");
+              return;
+            }
+            setError("");
+            setStep(2);
+          }}
+        >
+          <Field
+            label="ワークスペース名"
+            value={workspaceName}
+            onChange={setWorkspaceName}
+            autoComplete="organization"
+            placeholder="例: 社名"
+          />
+          {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
+          <button type="submit" className="btn btn-primary w-full">
+            続ける
+          </button>
+        </form>
+      </AuthLayout>
+    );
+  }
+
+  if (step === 2) {
+    return (
+      <AuthLayout title="オーナーアカウント" kicker={`「${workspaceName}」の管理者になります。`} step={2}>
+        <form onSubmit={(e) => void createWorkspace(e)}>
+          <Field label="あなたの名前" value={name} onChange={setName} autoComplete="name" />
+          <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="email" />
+          <Field label="パスワード" type="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
+          <p className="mb-3 -mt-1 text-[12px] text-muted">8 文字以上。あとからパスキーも使えます。</p>
+          {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
+          <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+            作成して始める
+          </button>
+          <button type="button" className="btn btn-ghost mt-2 w-full text-muted" onClick={() => setStep(1)}>
+            戻る
+          </button>
+        </form>
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout
+      title="パスキーを登録"
+      kicker="指紋や顔で入れるようにできます。あとから設定でも構いません。"
+      step={3}
+    >
+      {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
+      <button type="button" className="btn btn-primary w-full" onClick={() => void addPasskey()} disabled={busy}>
+        <Fingerprint size={16} />
+        このデバイスに追加
+      </button>
+      <button type="button" className="btn btn-ghost mt-2 w-full text-muted" onClick={goHome} disabled={busy}>
+        あとで
+      </button>
+    </AuthLayout>
+  );
 }
 
 export function InvitePage() {

@@ -42,7 +42,7 @@ export function WorkspaceApp() {
     const me = await api<{ user: User | null; workspace: Workspace | null }>("/api/me");
     if (!me.user || !me.workspace) {
       const boot = await api<{ needsSetup: boolean }>("/api/bootstrap");
-      nav(boot.needsSetup ? "/signup" : "/login", { replace: true });
+      nav(boot.needsSetup ? "/setup" : "/login", { replace: true });
       return false;
     }
     setUser(me.user);

@@ -305,6 +305,27 @@ button:disabled {
   box-shadow: 0 0 0 1px rgba(55, 53, 47, 0.08);
 }
 
+.field input::placeholder {
+  color: var(--color-muted);
+}
+
+.setup-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.setup-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--color-line);
+}
+
+.setup-dots span.is-on {
+  background: var(--color-ink);
+}
+
 .divider {
   display: flex;
   align-items: center;
