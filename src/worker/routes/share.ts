@@ -33,14 +33,32 @@ shareRoutes.put("/api/pages/:id/acl", async (c) => {
   }>();
   await db.delete(schema.pageAcl).where(eq(schema.pageAcl.pageId, id));
   const allowedPerm: schema.Permission[] = ["full", "edit", "view", "none"];
+  const next: { principalType: "user" | "workspace"; principalId: string | null; permission: schema.Permission }[] = [];
   for (const acl of body.acls) {
     if (acl.principalType !== "user" && acl.principalType !== "workspace") continue;
     if (!allowedPerm.includes(acl.permission)) continue;
+    if (acl.principalType === "user" && !acl.principalId) continue;
+    next.push({
+      principalType: acl.principalType,
+      principalId: acl.principalType === "user" ? (acl.principalId ?? null) : null,
+      permission: acl.permission,
+    });
+  }
+  const selfAcl = next.find((a) => a.principalType === "user" && a.principalId === user.id);
+  const wsAcl = next.find((a) => a.principalType === "workspace");
+  const selfKeepsFull = selfAcl
+    ? selfAcl.permission === "full"
+    : !wsAcl || wsAcl.permission === "full";
+  if (!selfKeepsFull) {
+    if (selfAcl) selfAcl.permission = "full";
+    else next.push({ principalType: "user", principalId: user.id, permission: "full" });
+  }
+  for (const acl of next) {
     await db.insert(schema.pageAcl).values({
       id: crypto.randomUUID(),
       pageId: id,
       principalType: acl.principalType,
-      principalId: acl.principalId ?? null,
+      principalId: acl.principalId,
       permission: acl.permission,
     });
   }

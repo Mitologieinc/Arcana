@@ -597,7 +597,15 @@ export function PageEditor({
           }}
         />
       )}
-      {shareOpen && page && <ShareDialog page={page} onClose={() => setShareOpen(false)} />}
+      {shareOpen && page && (
+        <ShareDialog
+          page={page}
+          members={members}
+          userId={user.id}
+          canManageAcl={permission === "full"}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
       {commentsOpen && (
         <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
       )}
