@@ -7,13 +7,33 @@ type Props = {
   currentId?: string;
   onOpen: (id: string) => void;
   onCreateChild: (parentId: string) => void;
+  compact?: boolean;
 };
 
-export function SidebarTree({ pages, currentId, onOpen, onCreateChild }: Props) {
+export function SidebarTree({ pages, currentId, onOpen, onCreateChild, compact }: Props) {
   const roots = useMemo(
     () => pages.filter((p) => !p.parentId).sort((a, b) => a.position - b.position),
     [pages],
   );
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center gap-0.5">
+        {roots.map((p) => (
+          <button
+            key={p.id}
+            className={`flex h-8 w-8 items-center justify-center rounded-[6px] text-[15px] ${
+              currentId === p.id ? "bg-[rgba(55,53,47,0.08)]" : "hover:bg-hover"
+            }`}
+            title={p.title || "無題"}
+            onClick={() => onOpen(p.id)}
+          >
+            {p.icon || (p.type === "database" ? "🗃️" : "📄")}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>

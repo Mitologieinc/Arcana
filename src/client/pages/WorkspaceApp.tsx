@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FilePlus, LayoutGrid, LogOut, Search, Settings } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, FilePlus, LayoutGrid, LogOut, Search, Settings } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, relativeTime } from "../lib/format";
@@ -9,7 +9,7 @@ import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
-import { BrandMark } from "../components/Brand";
+import { BrandLockup, BrandMark } from "../components/Brand";
 import { Avatar } from "../components/Avatar";
 
 export function WorkspaceApp() {
@@ -23,6 +23,15 @@ export function WorkspaceApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [passkeyCount, setPasskeyCount] = useState<number | null>(null);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("arcana.sidebar") === "1");
+
+  function toggleSidebar() {
+    setCollapsed((v) => {
+      const next = !v;
+      localStorage.setItem("arcana.sidebar", next ? "1" : "0");
+      return next;
+    });
+  }
 
   async function refresh() {
     const me = await api<{ user: User | null; workspace: Workspace | null }>("/api/me");
@@ -84,9 +93,9 @@ export function WorkspaceApp() {
   if (!ready || !user || !workspace) {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
-        <div className="flex flex-col items-center gap-4">
-          <BrandMark className="h-10 w-auto rounded-md" />
-          <div className="skeleton h-2 w-24" />
+        <div className="flex flex-col items-center gap-3">
+          <BrandMark className="h-10 w-10 rounded-xl" />
+          <div className="skeleton h-2 w-16" />
         </div>
       </div>
     );
@@ -94,49 +103,90 @@ export function WorkspaceApp() {
 
   return (
     <div className="flex h-full bg-white">
-      <aside className="flex w-[252px] shrink-0 flex-col bg-sidebar px-1.5 py-2">
-        <button
-          className="mb-2 overflow-hidden rounded-[8px] bg-black px-2.5 py-2"
-          onClick={() => nav("/")}
-          title="Arcana"
-        >
-          <BrandMark className="h-6 w-full object-contain" />
-        </button>
-        <button className="sidebar-item mb-2 h-8 px-2 font-medium" onClick={() => nav("/")} title={workspace.name}>
-          <span className="min-w-0 truncate">{workspace.name}</span>
-        </button>
-        <button className="sidebar-item text-muted" onClick={() => setSearchOpen(true)}>
+      <aside
+        className={`flex shrink-0 flex-col bg-sidebar py-2 transition-[width] duration-200 ease-out ${
+          collapsed ? "w-[56px] px-1.5" : "w-[252px] px-1.5"
+        }`}
+      >
+        {collapsed ? (
+          <button className="mb-2 flex justify-center" onClick={() => nav("/")} title="Arcana WorkSquare">
+            <BrandMark className="h-8 w-8 rounded-[8px]" />
+          </button>
+        ) : (
+          <button
+            className="mb-2 overflow-hidden rounded-[8px] bg-black px-2 py-1.5"
+            onClick={() => nav("/")}
+            title="Arcana WorkSquare"
+          >
+            <BrandLockup className="h-9 w-full object-contain" />
+          </button>
+        )}
+        {!collapsed && (
+          <button className="sidebar-item mb-2 h-8 px-2 font-medium" onClick={() => nav("/")} title={workspace.name}>
+            <span className="min-w-0 truncate">{workspace.name}</span>
+          </button>
+        )}
+        <button className={`sidebar-item text-muted ${collapsed ? "justify-center px-0" : ""}`} onClick={() => setSearchOpen(true)} title="検索">
           <Search size={15} strokeWidth={1.75} />
-          検索
-          <kbd className="kbd ml-auto">⌘K</kbd>
+          {!collapsed && (
+            <>
+              検索
+              <kbd className="kbd ml-auto">⌘K</kbd>
+            </>
+          )}
         </button>
-        <button className="sidebar-item text-muted" onClick={() => createPage(null, "page")}>
+        <button
+          className={`sidebar-item text-muted ${collapsed ? "justify-center px-0" : ""}`}
+          onClick={() => createPage(null, "page")}
+          title="新規ページ"
+        >
           <FilePlus size={15} strokeWidth={1.75} />
-          新規ページ
+          {!collapsed && "新規ページ"}
         </button>
-        <button className="sidebar-item mb-3 text-muted" onClick={() => createPage(null, "database")}>
+        <button
+          className={`sidebar-item mb-3 text-muted ${collapsed ? "justify-center px-0" : ""}`}
+          onClick={() => createPage(null, "database")}
+          title="新規データベース"
+        >
           <LayoutGrid size={15} strokeWidth={1.75} />
-          新規データベース
+          {!collapsed && "新規データベース"}
         </button>
-        <div className="mb-1 px-2 text-[11px] font-medium tracking-wide text-muted">ページ</div>
+        {!collapsed && <div className="mb-1 px-2 text-[11px] font-medium tracking-wide text-muted">ページ</div>}
         <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-0.5 pb-2">
           <SidebarTree
             pages={pages}
             currentId={pageId}
+            compact={collapsed}
             onOpen={(id) => nav(`/page/${id}`)}
             onCreateChild={(id) => createPage(id, "page")}
           />
         </div>
-        {passkeyCount === 0 && (
+        {passkeyCount === 0 && !collapsed && (
           <button className="sidebar-item mb-1 text-[12px] text-muted" onClick={openSettings}>
             パスキーを追加
           </button>
         )}
-        <div className="mt-1 flex items-center gap-0.5 border-t border-transparent pt-1">
-          <button className="sidebar-item min-w-0 flex-1" onClick={openSettings}>
+        <button
+          className={`sidebar-item mb-0.5 text-muted ${collapsed ? "justify-center px-0" : ""}`}
+          onClick={toggleSidebar}
+          title={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+        >
+          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          {!collapsed && "サイドバーを閉じる"}
+        </button>
+        <div className={`mt-0.5 flex items-center gap-0.5 ${collapsed ? "flex-col" : ""}`}>
+          <button
+            className={`sidebar-item min-w-0 ${collapsed ? "justify-center px-0" : "flex-1"}`}
+            onClick={openSettings}
+            title={user.name}
+          >
             <Avatar name={user.name} seed={user.id} />
-            <span className="min-w-0 truncate">{user.name}</span>
-            <Settings size={14} className="ml-auto shrink-0 text-muted" />
+            {!collapsed && (
+              <>
+                <span className="min-w-0 truncate">{user.name}</span>
+                <Settings size={14} className="ml-auto shrink-0 text-muted" />
+              </>
+            )}
           </button>
           <button
             className="btn-ghost h-[30px] w-[30px] p-0 text-muted"

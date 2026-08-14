@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { Page, Permission, User } from "../lib/types";
 import { PageEditor } from "../components/PageEditor";
-import { BrandMark } from "../components/Brand";
+import { BrandLockup, BrandMark } from "../components/Brand";
 
 export function SharePage() {
   const { token } = useParams();
@@ -24,7 +24,7 @@ export function SharePage() {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
-        <BrandMark className="h-10 w-auto rounded-md" />
+        <BrandLockup className="h-12 w-auto rounded-xl" />
         <p className="text-[14px] text-danger">{error}</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function SharePage() {
   if (!page || !token) {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
-        <div className="skeleton h-2 w-24" />
+        <BrandMark className="h-10 w-10 rounded-xl" />
       </div>
     );
   }
