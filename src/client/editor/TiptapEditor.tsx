@@ -30,12 +30,14 @@ export function TiptapEditor({
   shareToken,
   editable,
   title,
+  compact,
 }: {
   pageId: string;
   user: User;
   shareToken?: string;
   editable: boolean;
   title: string;
+  compact?: boolean;
 }) {
   const indexTimer = useRef<number | null>(null);
   const titleRef = useRef(title);
@@ -92,7 +94,7 @@ export function TiptapEditor({
     ],
     editorProps: {
       attributes: {
-        class: "arcana-doc",
+        class: compact ? "arcana-doc arcana-doc-peek" : "arcana-doc",
         spellcheck: "true",
       },
       handlePaste(view, event) {
@@ -162,7 +164,7 @@ export function TiptapEditor({
 
   return (
     <div
-      className="arcana-editor min-h-[55vh]"
+      className={compact ? "arcana-editor" : "arcana-editor min-h-[55vh]"}
       onClick={(e) => {
         if (e.target === e.currentTarget) editor.chain().focus("end").run();
       }}

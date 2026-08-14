@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { DbFilter, DbProperty, DbView, Page } from "../lib/types";
+import { parseProps, PropertyValue } from "./PropertyValue";
 
 type Props = {
   pageId: string;
@@ -12,23 +13,13 @@ type Props = {
   onChanged: () => Promise<unknown>;
 };
 
-function parseProps(row: Page): Record<string, unknown> {
-  if (!row.properties) return {};
-  try {
-    return JSON.parse(row.properties) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
 function applyFilters(rows: Page[], schema: DbProperty[], filters: DbFilter[] | undefined) {
   if (!filters?.length) return rows;
   return rows.filter((row) => {
-    const props = parseProps(row);
+    const props = parseProps(row.properties);
     return filters.every((f) => {
       const prop = schema.find((p) => p.id === f.propertyId);
-      const raw =
-        prop?.type === "title" ? row.title : String(props[f.propertyId] ?? "");
+      const raw = prop?.type === "title" ? row.title : String(props[f.propertyId] ?? "");
       if (f.op === "contains") return raw.includes(f.value);
       return raw === f.value;
     });
@@ -47,26 +38,31 @@ export function DatabaseView({
   const [viewId, setViewId] = useState(views[0]?.id);
   const view = views.find((v) => v.id === viewId) ?? views[0];
   const [filterValue, setFilterValue] = useState("");
-  const [filterProp, setFilterProp] = useState(schema[0]?.id ?? "title");
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const skipTitleBlur = useRef(false);
 
   const filtered = useMemo(() => {
     const extra: DbFilter[] = filterValue
-      ? [{ propertyId: filterProp, op: "contains", value: filterValue }]
+      ? [{ propertyId: "title", op: "contains", value: filterValue }]
       : [];
     return applyFilters(rows, schema, [...(view?.config.filters ?? []), ...extra]);
-  }, [rows, schema, view, filterValue, filterProp]);
+  }, [rows, schema, view, filterValue]);
 
-  async function addRow() {
-    await api("/api/pages", {
+  useEffect(() => {
+    if (editingTitleId) titleInputRef.current?.focus();
+  }, [editingTitleId, rows.length]);
+
+  async function addRow(groupValue?: string) {
+    const properties: Record<string, unknown> = {};
+    const groupId = view?.config.groupBy ?? "status";
+    if (groupValue) properties[groupId] = groupValue;
+    const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
-      body: JSON.stringify({
-        parentId: pageId,
-        type: "page",
-        title: "無題",
-        properties: { status: "todo" },
-      }),
+      body: JSON.stringify({ parentId: pageId, type: "page", title: "", properties }),
     });
     await onChanged();
+    setEditingTitleId(res.page.id);
   }
 
   async function updateRow(row: Page, patch: { title?: string; properties?: Record<string, unknown> }) {
@@ -74,7 +70,7 @@ export function DatabaseView({
       method: "PATCH",
       body: JSON.stringify({
         title: patch.title ?? row.title,
-        properties: patch.properties ?? parseProps(row),
+        properties: patch.properties ?? parseProps(row.properties),
       }),
     });
     await onChanged();
@@ -84,11 +80,64 @@ export function DatabaseView({
     return <p className="mt-6 text-muted">ビューがありません</p>;
   }
 
-  const statusProp = schema.find((p) => p.id === (view.config.groupBy ?? "status")) ?? schema.find((p) => p.type === "select");
+  const statusProp =
+    schema.find((p) => p.id === (view.config.groupBy ?? "status")) ??
+    schema.find((p) => p.type === "select" || p.type === "status");
+  const dataProps = schema.filter((p) => p.type !== "title");
+
+  function titleCell(row: Page) {
+    const editing = editingTitleId === row.id;
+    if (editing) {
+      return (
+        <input
+          ref={titleInputRef}
+          className="w-full border-none bg-transparent text-[14px] outline-none placeholder:text-muted"
+          defaultValue={row.title}
+          placeholder="無題"
+          onBlur={(e) => {
+            if (skipTitleBlur.current) {
+              skipTitleBlur.current = false;
+              return;
+            }
+            const next = e.target.value;
+            setEditingTitleId(null);
+            if (next !== row.title) void updateRow(row, { title: next });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              skipTitleBlur.current = true;
+              const next = e.currentTarget.value;
+              void (async () => {
+                if (next !== row.title) await updateRow(row, { title: next });
+                const groupId = view?.config.groupBy ?? "status";
+                const groupValue = String(parseProps(row.properties)[groupId] ?? "") || undefined;
+                await addRow(view?.type === "board" ? groupValue : undefined);
+              })();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setEditingTitleId(null);
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      );
+    }
+    return (
+      <button
+        className={`w-full truncate text-left text-[14px] ${row.title ? "" : "text-muted"}`}
+        onClick={() => onOpenRow(row.id)}
+      >
+        {row.icon ? `${row.icon} ` : ""}
+        {row.title || "無題"}
+      </button>
+    );
+  }
 
   return (
-    <div className="mt-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="mt-2">
+      <div className="mb-2 flex flex-wrap items-center gap-1">
         {views.map((v) => (
           <button
             key={v.id}
@@ -98,60 +147,92 @@ export function DatabaseView({
             {v.name}
           </button>
         ))}
-        <select
-          className="ml-1 h-8 rounded-md border border-transparent bg-transparent px-2 text-[13px] text-muted hover:bg-hover"
-          value={filterProp}
-          onChange={(e) => setFilterProp(e.target.value)}
-        >
-          {schema.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
         <input
-          className="h-8 w-40 rounded-md border border-transparent bg-transparent px-2 text-[13px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
-          placeholder="フィルタ…"
+          className="ml-2 h-8 w-40 rounded-md border-none bg-transparent px-2 text-[13px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
+          placeholder="検索"
           value={filterValue}
           onChange={(e) => setFilterValue(e.target.value)}
         />
-        {editable && (
-          <button className="btn btn-ghost ml-auto h-8 px-2.5 text-[13px]" onClick={addRow}>
+        {editable && view.type !== "board" && (
+          <button className="btn-ghost ml-auto h-8 px-2.5 text-[13px] text-muted" onClick={() => void addRow()}>
             新規
           </button>
         )}
       </div>
 
       {view.type === "board" && statusProp ? (
-        <div className="grid auto-cols-fr grid-flow-col gap-3 overflow-x-auto pb-2">
-          {(statusProp.options ?? []).map((opt) => {
-            const colRows = filtered.filter((r) => String(parseProps(r)[statusProp.id] ?? "todo") === opt.id);
-            return (
-              <div key={opt.id} className="min-w-56 rounded-[10px] bg-canvas p-2">
-                <div className="mb-2 px-1.5 text-[12px] font-medium text-muted">
-                  {opt.name}
-                  <span className="ml-1.5 text-[#c4c2bc]">{colRows.length}</span>
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {(() => {
+            const options = statusProp.options ?? [];
+            const known = new Set(options.map((o) => o.id));
+            const columns: { id: string; name: string; status?: string }[] = [
+              { id: "__empty__", name: "ステータスなし" },
+              ...options.map((o) => ({ id: o.id, name: o.name, status: o.id })),
+            ];
+            return columns.map((col) => {
+              const colRows = filtered.filter((r) => {
+                const raw = String(parseProps(r.properties)[statusProp.id] ?? "");
+                if (col.id === "__empty__") return !raw || !known.has(raw);
+                return raw === col.id;
+              });
+              if (col.id === "__empty__" && colRows.length === 0) return null;
+              return (
+                <div
+                  key={col.id}
+                  className="w-64 shrink-0 rounded-[10px] bg-canvas p-2"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("text/plain");
+                    const row = rows.find((r) => r.id === id);
+                    if (!row || !editable) return;
+                    void updateRow(row, {
+                      properties: { ...parseProps(row.properties), [statusProp.id]: col.status ?? "" },
+                    });
+                  }}
+                >
+                  <div className="mb-2 px-1.5 text-[12px] font-medium text-muted">
+                    {col.name}
+                    <span className="ml-1.5 text-[#c4c2bc]">{colRows.length}</span>
+                  </div>
+                  {colRows.map((row) => (
+                    <div
+                      key={row.id}
+                      draggable={editable}
+                      onDragStart={(e) => e.dataTransfer.setData("text/plain", row.id)}
+                      className="mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left text-[14px] shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa]"
+                      onClick={() => (editingTitleId === row.id ? undefined : onOpenRow(row.id))}
+                    >
+                      {editingTitleId === row.id ? (
+                        titleCell(row)
+                      ) : (
+                        <span className={row.title ? "" : "text-muted"}>{row.title || "無題"}</span>
+                      )}
+                    </div>
+                  ))}
+                  {editable && (
+                    <button
+                      className="w-full rounded-md px-1.5 py-1.5 text-left text-[13px] text-muted hover:bg-hover"
+                      onClick={() => void addRow(col.status)}
+                    >
+                      + 新規
+                    </button>
+                  )}
                 </div>
-                {colRows.map((row) => (
-                  <button
-                    key={row.id}
-                    className="mb-2 w-full rounded-[8px] bg-white p-2.5 text-left text-[14px] shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa]"
-                    onClick={() => onOpenRow(row.id)}
-                  >
-                    {row.icon} {row.title || "無題"}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       ) : (
-        <div className="overflow-auto rounded-[10px] border border-line">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas text-left text-[12px] text-muted">
+        <div className="overflow-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="text-left text-[12px] text-muted">
               <tr>
-                {schema.map((p) => (
-                  <th key={p.id} className="px-3 py-2 font-medium">
+                <th className="min-w-[220px] border-b border-line px-2 py-2 font-medium">
+                  {schema.find((p) => p.type === "title")?.name ?? "名前"}
+                </th>
+                {dataProps.map((p) => (
+                  <th key={p.id} className="min-w-[120px] border-b border-line px-2 py-2 font-medium">
                     {p.name}
                   </th>
                 ))}
@@ -159,71 +240,30 @@ export function DatabaseView({
             </thead>
             <tbody>
               {filtered.map((row) => {
-                const props = parseProps(row);
+                const props = parseProps(row.properties);
                 return (
-                  <tr key={row.id} className="border-t border-line hover:bg-[rgba(55,53,47,0.03)]">
-                    {schema.map((p) => (
-                      <td key={p.id} className="px-3 py-1.5">
-                        {p.type === "title" ? (
-                          <button className="text-left hover:underline" onClick={() => onOpenRow(row.id)}>
-                            {row.icon} {row.title || "無題"}
-                          </button>
-                        ) : p.type === "select" || p.type === "status" ? (
-                          <select
-                            disabled={!editable}
-                            className="rounded-md border border-transparent bg-transparent"
-                            value={String(props[p.id] ?? "")}
-                            onChange={(e) =>
-                              updateRow(row, { properties: { ...props, [p.id]: e.target.value } })
-                            }
-                          >
-                            <option value="">—</option>
-                            {(p.options ?? []).map((o) => (
-                              <option key={o.id} value={o.id}>
-                                {o.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : p.type === "checkbox" ? (
-                          <input
-                            type="checkbox"
-                            disabled={!editable}
-                            checked={Boolean(props[p.id])}
-                            onChange={(e) =>
-                              updateRow(row, { properties: { ...props, [p.id]: e.target.checked } })
-                            }
-                          />
-                        ) : p.type === "number" ? (
-                          <input
-                            type="number"
-                            disabled={!editable}
-                            className="w-24 border-none bg-transparent"
-                            defaultValue={String(props[p.id] ?? "")}
-                            onBlur={(e) =>
-                              updateRow(row, {
-                                properties: { ...props, [p.id]: Number(e.target.value) },
-                              })
-                            }
-                          />
-                        ) : (
-                          <input
-                            disabled={!editable}
-                            className="w-full border-none bg-transparent"
-                            defaultValue={String(props[p.id] ?? "")}
-                            onBlur={(e) =>
-                              updateRow(row, { properties: { ...props, [p.id]: e.target.value } })
-                            }
-                          />
-                        )}
+                  <tr key={row.id} className="hover:bg-[rgba(55,53,47,0.03)]">
+                    <td className="border-b border-line px-2 py-1.5">{titleCell(row)}</td>
+                    {dataProps.map((p) => (
+                      <td key={p.id} className="border-b border-line px-2 py-1.5">
+                        <PropertyValue
+                          property={p}
+                          value={props[p.id]}
+                          editable={editable}
+                          onChange={(v) => void updateRow(row, { properties: { ...props, [p.id]: v } })}
+                        />
                       </td>
                     ))}
                   </tr>
                 );
               })}
               {editable && (
-                <tr className="border-t border-line">
-                  <td colSpan={Math.max(schema.length, 1)} className="px-2 py-1">
-                    <button className="w-full rounded-md px-1 py-1.5 text-left text-[13px] text-muted hover:bg-hover" onClick={addRow}>
+                <tr>
+                  <td colSpan={Math.max(dataProps.length + 1, 1)} className="px-1 py-1">
+                    <button
+                      className="w-full rounded-md px-1 py-1.5 text-left text-[13px] text-muted hover:bg-hover"
+                      onClick={() => void addRow()}
+                    >
                       + 新規
                     </button>
                   </td>

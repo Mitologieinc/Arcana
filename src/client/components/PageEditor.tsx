@@ -4,6 +4,8 @@ import { ChevronsRight, ChevronRight, Link2, MoreHorizontal, SmilePlus, Trash2 }
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Page, Permission, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
+import { parseProps, PropertyValue } from "./PropertyValue";
+import { RowPeek } from "./RowPeek";
 import { ShareDialog } from "./ShareDialog";
 import { TiptapEditor } from "../editor/TiptapEditor";
 
@@ -45,24 +47,31 @@ export function PageEditor({
   const [iconOpen, setIconOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [title, setTitle] = useState(fallback?.title ?? "");
+  const [peekId, setPeekId] = useState<string | null>(null);
+  const [parentSchema, setParentSchema] = useState<DbProperty[]>([]);
 
-  useEffect(() => {
+  async function reloadPage() {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
-    api<{
+    const d = await api<{
       page: Page;
       children: Page[];
       permission: Permission;
       database: { schema: DbProperty[]; views: DbView[] } | null;
-    }>(`/api/pages/${pageId}${q}`)
-      .then((d) => {
-        setPage(d.page);
-        setTitle(d.page.title);
-        setChildren(d.children);
-        setPermission(d.permission);
-        setDbSchema(d.database?.schema ?? []);
-        setDbViews(d.database?.views ?? []);
-      })
-      .catch(console.error);
+      parentDatabase: { schema: DbProperty[] } | null;
+    }>(`/api/pages/${pageId}${q}`);
+    setPage(d.page);
+    setTitle(d.page.title);
+    setChildren(d.children);
+    setPermission(d.permission);
+    setDbSchema(d.database?.schema ?? []);
+    setDbViews(d.database?.views ?? []);
+    setParentSchema(d.parentDatabase?.schema ?? []);
+    return d;
+  }
+
+  useEffect(() => {
+    setPeekId(null);
+    reloadPage().catch(console.error);
   }, [pageId, shareToken]);
 
   useEffect(() => {
@@ -114,6 +123,17 @@ export function PageEditor({
     onOpenPage("");
   }
 
+  async function saveProp(id: string, value: unknown) {
+    if (!editable || !page) return;
+    const next = { ...parseProps(page.properties), [id]: value };
+    setPage({ ...page, properties: JSON.stringify(next) });
+    await api(`/api/pages/${pageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ properties: next }),
+    });
+    await onPagesChanged();
+  }
+
   const crumbs = useMemo(() => {
     if (!page) return [];
     const map = new Map(pages.map((p) => [p.id, p]));
@@ -125,6 +145,10 @@ export function PageEditor({
     }
     return chain;
   }, [page, pages]);
+
+  const pageProps = parseProps(page?.properties ?? null);
+  const parentFields = parentSchema.filter((p) => p.type !== "title");
+  const peekRow = children.find((r) => r.id === peekId) ?? null;
 
   if (!page) {
     return (
@@ -277,31 +301,59 @@ export function PageEditor({
               views={dbViews}
               rows={children}
               editable={editable}
-              onOpenRow={onOpenPage}
+              onOpenRow={setPeekId}
               onChanged={async () => {
-                const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
-                const d = await api<{
-                  children: Page[];
-                  database: { schema: DbProperty[]; views: DbView[] } | null;
-                }>(`/api/pages/${pageId}${q}`);
-                setChildren(d.children);
-                setDbSchema(d.database?.schema ?? []);
-                setDbViews(d.database?.views ?? []);
+                await reloadPage();
                 await onPagesChanged();
               }}
             />
           </div>
         ) : (
-          <TiptapEditor
-            key={pageId}
-            pageId={pageId}
-            user={user}
-            shareToken={shareToken}
-            editable={editable}
-            title={title}
-          />
+          <>
+            {parentFields.length > 0 && (
+              <div className="mt-4 space-y-1 px-24 max-[860px]:px-6">
+                {parentFields.map((p) => (
+                  <div key={p.id} className="flex min-h-8 items-center gap-4">
+                    <span className="w-28 shrink-0 truncate text-[13px] text-muted">{p.name}</span>
+                    <PropertyValue
+                      property={p}
+                      value={pageProps[p.id]}
+                      editable={editable}
+                      onChange={(v) => void saveProp(p.id, v)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            <TiptapEditor
+              key={pageId}
+              pageId={pageId}
+              user={user}
+              shareToken={shareToken}
+              editable={editable}
+              title={title}
+            />
+          </>
         )}
       </div>
+      {peekRow && (
+        <RowPeek
+          page={peekRow}
+          schema={dbSchema}
+          user={user}
+          editable={editable}
+          shareToken={shareToken}
+          onClose={() => setPeekId(null)}
+          onOpenPage={() => {
+            setPeekId(null);
+            onOpenPage(peekRow.id);
+          }}
+          onChanged={async () => {
+            await reloadPage();
+            await onPagesChanged();
+          }}
+        />
+      )}
       {shareOpen && page && <ShareDialog page={page} onClose={() => setShareOpen(false)} />}
     </div>
   );

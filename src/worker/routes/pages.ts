@@ -147,7 +147,21 @@ pageRoutes.get("/api/pages/:id", async (c) => {
     };
   }
 
-  return c.json({ page, children, database, permission, workspaceId });
+  let parentDatabase: { schema: unknown } | null = null;
+  if (page.parentId) {
+    const parents = await db.select().from(schema.pages).where(eq(schema.pages.id, page.parentId)).limit(1);
+    const parent = parents[0];
+    if (parent?.type === "database") {
+      const sch = await db
+        .select()
+        .from(schema.databaseSchemas)
+        .where(eq(schema.databaseSchemas.pageId, parent.id))
+        .limit(1);
+      parentDatabase = { schema: sch[0] ? JSON.parse(sch[0].properties) : [] };
+    }
+  }
+
+  return c.json({ page, children, database, parentDatabase, permission, workspaceId });
 });
 
 pageRoutes.patch("/api/pages/:id", async (c) => {

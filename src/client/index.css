@@ -270,10 +270,6 @@ button:disabled {
   box-shadow: 0 14px 40px rgba(15, 15, 15, 0.12), 0 0 0 1px rgba(15, 15, 15, 0.02);
 }
 
-.arcana-editor {
-  min-height: 55vh;
-}
-
 .arcana-doc {
   min-height: 50vh;
   padding: 4px 96px 40vh;
@@ -281,6 +277,11 @@ button:disabled {
   font-size: 16px;
   line-height: 1.65;
   color: var(--color-ink);
+}
+
+.arcana-doc.arcana-doc-peek {
+  min-height: 30vh;
+  padding: 4px 0 24vh;
 }
 
 .arcana-doc > * + * {
