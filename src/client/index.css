@@ -1516,16 +1516,22 @@ html[data-theme="dark"] .arcana-presence {
   user-select: none;
 }
 
-.jam.is-hand,
-.jam.is-hand * {
+.jam-stage {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.jam.is-hand .jam-stage,
+.jam.is-hand .jam-stage * {
   cursor: grab;
 }
 
-.jam.is-place {
+.jam.is-place .jam-stage {
   cursor: none;
 }
 
-.jam.is-pen {
+.jam.is-pen .jam-stage {
   cursor: crosshair;
 }
 
@@ -1730,8 +1736,8 @@ html[data-theme="dark"] .jam-label textarea {
 }
 
 .jam-tool.is-on {
-  background: #e6e6e6;
-  color: #1e1e1e;
+  background: #1e1e1e;
+  color: #fff;
 }
 
 .jam-fly {
@@ -1915,8 +1921,8 @@ html[data-theme="dark"] .jam-pop > button {
 
 html[data-theme="dark"] .jam-tool.is-on,
 html[data-theme="dark"] .jam-pop > button.is-on {
-  background: #3a3a37;
-  color: #e8e6e3;
+  background: #e8e6e3;
+  color: #1e1e1e;
 }
 
 html[data-theme="dark"] .jam-sep {

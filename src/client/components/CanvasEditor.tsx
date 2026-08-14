@@ -614,15 +614,16 @@ export function CanvasEditor({
   const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text";
 
   return (
-    <div
-      ref={boardRef}
-      className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onPointerLeave={() => setGhost(null)}
-    >
+    <div className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}>
+      <div
+        ref={boardRef}
+        className="jam-stage"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={() => setGhost(null)}
+      >
       <div
         className="jam-dots"
         style={{
@@ -744,14 +745,15 @@ export function CanvasEditor({
           <p>S 付箋　T 文字　R 図形　L コネクタ</p>
         </div>
       )}
+      </div>
 
-      <div className="jam-bar" onPointerDown={(e) => e.stopPropagation()}>
-        <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} disabled={!editable} onClick={() => setTool("select")} />
+      <div className="jam-bar">
+        <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => setTool("select")} />
         <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => setTool("hand")} />
         <span className="jam-sep" />
         <div className="jam-fly">
-          <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} disabled={!editable} onClick={() => setTool("sticky")} />
-          {editable && tool === "sticky" && (
+          <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} onClick={() => setTool("sticky")} />
+          {tool === "sticky" && (
             <div className="jam-pop">
               {STICKY_COLORS.map((c) => (
                 <button
@@ -759,34 +761,38 @@ export function CanvasEditor({
                   type="button"
                   className={`jam-swatch ${stickyColor === c ? "is-on" : ""}`}
                   style={{ background: c }}
-                  onClick={() => setStickyColor(c)}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStickyColor(c);
+                  }}
                 />
               ))}
             </div>
           )}
         </div>
         <div className="jam-fly">
-          <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} disabled={!editable} onClick={() => setTool("shape")} />
-          {editable && tool === "shape" && (
+          <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} onClick={() => setTool("shape")} />
+          {tool === "shape" && (
             <div className="jam-pop">
-              <button type="button" className={shapeKind === "round" ? "is-on" : ""} onClick={() => setShapeKind("round")}><Square size={16} /></button>
-              <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onClick={() => setShapeKind("ellipse")}><Circle size={16} /></button>
-              <button type="button" className={shapeKind === "diamond" ? "is-on" : ""} onClick={() => setShapeKind("diamond")}><Diamond size={16} /></button>
+              <button type="button" className={shapeKind === "round" ? "is-on" : ""} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShapeKind("round"); }}><Square size={16} /></button>
+              <button type="button" className={shapeKind === "ellipse" ? "is-on" : ""} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShapeKind("ellipse"); }}><Circle size={16} /></button>
+              <button type="button" className={shapeKind === "diamond" ? "is-on" : ""} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShapeKind("diamond"); }}><Diamond size={16} /></button>
             </div>
           )}
         </div>
-        <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} disabled={!editable} onClick={() => { setTool("line"); setLineFrom(null); }} />
-        <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} disabled={!editable} onClick={() => setTool("pen")} />
+        <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} onClick={() => { setTool("line"); setLineFrom(null); }} />
+        <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => setTool("pen")} />
         <span className="jam-sep" />
-        <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} disabled={!editable} onClick={() => setTool("text")} />
+        <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} onClick={() => setTool("text")} />
       </div>
 
-      <div className="jam-zoom" onPointerDown={(e) => e.stopPropagation()}>
-        <button type="button" onClick={() => zoomBy(0.9)} aria-label="縮小">
+      <div className="jam-zoom">
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(0.9); }} aria-label="縮小">
           <Minus size={14} />
         </button>
         <span>{Math.round(cam.z * 100)}%</span>
-        <button type="button" onClick={() => zoomBy(1.1)} aria-label="拡大">
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(1.1); }} aria-label="拡大">
           <Plus size={14} />
         </button>
       </div>
@@ -799,18 +805,25 @@ function ToolBtn({
   label,
   hot,
   on,
-  disabled,
   onClick,
 }: {
   icon: typeof MousePointer2;
   label: string;
   hot: string;
   on: boolean;
-  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button type="button" className={`jam-tool ${on ? "is-on" : ""}`} title={`${label}（${hot}）`} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      className={`jam-tool ${on ? "is-on" : ""}`}
+      title={`${label}（${hot}）`}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
+    >
       <Icon size={18} strokeWidth={1.8} />
     </button>
   );
