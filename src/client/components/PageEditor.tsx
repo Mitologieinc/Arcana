@@ -11,6 +11,7 @@ import { CommentsPanel } from "./CommentsPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { TiptapEditor } from "../editor/TiptapEditor";
 import { uploadImage } from "../editor/slash";
+import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
 
 type Props = {
   pageId: string;
@@ -48,6 +49,7 @@ export function PageEditor({
   const [dbViews, setDbViews] = useState<DbView[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [title, setTitle] = useState(fallback?.title ?? "");
   const [peekId, setPeekId] = useState<string | null>(null);
@@ -95,17 +97,18 @@ export function PageEditor({
   }, [pageId, location.state]);
 
   useEffect(() => {
-    if (!moreOpen && !iconOpen) return;
+    if (!moreOpen && !iconOpen && !coverOpen) return;
     const close = () => {
       setMoreOpen(false);
       setIconOpen(false);
+      setCoverOpen(false);
     };
     const t = window.setTimeout(() => window.addEventListener("click", close), 0);
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("click", close);
     };
-  }, [moreOpen, iconOpen]);
+  }, [moreOpen, iconOpen, coverOpen]);
 
   const editable = permission === "full" || permission === "edit";
 
@@ -119,20 +122,25 @@ export function PageEditor({
     await onPagesChanged();
   }
 
+  async function saveCoverKey(key: string | null) {
+    if (!editable) return;
+    setCoverOpen(false);
+    setPage((p) => (p ? { ...p, coverR2Key: key } : p));
+    await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: key }) });
+  }
+
   async function saveCover(file: File | null) {
     if (!editable) return;
     if (!file) {
-      setPage((p) => (p ? { ...p, coverR2Key: null } : p));
-      await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: null }) });
+      await saveCoverKey(null);
       return;
     }
     const src = await uploadImage(file);
     const id = src.split("/").pop() ?? null;
-    setPage((p) => (p ? { ...p, coverR2Key: id } : p));
-    await api(`/api/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ coverR2Key: id }) });
+    await saveCoverKey(id);
   }
 
-  function pickCover() {
+  function pickCoverFile() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
@@ -311,21 +319,33 @@ export function PageEditor({
       </header>
       {page.coverR2Key && (
         <div className="group/cover relative h-48 w-full bg-canvas">
-          <img src={`/api/files/${page.coverR2Key}`} alt="" className="h-48 w-full object-cover" />
+          <CoverVisual cover={page.coverR2Key} className="h-48 w-full object-cover" />
           {editable && (
             <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
               <button
                 className="rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
-                onClick={() => pickCover()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIconOpen(false);
+                  setCoverOpen(true);
+                }}
               >
                 カバーを変更
               </button>
               <button
                 className="rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
-                onClick={() => void saveCover(null)}
+                onClick={() => void saveCoverKey(null)}
               >
                 カバーを削除
               </button>
+            </div>
+          )}
+          {coverOpen && (
+            <div className="menu-panel absolute right-3 top-12 z-20 w-[min(420px,calc(100%-1.5rem))] p-2" onClick={(e) => e.stopPropagation()}>
+              <CoverPicker
+                onPick={(id) => void saveCoverKey(presetCoverKey(id))}
+                onUpload={pickCoverFile}
+              />
             </div>
           )}
         </div>
@@ -353,13 +373,16 @@ export function PageEditor({
                   ? "left-[182px] max-[860px]:left-[110px]"
                   : "left-24 max-[860px]:left-6"
               } ${page.coverR2Key && page.icon ? "top-1" : "top-0"} ${
-                iconOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
+                iconOpen || coverOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
               }`}
             >
               {!page.icon && (
                 <button
                   className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
-                  onClick={() => setIconOpen((v) => !v)}
+                  onClick={() => {
+                    setCoverOpen(false);
+                    setIconOpen((v) => !v);
+                  }}
                 >
                   <SmilePlus size={15} />
                   アイコンを追加
@@ -368,7 +391,11 @@ export function PageEditor({
               {!page.coverR2Key && (
                 <button
                   className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
-                  onClick={() => pickCover()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIconOpen(false);
+                    setCoverOpen(true);
+                  }}
                 >
                   <ImagePlus size={15} />
                   カバーを追加
@@ -390,7 +417,11 @@ export function PageEditor({
                   ? "absolute left-24 top-[-42px] z-[2] max-[860px]:left-6"
                   : "mb-1 block"
               }`}
-              onClick={() => editable && setIconOpen((v) => !v)}
+              onClick={() => {
+                if (!editable) return;
+                setCoverOpen(false);
+                setIconOpen((v) => !v);
+              }}
               disabled={!editable}
             >
               {page.icon}
@@ -425,6 +456,17 @@ export function PageEditor({
                   アイコンを削除
                 </button>
               )}
+            </div>
+          )}
+          {coverOpen && !page.coverR2Key && (
+            <div
+              className="menu-panel absolute left-24 top-[5.5rem] z-20 w-[min(420px,calc(100%-3rem))] p-2 max-[860px]:left-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CoverPicker
+                onPick={(id) => void saveCoverKey(presetCoverKey(id))}
+                onUpload={pickCoverFile}
+              />
             </div>
           )}
           <input

@@ -3,7 +3,7 @@ import { CalendarDays, Columns3, GripVertical, LayoutGrid, Plus, Search, Table2,
 import { api } from "../lib/api";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
 import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
-import { FloatMenu } from "./FloatMenu";
+import { CoverVisual } from "../lib/covers";
 import {
   optionClass,
   parseProps,
@@ -544,7 +544,7 @@ export function DatabaseView({
               onClick={() => onOpenRow(row.id)}
             >
               <div className="h-24 bg-canvas">
-                {row.coverR2Key && <img src={`/api/files/${row.coverR2Key}`} alt="" className="h-full w-full object-cover" />}
+                {row.coverR2Key && <CoverVisual cover={row.coverR2Key} className="h-full w-full object-cover" />}
               </div>
               <div className="px-3 py-2 text-[14px]">{row.icon ? `${row.icon} ` : ""}{row.title || "無題"}</div>
             </button>
