@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { toast } from "../lib/toast";
 import { permissionLabel } from "../lib/format";
 import type { Page, Permission } from "../lib/types";
 import { Modal } from "./Modal";
@@ -69,6 +70,7 @@ export function ShareDialog({ page, onClose }: Props) {
     });
     await navigator.clipboard.writeText(res.url);
     setCopied(res.url);
+    toast("リンクをコピーしました");
     await load();
   }
 

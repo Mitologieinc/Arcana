@@ -1,3 +1,11 @@
+export function modSymbol() {
+  if (typeof navigator === "undefined") return "Ctrl";
+  const platform = navigator.platform || "";
+  const ua = navigator.userAgent || "";
+  if (/Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua)) return "⌘";
+  return "Ctrl";
+}
+
 export function greeting() {
   const h = new Date().getHours();
   if (h < 5 || h >= 18) return "こんばんは";

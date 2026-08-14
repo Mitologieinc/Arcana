@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Fingerprint, Import, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
+import { toast } from "../lib/toast";
 import { roleLabel } from "../lib/format";
 import { Modal } from "./Modal";
 import { Avatar } from "./Avatar";
@@ -71,6 +72,7 @@ export function SettingsPanel({
       });
       setInviteUrl(res.url);
       await navigator.clipboard.writeText(res.url);
+      toast("招待リンクをコピーしました");
       setEmail("");
       await onChanged();
     } catch (e) {

@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage, SignupPage, SetupPage, InvitePage } from "./pages/AuthScreens";
 import { WorkspaceApp } from "./pages/WorkspaceApp";
 import { SharePage } from "./pages/SharePage";
+import { ToastHost } from "./components/ToastHost";
 
 export default function App() {
   return (
+    <>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -15,5 +17,7 @@ export default function App() {
       <Route path="/" element={<WorkspaceApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <ToastHost />
+    </>
   );
 }

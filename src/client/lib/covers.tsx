@@ -50,7 +50,7 @@ export const COVER_PRESETS: CoverPreset[] = [
   {
     id: "ember",
     name: "灯火",
-    css: "linear-gradient(118deg, #ffd7a8 0%, #e85d04 42%, #9a2b0e 100%)",
+    css: "linear-gradient(118deg, #ffd7a8 0%, #db5825 42%, #9a2b0e 100%)",
   },
   {
     id: "mist",

@@ -14,6 +14,8 @@ import { uploadImage } from "../editor/slash";
 import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
 import { PageIcon } from "./PageIcon";
 import { EmojiPicker } from "./EmojiPicker";
+import { ConfirmModal } from "./ConfirmModal";
+import { toast } from "../lib/toast";
 
 type Props = {
   pageId: string;
@@ -58,6 +60,7 @@ export function PageEditor({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function reloadPage() {
     const q = shareToken ? `?token=${encodeURIComponent(shareToken)}` : "";
@@ -255,7 +258,7 @@ export function PageEditor({
         {!shareToken && (
           <div className="relative flex shrink-0 items-center gap-0.5">
             <button
-              className={`btn-ghost h-8 w-8 p-0 ${favorited ? "text-[#d9730d]" : "text-muted"}`}
+              className={`btn-ghost h-8 w-8 p-0 ${favorited ? "text-cf" : "text-muted"}`}
               title="お気に入り"
               onClick={async () => {
                 const d = await api<{ favorited: boolean }>(`/api/favorites/${pageId}`, { method: "PUT" });
@@ -286,7 +289,7 @@ export function PageEditor({
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
                     setMoreOpen(false);
-                    void navigator.clipboard.writeText(window.location.href);
+                    void navigator.clipboard.writeText(window.location.href).then(() => toast("リンクをコピーしました"));
                   }}
                 >
                   <Link2 size={14} />
@@ -322,7 +325,7 @@ export function PageEditor({
                     className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
                     onClick={() => {
                       setMoreOpen(false);
-                      void remove();
+                      setConfirmDelete(true);
                     }}
                   >
                     <Trash2 size={14} />
@@ -383,15 +386,13 @@ export function PageEditor({
                 : "pt-20"
           }`}
         >
-          {editable && (
+          {editable && (!page.icon || !page.coverR2Key) && (
             <div
-              className={`pointer-events-none absolute z-[3] flex flex-wrap gap-1 ${
+              className={`absolute z-[3] flex flex-wrap gap-1 ${
                 page.icon
                   ? "left-[182px] max-[860px]:left-[110px]"
                   : "left-24 max-[860px]:left-6"
-              } ${page.coverR2Key && page.icon ? "top-1" : "top-0"} ${
-                iconOpen || coverOpen ? "pointer-events-auto opacity-100" : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-              }`}
+              } ${page.coverR2Key && page.icon ? "top-1" : "top-0"}`}
             >
               {!page.icon && (
                 <button
@@ -418,13 +419,6 @@ export function PageEditor({
                   カバーを追加
                 </button>
               )}
-              <button
-                className="inline-flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-[14px] text-muted hover:bg-hover"
-                onClick={() => setCommentsOpen(true)}
-              >
-                <MessageSquare size={15} />
-                コメントを追加
-              </button>
             </div>
           )}
           {page.icon ? (
@@ -590,6 +584,19 @@ export function PageEditor({
         <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
       )}
       {historyOpen && <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />}
+      {confirmDelete && (
+        <ConfirmModal
+          title="ページを削除"
+          body="ゴミ箱に移します。あとから戻せます。"
+          confirmLabel="削除"
+          danger
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            void remove();
+          }}
+        />
+      )}
     </div>
   );
 }

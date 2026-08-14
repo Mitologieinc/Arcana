@@ -3,13 +3,24 @@ import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNode
 import { useState } from "react";
 import { EmojiPicker } from "../components/EmojiPicker";
 
+function calloutTone(emoji: string) {
+  if (/💡|✨|🧠|💭/.test(emoji)) return "idea";
+  if (/⚠️|🚧|⚡|❓/.test(emoji)) return "warn";
+  if (/❌|🔥|☠️|🚨|💀|⛔/.test(emoji)) return "danger";
+  if (/✅|☑️|🎉/.test(emoji)) return "ok";
+  if (/💬|📝|ℹ️|📌|📎/.test(emoji)) return "info";
+  return "neutral";
+}
+
 function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
   const [open, setOpen] = useState(false);
+  const emoji = (node.attrs.emoji as string) || "💡";
   return (
     <NodeViewWrapper
       className={`arcana-callout ${selected ? "is-selected" : ""}`}
       data-type="callout"
-      data-emoji={node.attrs.emoji}
+      data-emoji={emoji}
+      data-tone={calloutTone(emoji)}
     >
       <button
         type="button"
@@ -17,7 +28,7 @@ function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
         contentEditable={false}
         onClick={() => setOpen((v) => !v)}
       >
-        {node.attrs.emoji || "💡"}
+        {emoji}
       </button>
       {open && (
         <div
@@ -51,8 +62,18 @@ export const Callout = Node.create({
   parseHTML() {
     return [{ tag: 'div[data-type="callout"]' }];
   },
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "callout", class: "arcana-callout" }), 0];
+  renderHTML({ node, HTMLAttributes }) {
+    const emoji = (node.attrs.emoji as string) || "💡";
+    return [
+      "div",
+      mergeAttributes(HTMLAttributes, {
+        "data-type": "callout",
+        "data-emoji": emoji,
+        "data-tone": calloutTone(emoji),
+        class: "arcana-callout",
+      }),
+      0,
+    ];
   },
   addNodeView() {
     return ReactNodeViewRenderer(CalloutView);

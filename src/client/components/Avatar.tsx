@@ -1,6 +1,6 @@
 import BoringAvatar from "boring-avatars";
 
-const COLORS = ["#e85d04", "#f4a261", "#264653", "#2a9d8f", "#e9c46a"];
+const COLORS = ["#b60003", "#db5825", "#264653", "#2a9d8f", "#e9c46a"];
 
 export function Avatar({
   name,

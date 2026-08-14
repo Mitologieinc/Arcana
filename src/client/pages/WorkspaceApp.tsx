@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { greeting, relativeTime } from "../lib/format";
+import { greeting, modSymbol, relativeTime } from "../lib/format";
 import type { Member, Page, User, Workspace } from "../lib/types";
 import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
@@ -87,13 +87,17 @@ export function WorkspaceApp() {
     [pages],
   );
 
-  async function createPage(parentId?: string | null, type: "page" | "database" = "page") {
+  async function createPage(
+    parentId?: string | null,
+    type: "page" | "database" = "page",
+    seed?: { title?: string; icon?: string },
+  ) {
     const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
-      body: JSON.stringify({ parentId: parentId ?? null, type }),
+      body: JSON.stringify({ parentId: parentId ?? null, type, title: seed?.title, icon: seed?.icon }),
     });
     await refresh();
-    nav(`/page/${res.page.id}`, { state: { focusTitle: true } });
+    nav(`/page/${res.page.id}`, { state: { focusTitle: !seed?.title } });
   }
 
   async function openSettings() {
@@ -123,10 +127,18 @@ export function WorkspaceApp() {
         onTrash={() => setTrashOpen(true)}
         onNotifs={() => setNotifOpen(true)}
       />
-      {navOpen && (
-        <aside className="arcana-nav">
+      <aside className={`arcana-nav ${navOpen ? "" : "is-collapsed"}`} aria-hidden={!navOpen}>
           <div className="flex h-11 items-center justify-between px-3">
-            <span className="text-[12px] font-medium tracking-wide text-muted">ページ</span>
+            <div className="flex min-w-0 items-center gap-1">
+              <button
+                className="btn-ghost h-7 w-7 p-0 text-muted"
+                onClick={toggleNav}
+                title="サイドバーを閉じる"
+              >
+                <PanelLeft size={15} strokeWidth={1.6} />
+              </button>
+              <span className="text-[12px] font-medium tracking-wide text-muted">ページ</span>
+            </div>
             <button className="btn-ghost h-7 w-7 p-0 text-muted" onClick={() => void createPage(null, "page")} title="新規ページ">
               <Plus size={15} strokeWidth={1.6} />
             </button>
@@ -161,8 +173,7 @@ export function WorkspaceApp() {
               }}
             />
           </div>
-        </aside>
-      )}
+      </aside>
       <main className="relative min-w-0 flex-1 overflow-auto">
         {pageId ? (
           <PageEditor
@@ -177,39 +188,16 @@ export function WorkspaceApp() {
             onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
           />
         ) : (
-          <div className="mx-auto max-w-[720px] px-10 py-20">
-            <button
-              className="flex h-11 w-full items-center gap-3 rounded-full border border-line bg-white px-4 text-left text-[14px] text-muted shadow-[0_1px_2px_rgba(15,15,15,0.04)] hover:bg-canvas"
-              onClick={() => setSearchOpen(true)}
-            >
-              <Search size={16} strokeWidth={1.6} />
-              <span className="flex-1">検索</span>
-              <kbd className="kbd">⌘K</kbd>
-            </button>
-            <p className="mt-10 text-[13px] text-muted">
-              {greeting()}、{user.name}
-            </p>
-            {recent.length > 0 ? (
-              <ul className="mt-6">
-                {recent.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
-                      onClick={() => nav(`/page/${p.id}`)}
-                    >
-                      <PageIcon icon={p.icon} fallback={p.type === "database" ? "🗃️" : "📄"} size={15} />
-                      <span className={`min-w-0 flex-1 truncate ${p.title ? "" : "text-muted"}`}>
-                        {p.title || "無題"}
-                      </span>
-                      <span className="shrink-0 text-[12px] text-muted">{relativeTime(p.updatedAt)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-8 text-[14px] text-muted">⌘K で探すか、左の ＋ から書いてください。</p>
-            )}
-          </div>
+          <Home
+            userName={user.name}
+            favorites={favorites}
+            recent={recent}
+            onSearch={() => setSearchOpen(true)}
+            onOpen={(id) => nav(`/page/${id}`)}
+            onMemo={() => void createPage(null, "page", { title: "メモ", icon: "📝" })}
+            onMeeting={() => void createPage(null, "page", { title: "会議メモ", icon: "📅" })}
+            onTasks={() => void createPage(null, "database", { title: "タスク", icon: "✅" })}
+          />
         )}
       </main>
       {searchOpen && (
@@ -266,5 +254,127 @@ export function WorkspaceApp() {
         />
       )}
     </div>
+  );
+}
+
+function Home({
+  userName,
+  favorites,
+  recent,
+  onSearch,
+  onOpen,
+  onMemo,
+  onMeeting,
+  onTasks,
+}: {
+  userName: string;
+  favorites: Page[];
+  recent: Page[];
+  onSearch: () => void;
+  onOpen: (id: string) => void;
+  onMemo: () => void;
+  onMeeting: () => void;
+  onTasks: () => void;
+}) {
+  const favIds = new Set(favorites.map((p) => p.id));
+  const continuePages = recent.filter((p) => !favIds.has(p.id)).slice(0, 8);
+  const empty = favorites.length === 0 && recent.length === 0;
+
+  return (
+    <div className="mx-auto max-w-[640px] px-10 py-16">
+      <button
+        className="flex h-11 w-full items-center gap-3 rounded-full border border-line bg-white px-4 text-left text-[14px] text-muted hover:bg-canvas"
+        onClick={onSearch}
+      >
+        <Search size={16} strokeWidth={1.6} />
+        <span className="flex-1">検索</span>
+        <kbd className="kbd">{modSymbol()}K</kbd>
+      </button>
+      <h1 className="mt-12 text-[22px] font-medium tracking-tight">
+        {greeting()}、{userName}
+      </h1>
+      {empty ? (
+        <div className="mt-8">
+          <p className="mb-3 text-[13px] text-muted">どれかから書き始めてください。</p>
+          <div className="grid grid-cols-3 gap-2 max-[520px]:grid-cols-1">
+            <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
+            <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
+            <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
+          </div>
+        </div>
+      ) : (
+        <>
+          {favorites.length > 0 && (
+            <section className="mt-8">
+              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">お気に入り</p>
+              <ul>
+                {favorites.map((p) => (
+                  <HomeRow key={p.id} page={p} onOpen={onOpen} />
+                ))}
+              </ul>
+            </section>
+          )}
+          {continuePages.length > 0 && (
+            <section className="mt-6">
+              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">最近</p>
+              <ul>
+                {continuePages.map((p) => (
+                  <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StartCard({
+  icon,
+  label,
+  hint,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="rounded-[10px] border border-line px-3 py-3 text-left hover:bg-hover"
+      onClick={onClick}
+    >
+      <span className="text-muted">{icon}</span>
+      <span className="mt-2 block text-[14px] font-medium">{label}</span>
+      <span className="mt-0.5 block text-[12px] text-muted">{hint}</span>
+    </button>
+  );
+}
+
+function HomeRow({
+  page,
+  onOpen,
+  showTime,
+}: {
+  page: Page;
+  onOpen: (id: string) => void;
+  showTime?: boolean;
+}) {
+  return (
+    <li>
+      <button
+        className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
+        onClick={() => onOpen(page.id)}
+      >
+        <PageIcon icon={page.icon} fallback={page.type === "database" ? "🗃️" : "📄"} size={15} />
+        <span className={`min-w-0 flex-1 truncate ${page.title ? "" : "text-muted"}`}>
+          {page.title || "無題"}
+        </span>
+        {showTime && <span className="shrink-0 text-[12px] text-muted">{relativeTime(page.updatedAt)}</span>}
+      </button>
+    </li>
   );
 }
