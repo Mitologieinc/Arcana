@@ -354,6 +354,8 @@ export function CanvasEditor({
       };
       put(n);
       startEdit(n.id);
+      setTool("select");
+      setGhost(null);
       return;
     }
     if (activeTool === "shape") {
