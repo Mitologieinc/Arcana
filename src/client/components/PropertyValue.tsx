@@ -11,8 +11,10 @@ import {
   User,
 } from "lucide-react";
 import type { DbProperty, Member, Page, SelectOption } from "../lib/types";
+import { evalFormula } from "../lib/formula";
 import { FloatMenu } from "./FloatMenu";
 import { Avatar } from "./Avatar";
+import { PageIcon } from "./PageIcon";
 
 const PILL: Record<string, string> = {
   gray: "bg-[#e3e2de] text-[#37352f]",
@@ -48,6 +50,7 @@ export function PropertyIcon({ type, size = 14 }: { type: DbProperty["type"]; si
   if (type === "date") return <Calendar {...p} />;
   if (type === "checkbox") return <CheckSquare {...p} />;
   if (type === "select") return <List {...p} />;
+  if (type === "multi_select") return <List {...p} />;
   if (type === "status") return <CircleDot {...p} />;
   if (type === "person") return <User {...p} />;
   if (type === "relation") return <Link2 {...p} />;
@@ -59,6 +62,7 @@ export const PROPERTY_TYPES: { type: Exclude<DbProperty["type"], "title">; name:
   { type: "text", name: "テキスト" },
   { type: "number", name: "数値" },
   { type: "select", name: "セレクト" },
+  { type: "multi_select", name: "マルチセレクト" },
   { type: "status", name: "ステータス" },
   { type: "date", name: "日付" },
   { type: "checkbox", name: "チェックボックス" },
@@ -112,17 +116,8 @@ export function PropertyValue({
   }
 
   if (property.type === "formula") {
-    const expr = property.expression ?? "";
-    const shown = expr.replace(/\{([^}]+)\}/g, (_, name: string) => {
-      if (name === "名前" || name === "title") return title;
-      const prop = schema.find((s) => s.name === name || s.id === name);
-      if (!prop) return "";
-      const raw = allProps[prop.id];
-      if (prop.type === "select" || prop.type === "status") {
-        return prop.options?.find((o) => o.id === String(raw ?? ""))?.name ?? "";
-      }
-      return raw == null ? "" : String(raw);
-    });
+    const snapshot = value == null ? "" : String(value);
+    const shown = evalFormula(property.expression ?? "", { title, schema, values: allProps }, snapshot);
     return <span className="truncate text-[13px] text-muted">{shown || "—"}</span>;
   }
 
@@ -197,7 +192,7 @@ export function PropertyValue({
                     onChange(next);
                   }}
                 >
-                  {on ? "✓ " : ""}{p.icon || "📄"} {p.title || "無題"}
+                  {on ? "✓ " : ""}<PageIcon icon={p.icon} size={14} className="mr-1 inline-block align-[-2px]" /> {p.title || "無題"}
                 </button>
               );
             })}
@@ -217,6 +212,67 @@ export function PropertyValue({
         onChange={(e) => onChange(e.target.checked)}
         onClick={(e) => e.stopPropagation()}
       />
+    );
+  }
+
+  if (property.type === "multi_select") {
+    const ids = Array.isArray(value) ? value.map(String) : [];
+    const selected = (property.options ?? []).filter((o) => ids.includes(o.id));
+    return (
+      <>
+        <button
+          ref={btnRef}
+          type="button"
+          disabled={!editable}
+          className="flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
+          onClick={(e) => {
+            e.stopPropagation();
+            openMenu(e.currentTarget);
+          }}
+        >
+          {selected.length ? selected.map((o) => (
+            <span key={o.id} className={`truncate rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(o.color)}`}>{o.name}</span>
+          )) : <span className="text-[13px] text-transparent">空</span>}
+        </button>
+        {open && anchor && (
+          <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={220}>
+            {(property.options ?? []).map((o) => {
+              const on = ids.includes(o.id);
+              return (
+                <button
+                  key={o.id}
+                  className="flex w-full items-center rounded-[6px] px-2 py-1.5 text-left hover:bg-hover"
+                  onClick={() => onChange(on ? ids.filter((x) => x !== o.id) : [...ids, o.id])}
+                >
+                  <span className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(o.color)}`}>{on ? "✓ " : ""}{o.name}</span>
+                </button>
+              );
+            })}
+            {onUpdateOptions && (
+              <form
+                className="mt-1 border-t border-line px-1 pt-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const name = newOpt.trim();
+                  if (!name) return;
+                  const opt = newSelectOption(name, property.options?.length ?? 0);
+                  onUpdateOptions([...(property.options ?? []), opt]);
+                  onChange([...ids, opt.id]);
+                  setNewOpt("");
+                }}
+              >
+                <input
+                  className="h-8 w-full rounded-[6px] border-none bg-transparent px-2 text-[13px] outline-none placeholder:text-muted"
+                  placeholder="オプションを追加"
+                  value={newOpt}
+                  onChange={(e) => setNewOpt(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </form>
+            )}
+          </FloatMenu>
+        )}
+      </>
     );
   }
 

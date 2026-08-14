@@ -2,10 +2,11 @@ import { richPlain } from "./notion";
 
 type DbProperty = {
   id: string;
-  type: "title" | "select" | "status" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
+  type: "title" | "select" | "status" | "multi_select" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
   name: string;
   options?: { id: string; name: string; color: string }[];
   databaseId?: string;
+  expression?: string;
 };
 
 type JSONNode = {
@@ -56,6 +57,11 @@ const BG_HEX: Record<string, string> = {
 };
 
 export type ImageUploader = (url: string) => Promise<string | null>;
+export type AssetUploader = (url: string) => Promise<{ src: string; type: string; name?: string } | null>;
+
+function translateNotionFormula(expression: string) {
+  return expression.replace(/prop\("([^"]+)"\)/g, "{$1}").replace(/prop\('([^']+)'\)/g, "{$1}");
+}
 
 function mappedId(idMap: Record<string, string>, notionId?: string | null) {
   if (!notionId) return undefined;
@@ -152,7 +158,7 @@ function detailsBlock(summary: JSONNode[], kids: JSONNode[]): JSONNode {
 export async function blocksToDoc(
   blocks: Record<string, unknown>[],
   idMap: Record<string, string>,
-  upload: ImageUploader,
+  upload: AssetUploader,
 ): Promise<{ type: "doc"; content: JSONNode[] }> {
   const content: JSONNode[] = [];
   let list: { kind: "bullet" | "ordered" | "task"; items: JSONNode[] } | null = null;
@@ -245,12 +251,16 @@ export async function blocksToDoc(
       content.push({ type: "horizontalRule" });
     } else if (type === "image") {
       const url = notionFileUrl(data);
-      const src = url ? await upload(url) : null;
-      if (src) content.push({ type: "image", attrs: { src, alt: richPlain(data.caption) } });
+      const asset = url ? await upload(url) : null;
+      if (asset?.type.startsWith("image/")) content.push({ type: "image", attrs: { src: asset.src, alt: richPlain(data.caption) } });
+      else if (asset) content.push({ type: "fileBlock", attrs: { src: asset.src, name: asset.name || richPlain(data.caption) || "ファイル", mime: asset.type } });
       else if (url) content.push(linkParagraph(url, richPlain(data.caption) || url));
     } else if (type === "video" || type === "file" || type === "pdf" || type === "audio") {
       const url = notionFileUrl(data);
-      if (url) content.push(linkParagraph(url, richPlain(data.caption) || url));
+      const asset = url ? await upload(url) : null;
+      const label = richPlain(data.caption) || asset?.name || url || "ファイル";
+      if (asset) content.push({ type: "fileBlock", attrs: { src: asset.src, name: label, mime: asset.type } });
+      else if (url) content.push(linkParagraph(url, label));
     } else if (type === "equation") {
       const expr = String(data.expression || "");
       if (expr) content.push({ type: "codeBlock", attrs: { language: "" }, content: [{ type: "text", text: expr }] });
@@ -291,7 +301,16 @@ export async function blocksToDoc(
     } else if (type === "bookmark" || type === "embed" || type === "link_preview") {
       const url = String(data.url || "");
       if (url) content.push(linkParagraph(url, richPlain(data.caption) || url));
-    } else if (type === "column_list" || type === "synced_block" || type === "column") {
+    } else if (type === "column_list") {
+      const cols = ((block.children as Record<string, unknown>[]) ?? []).filter((c) => c.type === "column");
+      const columns: JSONNode[] = [];
+      for (const col of cols) {
+        const inner = await blocksToDoc((col.children as Record<string, unknown>[]) ?? [], idMap, upload);
+        columns.push({ type: "column", content: inner.content.length ? inner.content : [{ type: "paragraph" }] });
+      }
+      if (columns.length >= 2) content.push({ type: "columnList", content: columns });
+      else content.push(...(await childDoc(block)));
+    } else if (type === "column" || type === "synced_block") {
       content.push(...(await childDoc(block)));
     } else if (rich) {
       content.push(paragraph(rich, idMap));
@@ -315,6 +334,7 @@ export function mapDatabaseSchema(properties: Record<string, unknown>): {
       select?: { options?: { id: string; name: string; color?: string }[] };
       status?: { options?: { id: string; name: string; color?: string }[] };
       relation?: { database_id?: string };
+      formula?: { expression?: string };
     };
     const type = p.type ?? "rich_text";
     if (type === "title") {
@@ -351,10 +371,23 @@ export function mapDatabaseSchema(properties: Record<string, unknown>): {
           color: NOTION_COLOR[o.color ?? ""] ?? SELECT_COLORS[i % SELECT_COLORS.length],
         })),
       });
+    } else if (type === "multi_select") {
+      const options = (p as { multi_select?: { options?: { id: string; name: string; color?: string }[] } }).multi_select?.options ?? [];
+      props.push({
+        id,
+        type: "multi_select",
+        name,
+        options: options.map((o, i) => ({
+          id: o.id,
+          name: o.name,
+          color: NOTION_COLOR[o.color ?? ""] ?? SELECT_COLORS[i % SELECT_COLORS.length],
+        })),
+      });
     } else if (type === "number") props.push({ id, type: "number", name });
     else if (type === "checkbox") props.push({ id, type: "checkbox", name });
     else if (type === "date" || type === "created_time" || type === "last_edited_time") props.push({ id, type: "date", name });
     else if (type === "relation") props.push({ id, type: "relation", name, databaseId: p.relation?.database_id });
+    else if (type === "formula") props.push({ id, type: "formula", name, expression: translateNotionFormula(p.formula?.expression ?? "") });
     else if (type === "button") continue;
     else props.push({ id, type: "text", name });
   }
@@ -377,7 +410,7 @@ export function mapRowProperties(
       rich_text?: unknown;
       select?: { id?: string; name?: string } | null;
       status?: { id?: string; name?: string } | null;
-      multi_select?: { name?: string }[];
+      multi_select?: { id?: string; name?: string }[];
       number?: number | null;
       checkbox?: boolean;
       date?: { start?: string | null } | null;
@@ -405,7 +438,7 @@ export function mapRowProperties(
     if (!def) continue;
     if (p.type === "select") values[key] = p.select?.id ?? null;
     else if (p.type === "status") values[key] = p.status?.id ?? null;
-    else if (p.type === "multi_select") values[key] = (p.multi_select ?? []).map((o) => o.name).join(", ");
+    else if (p.type === "multi_select") values[key] = (p.multi_select ?? []).map((o) => o.id).filter(Boolean);
     else if (p.type === "number") values[key] = p.number;
     else if (p.type === "checkbox") values[key] = Boolean(p.checkbox);
     else if (p.type === "date") values[key] = p.date?.start ? String(p.date.start).slice(0, 10) : null;

@@ -38,6 +38,8 @@ import type { User } from "../lib/types";
 import { EditorChromeContext } from "./chrome";
 import { DatabaseEmbed } from "./databaseEmbed";
 import { Callout } from "./callout";
+import { FileBlock } from "./fileBlock";
+import { Column, ColumnList } from "./columns";
 import { BlockHandle } from "./BlockHandle";
 import { ColorButton, LinkButton } from "./FormatMenu";
 import { SlashCommand, uploadImage } from "./slash";
@@ -157,6 +159,9 @@ export function TiptapEditor({
       DetailsSummary,
       DetailsContent,
       Callout,
+      FileBlock,
+      ColumnList,
+      Column,
       TableKit.configure({
         table: { resizable: true },
       }),

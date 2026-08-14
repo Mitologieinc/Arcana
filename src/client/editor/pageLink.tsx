@@ -6,6 +6,7 @@ import { NodeViewWrapper, ReactNodeViewRenderer, ReactRenderer, type ReactNodeVi
 import { forwardRef, useEffect, useImperativeHandle, useState, type MouseEvent } from "react";
 import { api } from "../lib/api";
 import { useEditorChrome } from "./chrome";
+import { PageIcon } from "../components/PageIcon";
 
 type Hit = { id: string; title: string; icon: string | null };
 
@@ -70,7 +71,7 @@ function PageBlockView({ node }: ReactNodeViewProps) {
         if (id) chrome?.onOpenPage?.(id);
       }}
     >
-      <span className="text-[16px]">{node.attrs.icon || "📄"}</span>
+      <PageIcon icon={String(node.attrs.icon || "")} size={16} />
       <span className="min-w-0 truncate font-medium">{node.attrs.title || "無題"}</span>
     </NodeViewWrapper>
   );

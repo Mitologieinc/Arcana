@@ -144,6 +144,33 @@ export async function notionBlockChildren(token: string, id: string) {
   return blocks;
 }
 
+export async function notionComments(token: string, blockId: string) {
+  const out: { body: string; author: string; createdAt: Date }[] = [];
+  let cursor: string | null = null;
+  do {
+    const q = new URLSearchParams({ block_id: blockId, page_size: "50" });
+    if (cursor) q.set("start_cursor", cursor);
+    const data = await notionFetch<{
+      results: {
+        created_time?: string;
+        created_by?: { name?: string };
+        rich_text?: unknown;
+      }[];
+      next_cursor: string | null;
+      has_more: boolean;
+    }>(token, `/comments?${q}`);
+    for (const item of data.results) {
+      out.push({
+        body: richPlain(item.rich_text),
+        author: item.created_by?.name || "",
+        createdAt: item.created_time ? new Date(item.created_time) : new Date(),
+      });
+    }
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+  return out;
+}
+
 export async function loadNestedBlocks(token: string, blocks: Record<string, unknown>[]) {
   for (const block of blocks) {
     if (!block.has_children) continue;

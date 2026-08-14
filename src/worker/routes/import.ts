@@ -8,6 +8,7 @@ import { canEdit, resolvePagePermission } from "../lib/acl";
 import {
   loadNestedBlocks,
   notionBlockChildren,
+  notionComments,
   notionDatabase,
   notionPage,
   notionQueryDatabase,
@@ -18,7 +19,6 @@ import {
 } from "../lib/notion";
 import {
   blocksToDoc,
-  emojiIcon,
   mapDatabaseSchema,
   mapRowProperties,
   notionFileUrl,
@@ -27,11 +27,10 @@ import {
 } from "../lib/notion-convert";
 import { allowAttempt, clientIp } from "../lib/rate-limit";
 import { plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
+import { isAllowedFileType, isImageType } from "../lib/files";
 import type { AppEnv } from "../types";
 
 export const importRoutes = new Hono<AppEnv>();
-
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 async function importer(c: Context<AppEnv>) {
   if (!allowAttempt(`import:${clientIp(c.req.raw)}`, 80, 10 * 60 * 1000)) {
@@ -144,19 +143,20 @@ async function writeBody(env: Env, db: ReturnType<typeof createDb>, pageId: stri
   await env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)").bind(pageId, title, text).run();
 }
 
-async function saveImage(env: Env, workspaceId: string, userId: string, url: string) {
+async function saveAsset(env: Env, workspaceId: string, userId: string, url: string) {
   const res = await fetch(url);
   if (!res.ok) return null;
   const type = (res.headers.get("content-type") || "").split(";")[0].trim();
-  if (!IMAGE_TYPES.has(type)) return null;
+  if (!isAllowedFileType(type)) return null;
   const buf = await res.arrayBuffer();
   if (buf.byteLength > 15 * 1024 * 1024) return null;
   const id = crypto.randomUUID();
+  const name = url.split("/").pop()?.split("?")[0] || "file";
   await env.FILES.put(`${workspaceId}/${id}`, buf, {
     httpMetadata: { contentType: type },
-    customMetadata: { uploadedBy: userId, imported: "notion" },
+    customMetadata: { uploadedBy: userId, imported: "notion", filename: name },
   });
-  return `/api/files/${id}`;
+  return { src: `/api/files/${id}`, type, name, id };
 }
 
 async function applyCover(
@@ -169,9 +169,25 @@ async function applyCover(
 ) {
   const url = notionFileUrl(cover);
   if (!url) return;
-  const src = await saveImage(env, workspaceId, userId, url);
-  const fileId = src?.split("/").pop();
-  if (fileId) await db.update(schema.pages).set({ coverR2Key: fileId }).where(eq(schema.pages.id, pageId));
+  const asset = await saveAsset(env, workspaceId, userId, url);
+  if (asset && isImageType(asset.type)) {
+    await db.update(schema.pages).set({ coverR2Key: asset.id }).where(eq(schema.pages.id, pageId));
+  }
+}
+
+async function resolveIcon(
+  env: Env,
+  workspaceId: string,
+  userId: string,
+  icon: { type?: string; emoji?: string } | null | undefined,
+  fallback: string,
+) {
+  if (icon?.type === "emoji" && icon.emoji) return icon.emoji;
+  const url = notionFileUrl(icon);
+  if (!url) return fallback;
+  const asset = await saveAsset(env, workspaceId, userId, url);
+  if (asset && isImageType(asset.type)) return `file:${asset.id}`;
+  return fallback;
 }
 
 importRoutes.post("/api/import/notion/whoami", async (c) => {
@@ -221,7 +237,7 @@ importRoutes.post("/api/import/notion/database", async (c) => {
     if (!(await canCreateUnder(ctx, body.parentId))) return c.json({ error: "作成権限がありません" }, 403);
     const dbObj = await notionDatabase(token, body.notionId);
     const title = Array.isArray(dbObj.title) ? richPlain(dbObj.title) : "無題のデータベース";
-    const icon = emojiIcon(dbObj.icon as { type?: string; emoji?: string }, "🗃️");
+    const icon = await resolveIcon(c.env, ctx.membership.workspaceId, ctx.user.id, dbObj.icon as { type?: string; emoji?: string }, "🗃️");
     const { properties, keyMap } = mapDatabaseSchema((dbObj.properties as Record<string, unknown>) ?? {});
     const id = await insertPage(c.env, ctx.db, {
       workspaceId: ctx.membership.workspaceId,
@@ -282,7 +298,7 @@ importRoutes.post("/api/import/notion/rows", async (c) => {
         if (!key) continue;
         mapped.values[key] = await notionRelationPageIds(token, String(row.id), p.id);
       }
-      const icon = emojiIcon(row.icon as { type?: string; emoji?: string }, "📄");
+      const icon = await resolveIcon(c.env, ctx.membership.workspaceId, ctx.user.id, row.icon as { type?: string; emoji?: string }, "📄");
       const id = await insertPage(c.env, ctx.db, {
         workspaceId: ctx.membership.workspaceId,
         parentId: body.databaseId,
@@ -357,7 +373,7 @@ importRoutes.post("/api/import/notion/page", async (c) => {
     const props = (page.properties as Record<string, { type?: string; title?: unknown }>) ?? {};
     const titleProp = Object.values(props).find((p) => p.type === "title");
     const title = richPlain(titleProp?.title) || "無題";
-    const icon = emojiIcon(page.icon as { type?: string; emoji?: string }, "📄");
+    const icon = await resolveIcon(c.env, ctx.membership.workspaceId, ctx.user.id, page.icon as { type?: string; emoji?: string }, "📄");
     const id = await insertPage(c.env, ctx.db, {
       workspaceId: ctx.membership.workspaceId,
       parentId: body.parentId ?? null,
@@ -387,8 +403,24 @@ importRoutes.post("/api/import/notion/body", async (c) => {
     const blocks = await notionBlockChildren(token, body.notionId);
     await loadNestedBlocks(token, blocks);
     const idMap = body.idMap ?? {};
-    const doc = await blocksToDoc(blocks, idMap, (url) => saveImage(c.env, ctx.membership.workspaceId, ctx.user.id, url));
+    const doc = await blocksToDoc(blocks, idMap, (url) => saveAsset(c.env, ctx.membership.workspaceId, ctx.user.id, url));
     await writeBody(c.env, ctx.db, body.pageId, doc);
+    try {
+      const comments = await notionComments(token, body.notionId);
+      for (const item of comments) {
+        const text = item.body.trim();
+        if (!text) continue;
+        await ctx.db.insert(schema.comments).values({
+          id: crypto.randomUUID(),
+          pageId: body.pageId,
+          userId: ctx.user.id,
+          body: item.author ? `（${item.author}）\n${text}` : text,
+          createdAt: item.createdAt,
+        });
+      }
+    } catch {
+      /* コメントは権限がなくても本文は残す */
+    }
     return c.json({ ok: true });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : "本文を取り込みできませんでした" }, 400);

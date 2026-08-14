@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import { getMembership, getSessionUser } from "../auth";
 import { createDb } from "../db/client";
 import * as schema from "../db/schema";
+import { FILE_TYPES, isAllowedFileType, isImageType } from "../lib/files";
 import type { AppEnv } from "../types";
 
 export const fileRoutes = new Hono<AppEnv>();
-
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 fileRoutes.post("/api/files", async (c) => {
   const user = await getSessionUser(c.env, c.req.raw);
@@ -23,7 +22,7 @@ fileRoutes.post("/api/files", async (c) => {
   if (!(file instanceof File)) return c.json({ error: "ファイルがありません" }, 400);
   if (file.size > 15 * 1024 * 1024) return c.json({ error: "15MBまでです" }, 400);
   const type = file.type || "application/octet-stream";
-  if (!IMAGE_TYPES.has(type)) return c.json({ error: "画像（JPEG / PNG / GIF / WebP）だけ送れます" }, 400);
+  if (!isAllowedFileType(type)) return c.json({ error: "画像、PDF、動画、音声だけ送れます" }, 400);
 
   const id = crypto.randomUUID();
   const key = `${membership.workspaceId}/${id}`;
@@ -31,7 +30,7 @@ fileRoutes.post("/api/files", async (c) => {
     httpMetadata: { contentType: type },
     customMetadata: { filename: file.name, uploadedBy: user.id },
   });
-  return c.json({ id, url: `/api/files/${id}`, key });
+  return c.json({ id, url: `/api/files/${id}`, key, name: file.name, type });
 });
 
 fileRoutes.get("/api/files/:id", async (c) => {
@@ -59,10 +58,11 @@ fileRoutes.get("/api/files/:id", async (c) => {
   if (!object) return c.json({ error: "見つかりません" }, 404);
 
   const type = object.httpMetadata?.contentType || "application/octet-stream";
+  const safe = FILE_TYPES.has(type) ? type : "application/octet-stream";
   const headers = new Headers();
-  headers.set("Content-Type", IMAGE_TYPES.has(type) ? type : "application/octet-stream");
+  headers.set("Content-Type", safe);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Cache-Control", "private, max-age=31536000, immutable");
-  headers.set("Content-Disposition", "inline");
+  headers.set("Content-Disposition", isImageType(safe) || safe.startsWith("video/") || safe.startsWith("audio/") || safe === "application/pdf" ? "inline" : "attachment");
   return new Response(object.body, { headers });
 });

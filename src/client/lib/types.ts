@@ -37,7 +37,7 @@ export type SelectOption = { id: string; name: string; color: string };
 
 export type DbProperty = {
   id: string;
-  type: "title" | "select" | "status" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
+  type: "title" | "select" | "status" | "multi_select" | "date" | "person" | "number" | "checkbox" | "text" | "relation" | "formula";
   name: string;
   options?: SelectOption[];
   databaseId?: string;

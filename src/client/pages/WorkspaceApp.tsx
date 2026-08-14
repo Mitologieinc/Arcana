@@ -8,6 +8,7 @@ import type { Member, Page, User, Workspace } from "../lib/types";
 import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
 import { PageEditor } from "../components/PageEditor";
+import { PageIcon } from "../components/PageIcon";
 import { SearchModal } from "../components/SearchModal";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { TrashPanel } from "../components/TrashPanel";
@@ -139,7 +140,7 @@ export function WorkspaceApp() {
                   className="flex h-[30px] w-full items-center gap-1.5 rounded-[6px] px-2 text-left text-[13px] hover:bg-hover"
                   onClick={() => nav(`/page/${p.id}`)}
                 >
-                  <span>{p.icon || "⭐"}</span>
+                  <PageIcon icon={p.icon} fallback="⭐" size={15} />
                   <span className="min-w-0 truncate">{p.title || "無題"}</span>
                 </button>
               ))}
@@ -196,7 +197,7 @@ export function WorkspaceApp() {
                       className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
                       onClick={() => nav(`/page/${p.id}`)}
                     >
-                      <span className="text-[15px]">{p.icon || (p.type === "database" ? "🗃️" : "📄")}</span>
+                      <PageIcon icon={p.icon} fallback={p.type === "database" ? "🗃️" : "📄"} size={15} />
                       <span className={`min-w-0 flex-1 truncate ${p.title ? "" : "text-muted"}`}>
                         {p.title || "無題"}
                       </span>

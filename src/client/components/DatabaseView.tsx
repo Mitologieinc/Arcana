@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
 import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
 import { CoverVisual } from "../lib/covers";
+import { PageIcon } from "./PageIcon";
 import {
   optionClass,
   parseProps,
@@ -68,7 +69,7 @@ function createProperty(type: Exclude<DbProperty["type"], "title">): DbProperty 
     type,
     name: found?.name ?? "プロパティ",
   };
-  if (type === "select") prop.options = [];
+  if (type === "select" || type === "multi_select") prop.options = [];
   if (type === "status") {
     prop.options = [
       { id: "todo", name: "未着手", color: "gray" },
@@ -450,8 +451,10 @@ export function DatabaseView({
           className={`min-w-0 flex-1 truncate text-left text-[14px] ${row.title ? "" : "text-muted"}`}
           onClick={() => onOpenRow(row.id)}
         >
-          {row.icon ? `${row.icon} ` : ""}
-          {row.title || "無題"}
+          <span className="inline-flex items-center gap-1">
+            {row.icon ? <PageIcon icon={row.icon} size={14} /> : null}
+            {row.title || "無題"}
+          </span>
         </button>
         <button
           className="hidden h-6 shrink-0 rounded-[4px] border border-line px-1.5 text-[11px] text-muted group-hover/title:inline-flex group-hover/title:items-center hover:bg-hover"
@@ -546,7 +549,10 @@ export function DatabaseView({
               <div className="h-24 bg-canvas">
                 {row.coverR2Key && <CoverVisual cover={row.coverR2Key} className="h-full w-full object-cover" />}
               </div>
-              <div className="px-3 py-2 text-[14px]">{row.icon ? `${row.icon} ` : ""}{row.title || "無題"}</div>
+              <div className="flex items-center gap-1 px-3 py-2 text-[14px]">
+                {row.icon ? <PageIcon icon={row.icon} size={14} /> : null}
+                {row.title || "無題"}
+              </div>
             </button>
           ))}
           {editable && (
@@ -698,6 +704,18 @@ export function DatabaseView({
                         {extras.length > 0 && editingTitleId !== row.id && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {extras.map((p) => {
+                              if (p.type === "multi_select") {
+                                const ids = Array.isArray(props[p.id]) ? (props[p.id] as string[]) : [];
+                                return ids.map((id) => {
+                                  const current = p.options?.find((o) => o.id === id);
+                                  if (!current) return null;
+                                  return (
+                                    <span key={`${p.id}-${id}`} className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}>
+                                      {current.name}
+                                    </span>
+                                  );
+                                });
+                              }
                               if (p.type === "select" || p.type === "status") {
                                 const current = p.options?.find((o) => o.id === String(props[p.id] ?? ""));
                                 if (!current) return null;

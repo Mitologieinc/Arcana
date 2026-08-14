@@ -978,6 +978,21 @@ button:disabled {
   background: var(--color-hover);
 }
 
+.arcana-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.arcana-column {
+  min-width: 0;
+}
+
+.arcana-file-block {
+  margin: 8px 0;
+}
+
 .arcana-callout {
   position: relative;
   display: flex;

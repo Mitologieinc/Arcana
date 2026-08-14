@@ -26,6 +26,7 @@ import {
 import { api } from "../lib/api";
 import type { Page } from "../lib/types";
 import { insertNamedTable } from "./simpleTable";
+import { twoColumns } from "./columns";
 
 export type SlashOptions = {
   pageId: string;
@@ -42,23 +43,32 @@ export type SlashItem = {
   command: (ctx: { editor: Editor; range: Range }) => void;
 };
 
-export async function uploadImage(file: File) {
+export async function uploadFile(file: File) {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/files", { method: "POST", body: fd });
-  const data = (await res.json()) as { url?: string };
-  if (!res.ok || !data.url) throw new Error("画像のアップロードに失敗しました");
-  return data.url;
+  const data = (await res.json()) as { url?: string; name?: string; type?: string };
+  if (!res.ok || !data.url) throw new Error("アップロードに失敗しました");
+  return { src: data.url, name: data.name || file.name, mime: data.type || file.type };
 }
 
-function pickImage(): Promise<File | null> {
+export async function uploadImage(file: File) {
+  const out = await uploadFile(file);
+  return out.src;
+}
+
+function pickFile(accept: string): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/*";
+    input.accept = accept;
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.click();
   });
+}
+
+function pickImage(): Promise<File | null> {
+  return pickFile("image/*");
 }
 
 async function createChildPage(parentId: string, type: "page" | "database" = "page") {
@@ -176,6 +186,28 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
       group: "basic",
       icon: Table2,
       command: ({ editor, range }) => insertNamedTable(editor, range),
+    },
+    {
+      title: "ファイル",
+      subtitle: "PDF・動画・音声",
+      aliases: ["file", "pdf", "video", "ファイル", "動画"],
+      group: "basic",
+      icon: FileText,
+      command: ({ editor, range }) => {
+        void pickFile("application/pdf,video/*,audio/*").then(async (file) => {
+          if (!file) return;
+          const asset = await uploadFile(file);
+          editor.chain().focus().deleteRange(range).insertContent({ type: "fileBlock", attrs: asset }).run();
+        });
+      },
+    },
+    {
+      title: "列",
+      subtitle: "2列に並べる",
+      aliases: ["column", "columns", "列", "カラム"],
+      group: "basic",
+      icon: Columns3,
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).insertContent(twoColumns()).run(),
     },
     {
       title: "ページ",

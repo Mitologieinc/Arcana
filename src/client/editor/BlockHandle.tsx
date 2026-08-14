@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { FloatMenu } from "../components/FloatMenu";
 
-const ATOM_BLOCKS = new Set(["image", "horizontalRule", "pageBlock", "databaseEmbed"]);
+const ATOM_BLOCKS = new Set(["image", "horizontalRule", "pageBlock", "databaseEmbed", "fileBlock"]);
 
 function lockHandle(editor: Editor, locked: boolean) {
   editor.view.dispatch(editor.state.tr.setMeta("lockDragHandle", locked));

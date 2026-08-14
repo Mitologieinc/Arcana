@@ -3,6 +3,7 @@ import { FilePlus, LayoutGrid, Search } from "lucide-react";
 import { api } from "../lib/api";
 import type { Page } from "../lib/types";
 import { Modal } from "./Modal";
+import { PageIcon } from "./PageIcon";
 
 type Result = { id: string; title: string; icon: string | null; type: string; snippet: string };
 
@@ -138,7 +139,9 @@ export function SearchModal({
                   {row.icon === "page" ? <FilePlus size={15} /> : <LayoutGrid size={15} />}
                 </span>
               ) : (
-                <span className="flex h-6 w-6 items-center justify-center text-[15px]">{row.icon}</span>
+                <span className="flex h-6 w-6 items-center justify-center">
+                  <PageIcon icon={row.icon} size={15} />
+                </span>
               )}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate ${row.kind === "page" && row.title === "無題" ? "text-muted" : ""}`}>

@@ -5,6 +5,7 @@ import { DatabaseView } from "../components/DatabaseView";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Member, Page, Permission } from "../lib/types";
 import { useEditorChrome } from "./chrome";
+import { PageIcon } from "../components/PageIcon";
 
 const RowPeek = lazy(() => import("../components/RowPeek").then((m) => ({ default: m.RowPeek })));
 
@@ -75,7 +76,10 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
               className="min-w-0 truncate rounded-[6px] px-1 py-0.5 text-left text-[15px] font-medium hover:bg-hover"
               onClick={() => chrome?.onOpenPage?.(embedId)}
             >
-              {page.icon || "🗃️"} {page.title || "無題のデータベース"}
+              <span className="inline-flex items-center gap-1">
+                <PageIcon icon={page.icon} fallback="🗃️" size={16} />
+                {page.title || "無題のデータベース"}
+              </span>
             </button>
           </div>
           <DatabaseView

@@ -73,6 +73,46 @@ const ImportDatabaseEmbed = Node.create({
   },
 });
 
+const ImportFileBlock = Node.create({
+  name: "fileBlock",
+  group: "block",
+  atom: true,
+  addAttributes() {
+    return { src: { default: "" }, name: { default: "ファイル" }, mime: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="file-block"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "file-block" })];
+  },
+});
+
+const ImportColumn = Node.create({
+  name: "column",
+  content: "block+",
+  isolating: true,
+  parseHTML() {
+    return [{ tag: 'div[data-type="column"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "column" }), 0];
+  },
+});
+
+const ImportColumnList = Node.create({
+  name: "columnList",
+  group: "block",
+  content: "column{2,}",
+  isolating: true,
+  parseHTML() {
+    return [{ tag: 'div[data-type="column-list"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "column-list" }), 0];
+  },
+});
+
 const schema = getSchema([
   StarterKit.configure({ undoRedo: false }),
   Underline,
@@ -89,6 +129,9 @@ const schema = getSchema([
   ImportPageBlock,
   ImportPageLink,
   ImportDatabaseEmbed,
+  ImportFileBlock,
+  ImportColumn,
+  ImportColumnList,
 ]);
 
 export function tiptapJsonToUpdate(doc: unknown): Uint8Array {

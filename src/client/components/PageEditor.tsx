@@ -12,6 +12,7 @@ import { HistoryPanel } from "./HistoryPanel";
 import { TiptapEditor } from "../editor/TiptapEditor";
 import { uploadImage } from "../editor/slash";
 import { CoverPicker, CoverVisual, presetCoverKey } from "../lib/covers";
+import { PageIcon } from "./PageIcon";
 
 type Props = {
   pageId: string;
@@ -151,6 +152,21 @@ export function PageEditor({
     input.click();
   }
 
+  function pickIconFile() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      void uploadImage(file).then((src) => {
+        const id = src.split("/").pop();
+        if (id) void saveIcon(`file:${id}`);
+      });
+    };
+    input.click();
+  }
+
   async function saveIcon(icon: string | null) {
     if (!editable) return;
     setIconOpen(false);
@@ -226,13 +242,15 @@ export function PageEditor({
                 className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
                 onClick={() => onOpenPage(c.id)}
               >
-                {c.icon || "📄"} {c.title || "無題"}
+                {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 inline-block align-[-2px]" /> : "📄 "}
+                {c.title || "無題"}
               </button>
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
           <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
-            {page.icon || "📄"} {title || "無題"}
+            <PageIcon icon={page.icon} size={14} className="mr-1 inline-block align-[-2px]" />
+            {title || "無題"}
           </span>
         </nav>
         {!shareToken && (
@@ -424,7 +442,7 @@ export function PageEditor({
               }}
               disabled={!editable}
             >
-              {page.icon}
+              <PageIcon icon={page.icon} fallback="📄" size={78} />
             </button>
           ) : (
             editable && !page.coverR2Key && <div className="h-8" />
@@ -448,6 +466,12 @@ export function PageEditor({
                   </button>
                 ))}
               </div>
+              <button
+                className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"
+                onClick={pickIconFile}
+              >
+                画像をアップロード
+              </button>
               {page.icon && (
                 <button
                   className="mt-1.5 w-full rounded-[6px] px-2 py-1.5 text-left text-[12px] text-muted hover:bg-hover"

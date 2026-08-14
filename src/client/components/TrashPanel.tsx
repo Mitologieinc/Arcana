@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import type { Page } from "../lib/types";
 import { relativeTime } from "../lib/format";
 import { SideSheet } from "./SideSheet";
+import { PageIcon } from "./PageIcon";
 
 export function TrashPanel({
   onClose,
@@ -29,7 +30,7 @@ export function TrashPanel({
         {pages.length === 0 && <p className="px-2 py-6 text-[13px] text-muted">空です</p>}
         {pages.map((p) => (
           <div key={p.id} className="flex items-center gap-2 rounded-[8px] px-2 py-2 hover:bg-hover">
-            <span className="text-[15px]">{p.icon || "📄"}</span>
+            <PageIcon icon={p.icon} size={15} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px]">{p.title || "無題"}</p>
               <p className="text-[11px] text-muted">{relativeTime(p.archivedAt ?? p.updatedAt)}</p>
