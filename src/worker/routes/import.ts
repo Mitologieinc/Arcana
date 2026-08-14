@@ -21,6 +21,7 @@ import {
   emojiIcon,
   mapDatabaseSchema,
   mapRowProperties,
+  notionFileUrl,
   remapRelationSchema,
   remapRelationValues,
 } from "../lib/notion-convert";
@@ -158,6 +159,21 @@ async function saveImage(env: Env, workspaceId: string, userId: string, url: str
   return `/api/files/${id}`;
 }
 
+async function applyCover(
+  env: Env,
+  db: ReturnType<typeof createDb>,
+  workspaceId: string,
+  userId: string,
+  pageId: string,
+  cover: unknown,
+) {
+  const url = notionFileUrl(cover);
+  if (!url) return;
+  const src = await saveImage(env, workspaceId, userId, url);
+  const fileId = src?.split("/").pop();
+  if (fileId) await db.update(schema.pages).set({ coverR2Key: fileId }).where(eq(schema.pages.id, pageId));
+}
+
 importRoutes.post("/api/import/notion/whoami", async (c) => {
   const ctx = await importer(c);
   if ("error" in ctx) return ctx.error;
@@ -216,13 +232,14 @@ importRoutes.post("/api/import/notion/database", async (c) => {
       icon,
     });
     await ctx.db.update(schema.databaseSchemas).set({ properties: JSON.stringify(properties) }).where(eq(schema.databaseSchemas.pageId, id));
-    const select = properties.find((p) => p.type === "select");
+    await applyCover(c.env, ctx.db, ctx.membership.workspaceId, ctx.user.id, id, dbObj.cover);
+    const group = properties.find((p) => p.type === "status") ?? properties.find((p) => p.type === "select");
     const views = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.pageId, id));
     const board = views.find((v) => v.type === "board");
-    if (board && select) {
+    if (board && group) {
       await ctx.db
         .update(schema.databaseViews)
-        .set({ config: JSON.stringify({ groupBy: select.id, filters: [], sorts: [] }) })
+        .set({ config: JSON.stringify({ groupBy: group.id, filters: [], sorts: [] }) })
         .where(eq(schema.databaseViews.id, board.id));
     } else if (board && views.length > 1) {
       await ctx.db.delete(schema.databaseViews).where(eq(schema.databaseViews.id, board.id));
@@ -276,6 +293,7 @@ importRoutes.post("/api/import/notion/rows", async (c) => {
         properties: mapped.values,
       });
       created.push({ notionId: String(row.id), id });
+      await applyCover(c.env, ctx.db, ctx.membership.workspaceId, ctx.user.id, id, row.cover);
     }
     return c.json({ created, next_cursor: page.next_cursor, has_more: page.has_more });
   } catch (e) {
@@ -348,20 +366,7 @@ importRoutes.post("/api/import/notion/page", async (c) => {
       title,
       icon,
     });
-    const coverUrl =
-      page.cover && typeof page.cover === "object"
-        ? (page.cover as { file?: { url?: string }; external?: { url?: string } }).file?.url ||
-          (page.cover as { external?: { url?: string } }).external?.url
-        : null;
-    if (coverUrl) {
-      const src = await saveImage(c.env, ctx.membership.workspaceId, ctx.user.id, coverUrl);
-      if (src) {
-        const fileId = src.split("/").pop();
-        if (fileId) {
-          await ctx.db.update(schema.pages).set({ coverR2Key: fileId }).where(eq(schema.pages.id, id));
-        }
-      }
-    }
+    await applyCover(c.env, ctx.db, ctx.membership.workspaceId, ctx.user.id, id, page.cover);
     return c.json({ id });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : "ページを取り込みできませんでした" }, 400);

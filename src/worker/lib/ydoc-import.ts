@@ -6,6 +6,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import { TableKit } from "@tiptap/extension-table";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
+import { TextStyleKit } from "@tiptap/extension-text-style";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import { encodeStateAsUpdate } from "yjs";
@@ -57,10 +58,26 @@ const ImportPageLink = Node.create({
   },
 });
 
+const ImportDatabaseEmbed = Node.create({
+  name: "databaseEmbed",
+  group: "block",
+  atom: true,
+  addAttributes() {
+    return { pageId: { default: "" }, title: { default: "無題のデータベース" } };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="database-embed"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "database-embed" })];
+  },
+});
+
 const schema = getSchema([
   StarterKit.configure({ undoRedo: false }),
   Underline,
-  Highlight,
+  Highlight.configure({ multicolor: true }),
+  TextStyleKit.configure({ fontFamily: false, fontSize: false, lineHeight: false }),
   Image,
   TaskList,
   TaskItem,
@@ -71,6 +88,7 @@ const schema = getSchema([
   ImportCallout,
   ImportPageBlock,
   ImportPageLink,
+  ImportDatabaseEmbed,
 ]);
 
 export function tiptapJsonToUpdate(doc: unknown): Uint8Array {
