@@ -22,6 +22,7 @@ const ORIGIN = "arcana-jam";
 const CLIP = { nodes: [] as JamNode[], n: 0 };
 const ZMIN = 0.2;
 const ZMAX = 3.5;
+const ZOOM_K = 0.01;
 
 function clampZ(z: number) {
   return Math.min(ZMAX, Math.max(ZMIN, z));
@@ -567,7 +568,8 @@ export function CanvasEditor({
         acc.zoom = true;
         acc.sx = e.clientX - r.left;
         acc.sy = e.clientY - r.top;
-        acc.factor *= Math.exp(-Math.max(-80, Math.min(80, dy)) * 0.001);
+        const k = Math.abs(dy) < 40 ? ZOOM_K : ZOOM_K * 0.35;
+        acc.factor *= Math.exp(-Math.max(-240, Math.min(240, dy)) * k);
       } else {
         acc.x += dx;
         acc.y += dy;
@@ -986,7 +988,7 @@ export function CanvasEditor({
     const targetZ = clampZ(from.z * factor);
     if (targetZ === from.z) return;
     const t0 = performance.now();
-    const dur = 180;
+    const dur = 90;
     const tick = (now: number) => {
       const t = Math.min(1, (now - t0) / dur);
       const ease = 1 - (1 - t) ** 3;
@@ -1221,11 +1223,11 @@ export function CanvasEditor({
       </div>
 
       <div className="jam-zoom">
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(0.9); }} aria-label="縮小">
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(0.8); }} aria-label="縮小">
           <Minus size={14} />
         </button>
         <span ref={zoomLabelRef}>{Math.round(cam.z * 100)}%</span>
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(1.1); }} aria-label="拡大">
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(1.25); }} aria-label="拡大">
           <Plus size={14} />
         </button>
       </div>
