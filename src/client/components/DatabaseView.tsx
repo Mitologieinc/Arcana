@@ -80,6 +80,98 @@ function createProperty(type: Exclude<DbProperty["type"], "title">): DbProperty 
   return prop;
 }
 
+function ColumnHeader({
+  prop,
+  editable,
+  renaming,
+  rename,
+  onRenameChange,
+  onStartRename,
+  onCommit,
+  onCancel,
+  onOpenMenu,
+}: {
+  prop: DbProperty;
+  editable: boolean;
+  renaming: boolean;
+  rename: string;
+  onRenameChange: (value: string) => void;
+  onStartRename: () => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  onOpenMenu: (rect: DOMRect) => void;
+}) {
+  if (editable && renaming) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-muted">
+        <button
+          type="button"
+          className="shrink-0 rounded-[4px] p-0.5 hover:bg-hover"
+          title="プロパティ"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCommit();
+            onOpenMenu(e.currentTarget.getBoundingClientRect());
+          }}
+        >
+          <PropertyIcon type={prop.type} />
+        </button>
+        <input
+          autoFocus
+          className="h-7 min-w-0 flex-1 rounded-[4px] bg-white px-1.5 text-[13px] font-medium text-ink outline-none ring-1 ring-[#2383e2]/50"
+          value={rename}
+          placeholder="列名"
+          onChange={(e) => onRenameChange(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={onCommit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <button
+        type="button"
+        className="shrink-0 rounded-[4px] p-0.5 text-muted hover:bg-hover"
+        title="プロパティ"
+        disabled={!editable}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!editable) return;
+          onOpenMenu(e.currentTarget.getBoundingClientRect());
+        }}
+      >
+        <PropertyIcon type={prop.type} />
+      </button>
+      <button
+        type="button"
+        className="min-w-0 flex-1 truncate rounded-[4px] px-0.5 text-left text-[13px] text-muted hover:bg-hover"
+        disabled={!editable}
+        onClick={() => {
+          if (!editable) return;
+          onStartRename();
+        }}
+      >
+        {prop.name}
+      </button>
+    </div>
+  );
+}
+
 export function DatabaseView({
   pageId,
   schema,
@@ -104,6 +196,8 @@ export function DatabaseView({
   const [addProp, setAddProp] = useState<DOMRect | null>(null);
   const [addView, setAddView] = useState<DOMRect | null>(null);
   const [rename, setRename] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const skipRenameBlur = useRef(false);
   const [calCursor, setCalCursor] = useState(() => {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
@@ -146,6 +240,32 @@ export function DatabaseView({
       body: JSON.stringify({ config }),
     });
     await onChanged();
+  }
+
+  function startRename(prop: DbProperty) {
+    skipRenameBlur.current = false;
+    setHeaderMenu(null);
+    setRenamingId(prop.id);
+    setRename(prop.name);
+  }
+
+  function cancelRename() {
+    skipRenameBlur.current = true;
+    setRenamingId(null);
+  }
+
+  function commitRename() {
+    if (skipRenameBlur.current) {
+      skipRenameBlur.current = false;
+      setRenamingId(null);
+      return;
+    }
+    const id = renamingId;
+    const prop = id ? schema.find((p) => p.id === id) : null;
+    const next = rename.trim();
+    setRenamingId(null);
+    if (!id || !prop || !next || next === prop.name) return;
+    void saveSchema(schema.map((p) => (p.id === id ? { ...p, name: next } : p)));
   }
 
   async function addRow(groupValue?: string) {
@@ -620,18 +740,23 @@ export function DatabaseView({
             <thead>
               <tr>
                 <th>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 text-muted"
-                    onClick={(e) => {
-                      if (!editable || !titleProp) return;
-                      setRename(titleProp.name);
-                      setHeaderMenu({ id: titleProp.id, rect: e.currentTarget.getBoundingClientRect() });
-                    }}
-                  >
-                    <PropertyIcon type="title" />
-                    {titleProp?.name ?? "名前"}
-                  </button>
+                  {titleProp && (
+                    <ColumnHeader
+                      prop={titleProp}
+                      editable={editable}
+                      renaming={renamingId === titleProp.id}
+                      rename={rename}
+                      onRenameChange={setRename}
+                      onStartRename={() => startRename(titleProp)}
+                      onCommit={commitRename}
+                      onCancel={cancelRename}
+                      onOpenMenu={(rect) => {
+                        setRenamingId(null);
+                        setRename(titleProp.name);
+                        setHeaderMenu({ id: titleProp.id, rect });
+                      }}
+                    />
+                  )}
                 </th>
                 {dataProps.map((p) => (
                   <th
@@ -643,8 +768,14 @@ export function DatabaseView({
                           : "arcana-drop-after"
                         : ""
                     }`}
-                    draggable={editable}
-                    onDragStart={(e) => beginDrag(e, "col", p.id)}
+                    draggable={editable && renamingId !== p.id}
+                    onDragStart={(e) => {
+                      if ((e.target as HTMLElement).closest("input")) {
+                        e.preventDefault();
+                        return;
+                      }
+                      beginDrag(e, "col", p.id);
+                    }}
                     onDragOver={(e) => hoverDrag(e, p.id)}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -652,18 +783,21 @@ export function DatabaseView({
                     }}
                     onDragEnd={(e) => endDrag(e)}
                   >
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-1.5 text-left text-muted"
-                      onClick={(e) => {
-                        if (dragging.current || !editable) return;
+                    <ColumnHeader
+                      prop={p}
+                      editable={editable}
+                      renaming={renamingId === p.id}
+                      rename={rename}
+                      onRenameChange={setRename}
+                      onStartRename={() => startRename(p)}
+                      onCommit={commitRename}
+                      onCancel={cancelRename}
+                      onOpenMenu={(rect) => {
+                        setRenamingId(null);
                         setRename(p.name);
-                        setHeaderMenu({ id: p.id, rect: e.currentTarget.getBoundingClientRect() });
+                        setHeaderMenu({ id: p.id, rect });
                       }}
-                    >
-                      <PropertyIcon type={p.type} />
-                      <span className="truncate">{p.name}</span>
-                    </button>
+                    />
                   </th>
                 ))}
                 {editable && (
@@ -779,9 +913,12 @@ export function DatabaseView({
           width={220}
         >
           <input
+            autoFocus
             className="mb-1 h-8 w-full rounded-[6px] bg-canvas px-2 text-[13px] outline-none"
             value={rename}
+            placeholder="列名"
             onChange={(e) => setRename(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             onBlur={() => {
               if (rename.trim() && rename !== headerMenuProp.name) {
                 void saveSchema(schema.map((p) => (p.id === headerMenuProp.id ? { ...p, name: rename.trim() } : p)));
@@ -881,8 +1018,11 @@ export function DatabaseView({
               onClick={() => {
                 const prop = createProperty(t.type);
                 if (t.type === "relation") prop.databaseId = pageId;
-                void saveSchema([...schema, prop]);
                 setAddProp(null);
+                void saveSchema([...schema, prop]).then(() => {
+                  setRenamingId(prop.id);
+                  setRename(prop.name);
+                });
               }}
             >
               <PropertyIcon type={t.type} />
