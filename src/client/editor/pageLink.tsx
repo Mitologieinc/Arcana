@@ -1,4 +1,5 @@
 import { Extension, Node, mergeAttributes } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import { isChangeOrigin } from "@tiptap/extension-collaboration";
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
@@ -85,12 +86,15 @@ const PageMenu = forwardRef<Handle, SuggestionProps<Hit, Hit>>(function PageMenu
   );
 });
 
+const pageMentionKey = new PluginKey("pageMention");
+
 export const PageMention = Extension.create({
   name: "pageMention",
   addProseMirrorPlugins() {
     return [
       Suggestion<Hit, Hit>({
         editor: this.editor,
+        pluginKey: pageMentionKey,
         char: "@",
         allowedPrefixes: [" ", "\n"],
         shouldShow: ({ transaction }) => !isChangeOrigin(transaction),

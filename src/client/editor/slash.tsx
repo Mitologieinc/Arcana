@@ -1,4 +1,5 @@
 import { Extension, type Editor, type Range } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import { isChangeOrigin } from "@tiptap/extension-collaboration";
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
@@ -193,12 +194,15 @@ const SlashMenu = forwardRef<MenuHandle, SuggestionProps<SlashItem, SlashItem>>(
   );
 });
 
+const slashPluginKey = new PluginKey("slashCommand");
+
 export const SlashCommand = Extension.create({
   name: "slashCommand",
   addProseMirrorPlugins() {
     return [
       Suggestion<SlashItem, SlashItem>({
         editor: this.editor,
+        pluginKey: slashPluginKey,
         char: "/",
         allowedPrefixes: [" ", "\n"],
         startOfLine: false,
