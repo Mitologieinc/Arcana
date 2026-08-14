@@ -69,6 +69,11 @@ html[data-theme="dark"] .arcana-doc .tableWrapper td {
   border-color: #3a3a37;
 }
 
+html[data-theme="dark"] .arcana-doc ul[data-type="taskList"] li input[type="checkbox"] {
+  background: #191919;
+  border-color: #5a5a56;
+}
+
 html[data-theme="dark"] .page-link {
   background: rgba(255, 255, 255, 0.08);
 }
@@ -756,6 +761,11 @@ button:disabled {
   list-style-type: square;
 }
 
+.arcana-doc li::marker {
+  color: #787774;
+  font-weight: 560;
+}
+
 .arcana-doc li {
   display: list-item;
   padding: 2px 0;
@@ -777,7 +787,33 @@ button:disabled {
 }
 
 .arcana-doc ul[data-type="taskList"] li > label {
-  margin-top: 5px;
+  display: flex;
+  margin-top: 4px;
+}
+
+.arcana-doc ul[data-type="taskList"] li input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid #c4c2bc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.arcana-doc ul[data-type="taskList"] li input[type="checkbox"]:checked {
+  border-color: var(--color-cf);
+  background: var(--color-cf);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5 6.5 11.5 12.5 4.5'/></svg>");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.arcana-doc ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--color-muted);
+  text-decoration: line-through;
 }
 
 .arcana-doc ul[data-type="taskList"] li > div {
@@ -986,9 +1022,9 @@ button:disabled {
 .arcana-doc details {
   display: flex;
   align-items: flex-start;
-  gap: 2px;
-  margin: 2px 0;
-  padding: 1px 0;
+  gap: 4px;
+  margin: 4px 0;
+  padding: 2px 0;
 }
 
 .arcana-doc .arcana-toggle > button {
@@ -998,27 +1034,32 @@ button:disabled {
   justify-content: center;
   width: 24px;
   height: 24px;
-  margin-top: 1px;
+  margin-top: 2px;
   border: 0;
   border-radius: 4px;
   padding: 0;
-  background: transparent;
-  color: var(--color-muted);
-}
-
-.arcana-doc .arcana-toggle > button:hover {
   background: var(--color-hover);
   color: var(--color-ink);
 }
 
+.arcana-doc .arcana-toggle > button:hover {
+  background: rgba(55, 53, 47, 0.12);
+}
+
 .arcana-doc .arcana-toggle > button::before {
-  content: "▸";
-  font-size: 12px;
-  line-height: 1;
+  display: block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 5px 0 5px 7px;
+  border-color: transparent transparent transparent currentColor;
+  content: "";
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
 }
 
 .arcana-doc .arcana-toggle.is-open > button::before {
-  content: "▾";
+  transform: rotate(90deg);
 }
 
 .arcana-doc .arcana-toggle > div {
@@ -1031,7 +1072,7 @@ button:disabled {
   display: block;
   min-height: 1.65em;
   padding: 3px 0;
-  font-weight: 510;
+  font-weight: 600;
   list-style: none;
   cursor: text;
 }
@@ -1042,7 +1083,9 @@ button:disabled {
 }
 
 .arcana-doc [data-type="detailsContent"] {
-  padding: 2px 0 4px;
+  margin-top: 2px;
+  padding: 4px 0 6px 12px;
+  border-left: 2px solid var(--color-line);
 }
 
 .arcana-doc [data-type="detailsContent"][hidden] {

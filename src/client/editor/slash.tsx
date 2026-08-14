@@ -109,7 +109,7 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
     },
     {
       title: "箇条書き",
-      subtitle: "箇条書きリスト",
+      subtitle: "・ 項目を並べる",
       aliases: ["ul", "list", "リスト", "箇条"],
       group: "basic",
       icon: List,
@@ -117,7 +117,7 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
     },
     {
       title: "番号付きリスト",
-      subtitle: "1, 2, 3…",
+      subtitle: "1, 2, 3 の順番",
       aliases: ["ol", "numbered", "番号"],
       group: "basic",
       icon: ListOrdered,
@@ -125,7 +125,7 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
     },
     {
       title: "ToDo",
-      subtitle: "チェックリスト",
+      subtitle: "チェックできる項目",
       aliases: ["todo", "task", "チェック"],
       group: "basic",
       icon: CheckSquare,
@@ -224,9 +224,9 @@ export function slashItems(opts: SlashOptions): SlashItem[] {
           .run(),
     },
     {
-      title: "トグルリスト",
-      subtitle: "開閉できるリスト",
-      aliases: ["toggle", "トグル", "details", "折りたたみ"],
+      title: "トグル",
+      subtitle: "クリックで開閉する見出し",
+      aliases: ["toggle", "トグル", "details", "折りたたみ", "プルダウン", "dropdown"],
       group: "basic",
       icon: ChevronRight,
       command: ({ editor, range }) => {

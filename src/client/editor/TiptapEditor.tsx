@@ -122,11 +122,17 @@ export function TiptapEditor({
         includeChildren: true,
         placeholder: ({ editor, node, pos }) => {
           if (node.type.name === "heading") return `見出し ${node.attrs.level}`;
-          if (node.type.name === "detailsSummary") return "トグル";
-          const parent = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size)).parent;
+          if (node.type.name === "detailsSummary") return "クリックで開閉するタイトル";
+          const $pos = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
+          const parent = $pos.parent;
           if (parent.type.name === "tableHeader") return "列名";
           if (parent.type.name === "tableCell") return "";
-          if (parent.type.name === "detailsContent") return "空のトグル。中身を入力…";
+          if (parent.type.name === "detailsContent") return "折りたたんだ中身を入力";
+          for (let d = $pos.depth; d > 0; d--) {
+            const name = $pos.node(d).type.name;
+            if (name === "taskItem") return "ToDo";
+            if (name === "listItem") return "項目";
+          }
           return "入力するか、'/' でコマンド";
         },
       }),
@@ -140,7 +146,14 @@ export function TiptapEditor({
       Image.configure({ resize: { enabled: true, minWidth: 80, minHeight: 80 } }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Details.configure({ persist: true, HTMLAttributes: { class: "arcana-toggle" } }),
+      Details.configure({
+        persist: true,
+        HTMLAttributes: { class: "arcana-toggle" },
+        renderToggleButton: ({ element, isOpen }) => {
+          element.title = isOpen ? "中身を隠す" : "中身を表示";
+          element.setAttribute("aria-label", isOpen ? "閉じる" : "開く");
+        },
+      }),
       DetailsSummary,
       DetailsContent,
       Callout,
