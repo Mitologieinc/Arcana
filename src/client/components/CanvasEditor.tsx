@@ -65,19 +65,19 @@ const SHAPE_FILLS = ["#ffffff", "#FFE299", "#FFB8A8", "#D3BDFF", "#A8DAFF", "#B3
 const SELECT = "#0d99ff";
 const GUIDE = "#f24822";
 const SNAP = 8;
-const GRID = 16;
+const GRID = 12;
 
 function gridFade(screen: number) {
-  if (screen < 7) return 0;
-  if (screen < 13) return (screen - 7) / 6;
-  if (screen < 28) return 1;
-  if (screen < 46) return (46 - screen) / 18;
+  if (screen < 6) return 0;
+  if (screen < 10) return (screen - 6) / 4;
+  if (screen < 22) return 1;
+  if (screen < 36) return (36 - screen) / 14;
   return 0;
 }
 
 function paintGrid(el: HTMLDivElement, x: number, y: number, z: number) {
   let step = GRID;
-  const ideal = 20 / z;
+  const ideal = 14 / z;
   while (step < ideal * 0.85) step *= 2;
   while (step / 2 >= ideal * 0.85 && step > 0.5) step /= 2;
   const coarse = step * z;
@@ -87,11 +87,11 @@ function paintGrid(el: HTMLDivElement, x: number, y: number, z: number) {
   const layers: string[] = [];
   const sizes: string[] = [];
   if (oc > 0.02) {
-    layers.push(`radial-gradient(circle 1.2px at 0 0, rgba(var(--jam-dot), ${0.85 * oc}) 1.05px, transparent 1.25px)`);
+    layers.push(`radial-gradient(circle 1.35px at 0 0, rgba(var(--jam-dot), ${oc}) 1.15px, transparent 1.4px)`);
     sizes.push(`${coarse}px ${coarse}px`);
   }
   if (of > 0.02) {
-    layers.push(`radial-gradient(circle 1.05px at 0 0, rgba(var(--jam-dot), ${0.42 * of}) 0.95px, transparent 1.15px)`);
+    layers.push(`radial-gradient(circle 1.15px at 0 0, rgba(var(--jam-dot), ${0.55 * of}) 1px, transparent 1.2px)`);
     sizes.push(`${fine}px ${fine}px`);
   }
   const pos = layers.map(() => `${x}px ${y}px`).join(", ");

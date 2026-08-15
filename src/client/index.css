@@ -1548,7 +1548,7 @@ html[data-theme="dark"] .arcana-presence {
 }
 
 .jam-dots {
-  --jam-dot: 180, 180, 176;
+  --jam-dot: 148, 148, 144;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -2013,7 +2013,7 @@ html[data-theme="dark"] .jam {
 }
 
 html[data-theme="dark"] .jam-dots {
-  --jam-dot: 78, 78, 74;
+  --jam-dot: 118, 118, 112;
 }
 
 html[data-theme="dark"] .jam-bar,
