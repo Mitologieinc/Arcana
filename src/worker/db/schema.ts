@@ -204,6 +204,7 @@ export const pageRevisions = sqliteTable("page_revisions", {
   pageId: text("page_id").notNull(),
   title: text("title").notNull(),
   bodyText: text("body_text").notNull(),
+  bodyJson: text("body_json"),
   createdBy: text("created_by").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });

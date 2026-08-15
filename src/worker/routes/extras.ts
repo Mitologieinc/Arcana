@@ -5,7 +5,7 @@ import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, resolvePagePermission } from "../lib/acl";
 import { purgeSubtree, restoreSubtree } from "../lib/page-tree";
-import { plainTextToDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
+import { normalizeTipTapDoc, plainTextToDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 
 export const extraRoutes = new Hono<AppEnv>();
@@ -329,7 +329,16 @@ extraRoutes.post("/api/pages/:id/revisions/:revId/restore", async (c) => {
     .update(schema.pages)
     .set({ title: rev.title, updatedAt: new Date() })
     .where(eq(schema.pages.id, id));
-  const update = tiptapJsonToUpdate(plainTextToDoc(rev.bodyText));
+  let update: Uint8Array | null = null;
+  if (rev.bodyJson) {
+    try {
+      const doc = normalizeTipTapDoc(JSON.parse(rev.bodyJson) as unknown);
+      if (doc) update = tiptapJsonToUpdate(doc);
+    } catch {
+      update = null;
+    }
+  }
+  if (!update) update = tiptapJsonToUpdate(plainTextToDoc(rev.bodyText));
   const stub = c.env.Y_DURABLE_OBJECTS.get(c.env.Y_DURABLE_OBJECTS.idFromName(id));
   await stub.replaceYjs(update);
   await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();

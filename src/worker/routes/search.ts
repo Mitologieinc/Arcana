@@ -62,7 +62,7 @@ searchRoutes.post("/api/pages/:id/index", async (c) => {
   const id = c.req.param("id");
   const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
-  const body = await c.req.json<{ title?: string; bodyText?: string }>();
+  const body = await c.req.json<{ title?: string; bodyText?: string; bodyJson?: unknown }>();
   await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
   await c.env.DB.prepare(
     "INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)",
@@ -78,12 +78,19 @@ searchRoutes.post("/api/pages/:id/index", async (c) => {
     .limit(1);
   const nextBody = body.bodyText ?? "";
   const nextTitle = body.title ?? "";
-  if (!last[0] || last[0].bodyText !== nextBody || last[0].title !== nextTitle) {
+  const nextJson = body.bodyJson !== undefined ? JSON.stringify(body.bodyJson) : (last[0]?.bodyJson ?? null);
+  if (
+    !last[0] ||
+    last[0].bodyText !== nextBody ||
+    last[0].title !== nextTitle ||
+    last[0].bodyJson !== nextJson
+  ) {
     await db.insert(schema.pageRevisions).values({
       id: crypto.randomUUID(),
       pageId: id,
       title: nextTitle,
       bodyText: nextBody,
+      bodyJson: nextJson,
       createdBy: user.id,
       createdAt: new Date(),
     });
