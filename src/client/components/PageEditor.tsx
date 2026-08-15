@@ -76,6 +76,8 @@ export function PageEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [followPeer, setFollowPeer] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<"connected" | "connecting" | "disconnected">("connected");
+  const prevSync = useRef(syncStatus);
   const [customTemplates, setCustomTemplates] = useState<SavedTemplate[]>([]);
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [saveTplName, setSaveTplName] = useState("");
@@ -104,6 +106,8 @@ export function PageEditor({
   useEffect(() => {
     setPeekId(null);
     setEditorEmpty(true);
+    prevSync.current = "connected";
+    setSyncStatus("connected");
     reloadPage().catch(console.error);
     api<{ pages: Page[] }>("/api/favorites")
       .then((d) => setFavorited(d.pages.some((p) => p.id === pageId)))
@@ -126,6 +130,13 @@ export function PageEditor({
       titleRef.current?.select();
     }
   }, [pageId, location.state]);
+
+  useEffect(() => {
+    if (prevSync.current !== "connected" && syncStatus === "connected") {
+      toast("再接続しました");
+    }
+    prevSync.current = syncStatus;
+  }, [syncStatus]);
 
   useEffect(() => {
     if (!moreOpen && !iconOpen && !coverOpen) return;
@@ -254,10 +265,17 @@ export function PageEditor({
     if (!editable || !page) return;
     const next = { ...parseProps(page.properties), [id]: value };
     setPage({ ...page, properties: JSON.stringify(next) });
-    await api(`/api/pages/${pageId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ properties: { [id]: value } }),
-    });
+    try {
+      await api(`/api/pages/${pageId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ properties: { [id]: value }, ifUpdatedAt: page.updatedAt }),
+      });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "更新できませんでした");
+      await reloadPage().catch(() => undefined);
+      await onPagesChanged();
+      return;
+    }
     await onPagesChanged();
   }
 
@@ -484,6 +502,11 @@ export function PageEditor({
           )}
         </div>
       </header>
+      {syncStatus !== "connected" && (
+        <div className="border-b border-line bg-canvas px-24 py-2 text-[13px] text-muted max-[860px]:px-6 max-[720px]:px-4">
+          {syncStatus === "connecting" ? "再接続中…" : "オフライン（変更は未同期）"}
+        </div>
+      )}
       {!editable && page.type !== "canvas" && (
         <div className="border-b border-line bg-canvas px-24 py-2 text-[13px] text-muted max-[860px]:px-6 max-[720px]:px-4">
           閲覧のみです。本文は編集できません
@@ -567,6 +590,7 @@ export function PageEditor({
             followClientId={followPeer}
             onFollowEnd={() => setFollowPeer(null)}
             onPresence={setPresence}
+            onSyncStatus={setSyncStatus}
           />
         </div>
       )}
@@ -804,6 +828,7 @@ export function PageEditor({
               onPagesChanged={onPagesChanged}
               onPresence={setPresence}
               onEmptyChange={setEditorEmpty}
+              onSyncStatus={setSyncStatus}
             />
           </>
         )}

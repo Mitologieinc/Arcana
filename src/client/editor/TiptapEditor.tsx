@@ -35,7 +35,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useIsMobile } from "../lib/media";
-import { api } from "../lib/api";
+import { indexPage } from "../lib/index-page";
 import type { User } from "../lib/types";
 import { EditorChromeContext } from "./chrome";
 import { DatabaseEmbed } from "./databaseEmbed";
@@ -93,6 +93,7 @@ export const TiptapEditor = forwardRef<
     onPagesChanged?: () => Promise<unknown>;
     onPresence?: (users: PresenceUser[]) => void;
     onEmptyChange?: (empty: boolean) => void;
+    onSyncStatus?: (status: "connected" | "connecting" | "disconnected") => void;
   }
 >(function TiptapEditor(
   {
@@ -106,6 +107,7 @@ export const TiptapEditor = forwardRef<
     onPagesChanged,
     onPresence,
     onEmptyChange,
+    onSyncStatus,
   },
   ref,
 ) {
@@ -159,6 +161,21 @@ export const TiptapEditor = forwardRef<
       onPresence([]);
     };
   }, [collab, onPresence]);
+
+  useEffect(() => {
+    if (!onSyncStatus) return;
+    const report = (ev: { status: string }) => {
+      const status =
+        ev.status === "connected" || ev.status === "connecting" ? ev.status : "disconnected";
+      onSyncStatus(status);
+    };
+    collab.provider.on("status", report);
+    report({ status: collab.provider.wsconnected ? "connected" : "disconnected" });
+    return () => {
+      collab.provider.off("status", report);
+      onSyncStatus("connected");
+    };
+  }, [collab, onSyncStatus]);
 
   const editor = useEditor({
     immediatelyRender: true,
@@ -300,9 +317,10 @@ export const TiptapEditor = forwardRef<
       if (!editable) return;
       if (indexTimer.current) window.clearTimeout(indexTimer.current);
       indexTimer.current = window.setTimeout(() => {
-        void api(`/api/pages/${pageId}/index`, {
-          method: "POST",
-          body: JSON.stringify({ title: titleRef.current, bodyText: ed.getText() }),
+        void indexPage(pageId, {
+          title: titleRef.current,
+          bodyText: ed.getText(),
+          bodyJson: ed.getJSON(),
         });
       }, 1500);
     },
