@@ -309,10 +309,18 @@ button:disabled {
 }
 
 .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--color-ink);
   border: 1px solid transparent;
   border-radius: 6px;
+}
+
+.btn-ghost svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .btn-ghost:hover:not(:disabled) {
