@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import {
@@ -175,12 +175,72 @@ function boundsOf(n: JamNode) {
 }
 
 function connectorEnds(n: JamNode, get: (id: string) => JamNode | undefined) {
+  const curve = connectorCurve(n, get);
+  return curve ? { p1: curve.p1, p2: curve.p2 } : null;
+}
+
+function connectorCurve(n: JamNode, get: (id: string) => JamNode | undefined) {
   const a = n.fromId ? get(n.fromId) : undefined;
   const b = n.toId ? get(n.toId) : undefined;
   if (!a || !b) return null;
+  return curveBetween(a, b);
+}
+
+function curveBetween(a: JamNode, b: JamNode) {
   const ac = center(a);
   const bc = center(b);
-  return { p1: edgeToward(a, bc.x, bc.y), p2: edgeToward(b, ac.x, ac.y) };
+  const p1 = edgeToward(a, bc.x, bc.y);
+  const p2 = edgeToward(b, ac.x, ac.y);
+  const o1x = p1.x - ac.x;
+  const o1y = p1.y - ac.y;
+  const o2x = p2.x - bc.x;
+  const o2y = p2.y - bc.y;
+  const l1 = Math.hypot(o1x, o1y) || 1;
+  const l2 = Math.hypot(o2x, o2y) || 1;
+  const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const k = Math.min(96, Math.max(28, dist * 0.42));
+  const c1 = { x: p1.x + (o1x / l1) * k, y: p1.y + (o1y / l1) * k };
+  const c2 = { x: p2.x + (o2x / l2) * k, y: p2.y + (o2y / l2) * k };
+  const ang = Math.atan2(p2.y - c2.y, p2.x - c2.x);
+  return {
+    p1,
+    p2,
+    c1,
+    c2,
+    ang,
+    d: `M${p1.x} ${p1.y} C${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`,
+  };
+}
+
+function curveToPoint(from: JamNode, hover: Pt) {
+  const ac = center(from);
+  const p1 = edgeToward(from, hover.x, hover.y);
+  const o1x = p1.x - ac.x;
+  const o1y = p1.y - ac.y;
+  const l1 = Math.hypot(o1x, o1y) || 1;
+  const dist = Math.hypot(hover.x - p1.x, hover.y - p1.y);
+  const k = Math.min(96, Math.max(28, dist * 0.42));
+  const c1 = { x: p1.x + (o1x / l1) * k, y: p1.y + (o1y / l1) * k };
+  const c2 = { x: hover.x - (hover.x - p1.x) * 0.28, y: hover.y - (hover.y - p1.y) * 0.28 };
+  return `M${p1.x} ${p1.y} C${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${hover.x} ${hover.y}`;
+}
+
+function bezierAt(p1: Pt, c1: Pt, c2: Pt, p2: Pt, t: number) {
+  const u = 1 - t;
+  return {
+    x: u * u * u * p1.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p2.x,
+    y: u * u * u * p1.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p2.y,
+  };
+}
+
+function hitCurve(p1: Pt, c1: Pt, c2: Pt, p2: Pt, x: number, y: number, pad: number) {
+  let prev = p1;
+  for (let i = 1; i <= 14; i++) {
+    const pt = bezierAt(p1, c1, c2, p2, i / 14);
+    if (distToSeg(x, y, prev.x, prev.y, pt.x, pt.y) <= pad) return true;
+    prev = pt;
+  }
+  return false;
 }
 
 function hitStroke(n: JamNode, x: number, y: number, pad: number, get: (id: string) => JamNode | undefined) {
@@ -194,9 +254,9 @@ function hitStroke(n: JamNode, x: number, y: number, pad: number, get: (id: stri
     return false;
   }
   if (n.kind === "line") {
-    const ends = connectorEnds(n, get);
-    if (!ends) return false;
-    return distToSeg(x, y, ends.p1.x, ends.p1.y, ends.p2.x, ends.p2.y) <= pad;
+    const curve = connectorCurve(n, get);
+    if (!curve) return false;
+    return hitCurve(curve.p1, curve.c1, curve.c2, curve.p2, x, y, pad);
   }
   return false;
 }
@@ -380,6 +440,8 @@ export function CanvasEditor({
   const [panning, setPanning] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+  const [penColor, setPenColor] = useState(INK);
+  const [menu, setMenu] = useState<null | { x: number; y: number; world: Pt }>(null);
   const pointerRef = useRef({ x: 0, y: 0 });
 
   const collab = useMemo(() => {
@@ -801,7 +863,7 @@ export function CanvasEditor({
   }, []);
 
   function overUi(t: EventTarget | null) {
-    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float"));
+    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float, .jam-menu"));
   }
 
   function ghostAt(tool: Tool, w: { x: number; y: number }) {
@@ -812,7 +874,9 @@ export function CanvasEditor({
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (menu) setMenu(null);
     if (overUi(e.target)) return;
+    if (e.button === 2) return;
     if (e.button === 1 || activeTool === "hand") {
       drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -896,7 +960,7 @@ export function CanvasEditor({
         h: 1,
         text: "",
         fill: "transparent",
-        stroke: INK,
+        stroke: penColor,
         points: [{ x: w.x, y: w.y }],
       };
       put(n);
@@ -907,7 +971,30 @@ export function CanvasEditor({
     }
     if (activeTool === "line") {
       const t = topAt(w.x, w.y);
-      if (!t || t.kind === "pen" || t.kind === "line") return;
+      if (lineFrom && t && t.id !== lineFrom && t.kind !== "pen" && t.kind !== "line") {
+        put({
+          id: nid(),
+          kind: "line",
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+          text: "",
+          fill: "transparent",
+          stroke: LINE,
+          fromId: lineFrom,
+          toId: t.id,
+        });
+        setLineFrom(null);
+        setLineHover(null);
+        setSelected([t.id]);
+        return;
+      }
+      if (!t || t.kind === "pen" || t.kind === "line") {
+        setLineFrom(null);
+        setLineHover(null);
+        return;
+      }
       setLineFrom(t.id);
       setLineHover(w);
       setSelected([t.id]);
@@ -959,6 +1046,24 @@ export function CanvasEditor({
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
+    if (activeTool === "select" && e.detail >= 2) {
+      const g = ghostAt("text", w)!;
+      const n: JamNode = {
+        id: nid(),
+        kind: "text",
+        x: g.x,
+        y: g.y,
+        w: g.w,
+        h: g.h,
+        text: "",
+        fill: "transparent",
+        stroke: "transparent",
+        fontSize: 28,
+      };
+      put(n);
+      startEdit(n.id);
+      return;
+    }
     setSelected([]);
     setLineFrom(null);
     drag.current = { mode: "marquee", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
@@ -975,6 +1080,7 @@ export function CanvasEditor({
     if (!d) {
       const hit = overUi(e.target) ? null : topAt(w.x, w.y);
       setHoverId(hit?.id ?? null);
+      if (lineFrom && activeTool === "line" && !overUi(e.target)) setLineHover(w);
       if (editable && !overUi(e.target)) paintGhost(ghostAt(activeTool, w));
       else paintGhost(null);
       return;
@@ -1150,6 +1256,7 @@ export function CanvasEditor({
         spawnBeside(src, d.side, moved, moved ? { x: w.x - src.w / 2, y: w.y - src.h / 2 } : undefined);
       }
     }
+    let keepLine = false;
     if (d?.mode === "line" && d.id) {
       const t = topAt(w.x, w.y);
       if (t && t.id !== d.id && t.kind !== "pen" && t.kind !== "line") {
@@ -1166,6 +1273,9 @@ export function CanvasEditor({
           fromId: d.id,
           toId: t.id,
         });
+      } else if (t && t.id === d.id && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 8) {
+        keepLine = true;
+        setLineFrom(d.id);
       }
     }
     if (d?.mode === "move" && d.editOnUp && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
@@ -1175,11 +1285,27 @@ export function CanvasEditor({
     drag.current = null;
     pendingMove.current = null;
     setMarquee(null);
-    setLineFrom(null);
-    setLineHover(null);
+    if (!keepLine) {
+      setLineFrom(null);
+      setLineHover(null);
+    }
     setGuides({ v: [], h: [] });
     setPanning(false);
     setBusy(false);
+  }
+
+  function onContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    if (!editable || overUi(e.target)) return;
+    const w = worldFromClient(e.clientX, e.clientY);
+    const t = topAt(w.x, w.y);
+    if (t) {
+      if (!selected.includes(t.id)) setSelected([t.id]);
+    } else {
+      setSelected([]);
+    }
+    const r = boardRef.current?.getBoundingClientRect();
+    setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), world: w });
   }
 
   useEffect(() => {
@@ -1187,6 +1313,10 @@ export function CanvasEditor({
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if (e.key === "Escape") {
         e.preventDefault();
+        if (menu) {
+          setMenu(null);
+          return;
+        }
         if (editing || typing) {
           setEditing(null);
           if (e.target instanceof HTMLElement) e.target.blur();
@@ -1319,7 +1449,7 @@ export function CanvasEditor({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [editing, editable, selected, collab]);
+  }, [editing, editable, selected, collab, menu]);
 
   function animateCam(to: { x: number; y: number; z: number }) {
     stopCamAnim();
@@ -1462,9 +1592,10 @@ export function CanvasEditor({
   const lineMid =
     solo?.kind === "line"
       ? (() => {
-          const ends = connectorEnds(solo, (id) => byId.get(id));
-          if (!ends) return null;
-          return { l: ((ends.p1.x + ends.p2.x) / 2) * cam.z + cam.x, t: ((ends.p1.y + ends.p2.y) / 2) * cam.z + cam.y };
+          const curve = connectorCurve(solo, (id) => byId.get(id));
+          if (!curve) return null;
+          const mid = bezierAt(curve.p1, curve.c1, curve.c2, curve.p2, 0.5);
+          return { l: mid.x * cam.z + cam.x, t: mid.y * cam.z + cam.y };
         })()
       : null;
   const multiBox =
@@ -1492,6 +1623,7 @@ export function CanvasEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onContextMenu={onContextMenu}
         onPointerLeave={() => {
           paintGhost(null);
           setHoverId(null);
@@ -1539,16 +1671,15 @@ export function CanvasEditor({
               );
             }
             if (n.kind === "line") {
-              const ends = connectorEnds(n, (id) => byId.get(id));
-              if (!ends) return null;
-              const { p1, p2 } = ends;
-              const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+              const curve = connectorCurve(n, (id) => byId.get(id));
+              if (!curve) return null;
+              const { p2, ang, d } = curve;
               const ah = 10;
               const stroke = n.stroke || LINE;
               return (
                 <g key={n.id}>
-                  {(on || hover) && <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={SELECT} strokeWidth={on ? 7 : 5} strokeLinecap="round" opacity={on ? 1 : 0.45} />}
-                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={2} />
+                  {(on || hover) && <path d={d} fill="none" stroke={SELECT} strokeWidth={on ? 7 : 5} strokeLinecap="round" opacity={on ? 1 : 0.45} />}
+                  <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" />
                   <polygon
                     fill={stroke}
                     points={`${p2.x},${p2.y} ${p2.x - ah * Math.cos(ang - 0.4)},${p2.y - ah * Math.sin(ang - 0.4)} ${p2.x - ah * Math.cos(ang + 0.4)},${p2.y - ah * Math.sin(ang + 0.4)}`}
@@ -1561,8 +1692,7 @@ export function CanvasEditor({
           {lineFrom && lineHover && (() => {
             const a = byId.get(lineFrom);
             if (!a) return null;
-            const p1 = edgeToward(a, lineHover.x, lineHover.y);
-            return <line x1={p1.x} y1={p1.y} x2={lineHover.x} y2={lineHover.y} stroke={LINE} strokeWidth={2} strokeDasharray="6 4" />;
+            return <path d={curveToPoint(a, lineHover)} fill="none" stroke={LINE} strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" />;
           })()}
         </svg>
         <div ref={ghostRef} className="jam-ghost jam-sticky" hidden />
@@ -1640,7 +1770,7 @@ export function CanvasEditor({
       {empty && (
         <div className="jam-empty">
           <p>付箋を置いて、線でつなぐ</p>
-          <p>S 付箋　T 文字　R 図形　L コネクタ　Shift+1 全体</p>
+          <p>ダブルクリックで文字　S 付箋　L コネクタ</p>
         </div>
       )}
       {box && solo && activeTool === "select" && editable && !busy && (
@@ -1739,6 +1869,9 @@ export function CanvasEditor({
           <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
         </div>
       )}
+      {multiBox && activeTool === "select" && !busy && (
+        <div className="jam-selbox" style={{ left: multiBox.l - 4, top: multiBox.t - 4, width: multiBox.w + 8, height: multiBox.h + 8 }} />
+      )}
       {multiBox && activeTool === "select" && editable && !busy && !editing && (
         <div className="jam-float jam-align" style={{ left: multiBox.l + multiBox.w / 2, top: multiBox.t }} onPointerDown={(e) => e.stopPropagation()}>
           <button type="button" title="左揃え" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("left"); }}><AlignLeft size={14} /></button>
@@ -1767,6 +1900,81 @@ export function CanvasEditor({
               ))}
             </>
           )}
+        </div>
+      )}
+      {menu && (
+        <div
+          className="jam-menu"
+          style={{ left: Math.min(menu.x, (boardRef.current?.clientWidth ?? 320) - 168), top: Math.min(menu.y, (boardRef.current?.clientHeight ?? 240) - 220) }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              copySelected();
+              setMenu(null);
+            }}
+          >
+            コピー
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              pointerRef.current = menu.world;
+              void pasteClipboard();
+              setMenu(null);
+            }}
+          >
+            貼り付け
+          </button>
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              if (selected.length) setSelected(duplicateIds(selected));
+              setMenu(null);
+            }}
+          >
+            複製
+          </button>
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              if (selected.length) removeIds(selected);
+              setMenu(null);
+            }}
+          >
+            削除
+          </button>
+          <span className="jam-menu-sep" />
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              if (selected.length) restack(selected, "front");
+              setMenu(null);
+            }}
+          >
+            最前面へ
+          </button>
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              if (selected.length) restack(selected, "back");
+              setMenu(null);
+            }}
+          >
+            最背面へ
+          </button>
         </div>
       )}
       </div>
@@ -1806,7 +2014,14 @@ export function CanvasEditor({
           )}
         </div>
         <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} onClick={() => { setTool("line"); setLineFrom(null); }} />
-        <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => setTool("pen")} />
+        <div className="jam-fly">
+          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => setTool("pen")} />
+          {tool === "pen" && (
+            <div className="jam-pop">
+              <StrokeSwatches value={penColor} onPick={setPenColor} />
+            </div>
+          )}
+        </div>
         <span className="jam-sep" />
         <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} onClick={() => setTool("text")} />
       </div>
