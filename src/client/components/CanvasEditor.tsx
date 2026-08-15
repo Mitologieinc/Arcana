@@ -401,6 +401,10 @@ export function CanvasEditor({
   const wheelRaf = useRef<number | null>(null);
   const wheelAcc = useRef({ x: 0, y: 0, factor: 1, sx: 0, sy: 0, zoom: false });
   const cursorBuf = useRef({ x: 0, y: 0 });
+  const remotes = useRef(new Map<string, { id: string; tx: number; ty: number; x: number; y: number }>());
+  const cursorEls = useRef(new Map<string, HTMLDivElement>());
+  const cursorRaf = useRef<number | null>(null);
+  const cursorLast = useRef(0);
   const drag = useRef<null | {
     mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape" | "resize" | "port";
     x: number;
@@ -432,7 +436,7 @@ export function CanvasEditor({
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [space, setSpace] = useState(false);
-  const [cursors, setCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+  const [peers, setPeers] = useState<{ id: string; name: string; color: string }[]>([]);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [lineHover, setLineHover] = useState<{ x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
@@ -507,11 +511,49 @@ export function CanvasEditor({
     }
   }
 
+  function paintCursors() {
+    const c = camRef.current;
+    remotes.current.forEach((r) => {
+      const el = cursorEls.current.get(r.id);
+      if (!el) return;
+      el.style.transform = `translate3d(${r.x * c.z + c.x}px, ${r.y * c.z + c.y}px, 0)`;
+    });
+  }
+
+  function tickCursors(now: number) {
+    const dt = Math.min(32, now - (cursorLast.current || now));
+    cursorLast.current = now;
+    const k = 1 - Math.exp(-dt / 72);
+    let moving = false;
+    remotes.current.forEach((r) => {
+      const dx = r.tx - r.x;
+      const dy = r.ty - r.y;
+      if (dx * dx + dy * dy < 0.04) {
+        r.x = r.tx;
+        r.y = r.ty;
+      } else {
+        r.x += dx * k;
+        r.y += dy * k;
+        moving = true;
+      }
+    });
+    paintCursors();
+    if (moving) cursorRaf.current = requestAnimationFrame(tickCursors);
+    else cursorRaf.current = null;
+  }
+
+  function startCursorTick() {
+    if (cursorRaf.current != null) return;
+    cursorLast.current = performance.now();
+    cursorRaf.current = requestAnimationFrame(tickCursors);
+  }
+
   function paintCam(c: { x: number; y: number; z: number }, commit = false) {
     camRef.current = c;
     if (worldRef.current) worldRef.current.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.z})`;
     if (dotsRef.current) paintGrid(dotsRef.current, c.x, c.y, c.z);
     if (zoomLabelRef.current) zoomLabelRef.current.textContent = `${Math.round(c.z * 100)}%`;
+    paintCursors();
     if (commit) {
       if (camSync.current) window.clearTimeout(camSync.current);
       setCam(c);
@@ -594,7 +636,7 @@ export function CanvasEditor({
     awareness.setLocalStateField("user", { name: user.name || "ゲスト", color: colorFor(user.id), id: user.id });
     const report = () => {
       const others: PresenceUser[] = [];
-      const next: { id: string; name: string; color: string; x: number; y: number }[] = [];
+      const next: { id: string; name: string; color: string }[] = [];
       awareness.getStates().forEach((state, clientId) => {
         if (clientId === awareness.clientID) return;
         const raw = state.user as { name?: string; color?: string; id?: string } | undefined;
@@ -607,14 +649,26 @@ export function CanvasEditor({
         });
         const p = state.jam as { x?: number; y?: number } | undefined;
         if (typeof p?.x === "number" && typeof p.y === "number") {
-          next.push({ id: String(clientId), name: raw.name, color: raw.color || "#37352f", x: p.x, y: p.y });
+          const id = String(clientId);
+          next.push({ id, name: raw.name, color: raw.color || "#37352f" });
+          const cur = remotes.current.get(id);
+          if (cur) {
+            cur.tx = p.x;
+            cur.ty = p.y;
+          } else {
+            remotes.current.set(id, { id, tx: p.x, ty: p.y, x: p.x, y: p.y });
+          }
         }
       });
+      for (const id of [...remotes.current.keys()]) {
+        if (!next.some((p) => p.id === id)) remotes.current.delete(id);
+      }
       onPresence?.(others);
-      setCursors((prev) => {
-        if (prev.length === next.length && prev.every((c, i) => c.id === next[i].id && c.x === next[i].x && c.y === next[i].y)) return prev;
+      setPeers((prev) => {
+        if (prev.length === next.length && prev.every((c, i) => c.id === next[i].id && c.name === next[i].name && c.color === next[i].color)) return prev;
         return next;
       });
+      startCursorTick();
     };
     awareness.on("change", report);
     collab.provider.on("status", report);
@@ -622,6 +676,8 @@ export function CanvasEditor({
     return () => {
       awareness.off("change", report);
       collab.provider.off("status", report);
+      if (cursorRaf.current != null) cancelAnimationFrame(cursorRaf.current);
+      cursorRaf.current = null;
     };
   }, [collab, user, onPresence]);
 
@@ -1627,6 +1683,7 @@ export function CanvasEditor({
         onPointerLeave={() => {
           paintGhost(null);
           setHoverId(null);
+          collab.provider.awareness.setLocalStateField("jam", null);
         }}
       >
       <div ref={dotsRef} className="jam-dots" />
@@ -1758,10 +1815,32 @@ export function CanvasEditor({
         )}
       </div>
 
-      {cursors.map((c) => (
-        <div key={c.id} className="jam-cursor" style={{ left: c.x * cam.z + cam.x, top: c.y * cam.z + cam.y, color: c.color }}>
-          <svg width="16" height="20" viewBox="0 0 16 20">
-            <path d="M1 1 L1 17 L5.5 13.2 L9.2 19.2 L11.4 18.1 L7.6 12.1 L14 12.1 Z" fill="currentColor" stroke="#fff" strokeWidth="1" />
+      {peers.map((c) => (
+        <div
+          key={c.id}
+          className="jam-cursor"
+          ref={(el) => {
+            if (el) {
+              cursorEls.current.set(c.id, el);
+              const r = remotes.current.get(c.id);
+              if (r) {
+                const cam = camRef.current;
+                el.style.transform = `translate3d(${r.x * cam.z + cam.x}px, ${r.y * cam.z + cam.y}px, 0)`;
+              }
+            } else {
+              cursorEls.current.delete(c.id);
+            }
+          }}
+          style={{ color: c.color }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+            <path
+              d="M5.2 2.8v16.6l4.7-4.5 3.4 7.6 2.7-1.2-3.4-7.5h6.8Z"
+              fill="currentColor"
+              stroke="#fff"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
           </svg>
           <span style={{ background: c.color }}>{c.name}</span>
         </div>
