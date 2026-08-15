@@ -37,6 +37,10 @@ type Props = {
   onChanged: () => Promise<unknown>;
 };
 
+function localIso(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function applyFilters(rows: Page[], schema: DbProperty[], filters: DbFilter[] | undefined) {
   if (!filters?.length) return rows;
   return rows.filter((row) => {
@@ -341,17 +345,31 @@ export function DatabaseView({
     void saveSchema(schema.map((p) => (p.id === id ? { ...p, name: next } : p)));
   }
 
-  async function addRow(groupValue?: string) {
+  async function addRow(init?: string | { groupValue?: string; date?: string; datePropId?: string }) {
+    const opts = typeof init === "string" ? { groupValue: init } : init ?? {};
     const properties: Record<string, unknown> = {};
     const groupId = view?.config.groupBy ?? "status";
-    if (groupValue) properties[groupId] = groupValue;
+    if (opts.groupValue) properties[groupId] = opts.groupValue;
+    const datePropId = opts.datePropId ?? schema.find((p) => p.type === "date")?.id;
+    if (opts.date && datePropId) properties[datePropId] = opts.date;
     const res = await api<{ page: Page }>("/api/pages", {
       method: "POST",
       body: JSON.stringify({ parentId: pageId, type: "page", title: "", properties }),
     });
     await onChanged();
-    if (isMobile) onOpenRow(res.page.id);
+    if (isMobile || view?.type === "calendar") onOpenRow(res.page.id);
     else setEditingTitleId(res.page.id);
+    return res.page;
+  }
+
+  async function addCalendarRow(iso?: string) {
+    let dateProp = schema.find((p) => p.type === "date");
+    if (!dateProp) {
+      dateProp = { id: crypto.randomUUID(), type: "date", name: "日付" };
+      await saveSchema([...schema, dateProp]);
+    }
+    const date = iso ?? localIso();
+    await addRow({ date, datePropId: dateProp.id });
   }
 
   async function updateRow(
@@ -619,7 +637,7 @@ export function DatabaseView({
         {editable && (
           <button
             className="btn btn-primary ml-1 h-9 shrink-0 px-3 text-[13px]"
-            onClick={() => void addRow()}
+            onClick={() => void (view.type === "calendar" ? addCalendarRow() : addRow())}
           >
             新規
           </button>
@@ -754,9 +772,20 @@ export function DatabaseView({
                       if (!cell || cell.dayRows.length === 0) return null;
                       return (
                         <li key={i} className="px-3 py-2.5">
-                          <p className="mb-1 text-[12px] font-medium text-muted">
-                            {calCursor.m + 1}/{cell.day}
-                          </p>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="text-[12px] font-medium text-muted">
+                              {calCursor.m + 1}/{cell.day}
+                            </p>
+                            {editable && (
+                              <button
+                                type="button"
+                                className="text-[12px] text-muted"
+                                onClick={() => void addCalendarRow(cell.iso)}
+                              >
+                                + 追加
+                              </button>
+                            )}
+                          </div>
                           {cell.dayRows.map((r) => (
                             <button
                               key={r.id}
@@ -769,6 +798,17 @@ export function DatabaseView({
                         </li>
                       );
                     })}
+                    {editable && (
+                      <li>
+                        <button
+                          type="button"
+                          className="flex h-11 w-full items-center justify-center text-[14px] text-muted active:bg-hover"
+                          onClick={() => void addCalendarRow()}
+                        >
+                          + 予定を追加
+                        </button>
+                      </li>
+                    )}
                   </ul>
                 ) : (
                 <div className="grid grid-cols-7 gap-px rounded-[8px] bg-line">
@@ -776,12 +816,33 @@ export function DatabaseView({
                     <div key={d} className="bg-white px-2 py-1 text-[11px] text-muted">{d}</div>
                   ))}
                   {cells.map((cell, i) => (
-                    <div key={i} className="min-h-24 bg-white p-1">
+                    <div
+                      key={i}
+                      className={`group/day min-h-24 bg-white p-1 ${editable && cell ? "cursor-pointer" : ""}`}
+                      onClick={() => {
+                        if (!editable || !cell) return;
+                        void addCalendarRow(cell.iso);
+                      }}
+                    >
                       {cell && (
                         <>
-                          <div className="text-[11px] text-muted">{cell.day}</div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-muted">{cell.day}</span>
+                            {editable && (
+                              <span className="flex h-4 w-4 items-center justify-center rounded text-muted opacity-0 group-hover/day:opacity-100">
+                                <Plus size={11} />
+                              </span>
+                            )}
+                          </div>
                           {cell.dayRows.map((r) => (
-                            <button key={r.id} className="mt-0.5 block w-full truncate rounded px-1 text-left text-[12px] hover:bg-hover" onClick={() => onOpenRow(r.id)}>
+                            <button
+                              key={r.id}
+                              className="mt-0.5 block w-full truncate rounded px-1 text-left text-[12px] hover:bg-hover"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenRow(r.id);
+                              }}
+                            >
                               {r.title || "無題"}
                             </button>
                           ))}
