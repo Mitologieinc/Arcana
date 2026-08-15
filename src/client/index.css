@@ -1527,6 +1527,11 @@ html[data-theme="dark"] .arcana-presence {
   cursor: grab;
 }
 
+.jam.is-grabbing .jam-stage,
+.jam.is-grabbing .jam-stage * {
+  cursor: grabbing;
+}
+
 .jam.is-place .jam-stage {
   cursor: none;
 }
@@ -1611,6 +1616,17 @@ html[data-theme="dark"] .arcana-presence {
 .jam-label.is-on {
   outline: 1.5px solid #0d99ff;
   outline-offset: 3px;
+}
+
+.jam-sticky.is-hover,
+.jam-shape.is-hover,
+.jam-label.is-hover {
+  outline: 1.5px solid rgba(13, 153, 255, 0.45);
+  outline-offset: 3px;
+}
+
+.jam-guides line {
+  stroke-width: 1;
 }
 
 .jam-sticky textarea,
@@ -1832,6 +1848,7 @@ html[data-theme="dark"] .jam-label textarea {
   position: absolute;
   z-index: 9;
   display: flex;
+  align-items: center;
   gap: 4px;
   transform: translate(-50%, calc(-100% - 12px));
   padding: 6px;
@@ -1839,6 +1856,38 @@ html[data-theme="dark"] .jam-label textarea {
   background: #fff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 20px rgba(0, 0, 0, 0.12);
   pointer-events: auto;
+}
+
+.jam-float-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: #e6e6e6;
+}
+
+.jam-align button,
+.jam-mini {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #1e1e1e;
+}
+
+.jam-align button:hover,
+.jam-mini:hover {
+  background: #f1f0ed;
+}
+
+.jam-mini-label {
+  min-width: 22px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .jam-zoom {
@@ -1863,6 +1912,22 @@ html[data-theme="dark"] .jam-label textarea {
   text-align: center;
 }
 
+.jam-zoom-pct {
+  min-width: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.jam-zoom-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: #e6e6e6;
+}
+
 .jam-zoom button {
   display: flex;
   width: 28px;
@@ -1875,7 +1940,8 @@ html[data-theme="dark"] .jam-label textarea {
   color: inherit;
 }
 
-.jam-zoom button:hover {
+.jam-zoom button:hover,
+.jam-zoom-pct:hover {
   background: #f1f0ed;
 }
 
@@ -1980,7 +2046,21 @@ html[data-theme="dark"] .jam-pop > button.is-on {
   color: #1e1e1e;
 }
 
-html[data-theme="dark"] .jam-sep {
+html[data-theme="dark"] .jam-sep,
+html[data-theme="dark"] .jam-float-sep,
+html[data-theme="dark"] .jam-zoom-sep {
+  background: #3a3a37;
+}
+
+html[data-theme="dark"] .jam-align button,
+html[data-theme="dark"] .jam-mini,
+html[data-theme="dark"] .jam-mini-label {
+  color: #e8e6e3;
+}
+
+html[data-theme="dark"] .jam-align button:hover,
+html[data-theme="dark"] .jam-mini:hover,
+html[data-theme="dark"] .jam-zoom-pct:hover {
   background: #3a3a37;
 }
 

@@ -2,6 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import {
+  AlignCenter,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignLeft,
+  AlignRight,
+  AlignStartVertical,
   Circle,
   Diamond,
   Hand,
@@ -9,10 +15,13 @@ import {
   MousePointer2,
   Pencil,
   Plus,
+  Redo2,
+  Scan,
   Spline,
   Square,
   StickyNote,
   Type,
+  Undo2,
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
@@ -52,7 +61,10 @@ const LINE = "#b3b3b3";
 const SHAPE_STROKE = "#b3b3b3";
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
 const STROKE_COLORS = [INK, "#5c5c5c", LINE, "#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#ffffff"];
+const SHAPE_FILLS = ["#ffffff", "#FFE299", "#FFB8A8", "#D3BDFF", "#A8DAFF", "#B3EFBD", "#E6E6E6"];
 const SELECT = "#0d99ff";
+const GUIDE = "#f24822";
+const SNAP = 8;
 
 type Pt = { x: number; y: number };
 
@@ -171,6 +183,66 @@ function shiftNode(n: JamNode, dx: number, dy: number): JamNode {
   return { ...n, x: n.x + dx, y: n.y + dy };
 }
 
+type Box = { x: number; y: number; w: number; h: number };
+
+function unionBoxes(boxes: Box[]) {
+  if (!boxes.length) return null;
+  let minX = boxes[0].x;
+  let minY = boxes[0].y;
+  let maxX = boxes[0].x + boxes[0].w;
+  let maxY = boxes[0].y + boxes[0].h;
+  for (const b of boxes) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function snapDelta(moving: Box[], others: Box[], dx: number, dy: number, threshold: number) {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const o of others) {
+    xs.push(o.x, o.x + o.w / 2, o.x + o.w);
+    ys.push(o.y, o.y + o.h / 2, o.y + o.h);
+  }
+  const mx = moving.flatMap((m) => [m.x + dx, m.x + m.w / 2 + dx, m.x + m.w + dx]);
+  const my = moving.flatMap((m) => [m.y + dy, m.y + m.h / 2 + dy, m.y + m.h + dy]);
+  let bestX = threshold + 1;
+  let adjX = 0;
+  let v: number[] = [];
+  for (const a of mx) {
+    for (const b of xs) {
+      const d = Math.abs(a - b);
+      if (d < bestX) {
+        bestX = d;
+        adjX = b - a;
+        v = [b];
+      }
+    }
+  }
+  let bestY = threshold + 1;
+  let adjY = 0;
+  let h: number[] = [];
+  for (const a of my) {
+    for (const b of ys) {
+      const d = Math.abs(a - b);
+      if (d < bestY) {
+        bestY = d;
+        adjY = b - a;
+        h = [b];
+      }
+    }
+  }
+  return {
+    dx: dx + (bestX <= threshold ? adjX : 0),
+    dy: dy + (bestY <= threshold ? adjY : 0),
+    v: bestX <= threshold ? v : [],
+    h: bestY <= threshold ? h : [],
+  };
+}
+
 function center(n: JamNode) {
   return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
 }
@@ -271,6 +343,10 @@ export function CanvasEditor({
   const [lineHover, setLineHover] = useState<{ x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
   const [busy, setBusy] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+  const pointerRef = useRef({ x: 0, y: 0 });
 
   const collab = useMemo(() => {
     const doc = new Y.Doc();
@@ -562,10 +638,15 @@ export function CanvasEditor({
       /* in-memory */
     }
     if (!items.length) return;
-    const n = CLIP.nodes === items ? CLIP.n : 1;
-    insertNodes(items, 24 * n, 24 * n);
+    const boxes = items.filter((n) => n.kind !== "line").map(boundsOf);
+    const uni = unionBoxes(boxes);
+    if (uni) {
+      insertNodes(items, pointerRef.current.x - (uni.x + uni.w / 2), pointerRef.current.y - (uni.y + uni.h / 2));
+    } else {
+      insertNodes(items, 24, 24);
+    }
     CLIP.nodes = items;
-    CLIP.n = n + 1;
+    CLIP.n = 1;
   }
 
   function spawnBeside(src: JamNode, side: Side, withLine: boolean, at?: { x: number; y: number }) {
@@ -689,7 +770,7 @@ export function CanvasEditor({
   }, []);
 
   function overUi(t: EventTarget | null) {
-    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title"));
+    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float"));
   }
 
   function ghostAt(tool: Tool, w: { x: number; y: number }) {
@@ -705,6 +786,7 @@ export function CanvasEditor({
       drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
       paintGhost(null);
+      setPanning(true);
       setBusy(true);
       return;
     }
@@ -807,9 +889,15 @@ export function CanvasEditor({
     const t = topAt(w.x, w.y);
     if (t) {
       const already = !e.shiftKey && selected.length === 1 && selected[0] === t.id;
-      const ids = e.shiftKey || selected.includes(t.id) ? Array.from(new Set([...selected, t.id])) : [t.id];
+      const ids = e.shiftKey
+        ? selected.includes(t.id)
+          ? selected.filter((id) => id !== t.id)
+          : [...selected, t.id]
+        : selected.includes(t.id)
+          ? selected
+          : [t.id];
       setSelected(ids);
-      if (t.kind === "line") return;
+      if (e.shiftKey || t.kind === "line") return;
       if (e.detail >= 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
         startEdit(t.id);
         return;
@@ -850,23 +938,50 @@ export function CanvasEditor({
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const w = worldFromClient(e.clientX, e.clientY);
+    pointerRef.current = w;
     sendCursor(w);
     const d = drag.current;
-    if (!d && editable && !overUi(e.target)) paintGhost(ghostAt(activeTool, w));
-    else if (!d) paintGhost(null);
-    if (!d) return;
+    if (!d) {
+      const hit = overUi(e.target) ? null : topAt(w.x, w.y);
+      setHoverId(hit?.id ?? null);
+      if (editable && !overUi(e.target)) paintGhost(ghostAt(activeTool, w));
+      else paintGhost(null);
+      return;
+    }
+    setHoverId(null);
     if (d.mode === "pan") {
       stopCamAnim();
       paintCam({ x: d.cx + (e.clientX - d.x), y: d.cy + (e.clientY - d.y), z: camRef.current.z });
       return;
     }
     if (d.mode === "move" && d.ids && d.origin) {
-      pendingMove.current = { ids: d.ids, origin: d.origin, dx: w.x - d.x, dy: w.y - d.y };
+      let dx = w.x - d.x;
+      let dy = w.y - d.y;
+      if (e.shiftKey) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+      pendingMove.current = { ids: d.ids, origin: d.origin, dx, dy };
       if (moveRaf.current == null) {
         moveRaf.current = requestAnimationFrame(() => {
           moveRaf.current = null;
           const p = pendingMove.current;
           if (!p) return;
+          const movingIds = new Set(p.ids);
+          const moving: Box[] = [];
+          const others: Box[] = [];
+          for (const n of nodesRef.current) {
+            if (n.kind === "line") continue;
+            const o = p.origin[n.id];
+            const b = o ? { x: o.x, y: o.y, w: n.w, h: n.h } : boundsOf(n);
+            if (o && n.kind === "pen" && o.points) Object.assign(b, penBounds(o.points));
+            if (movingIds.has(n.id) && o) moving.push(b);
+            else if (!movingIds.has(n.id)) others.push(boundsOf(n));
+          }
+          const snapped = others.length ? snapDelta(moving, others, p.dx, p.dy, SNAP / camRef.current.z) : { dx: p.dx, dy: p.dy, v: [] as number[], h: [] as number[] };
+          p.dx = snapped.dx;
+          p.dy = snapped.dy;
+          setGuides({ v: snapped.v, h: snapped.h });
           nodesRef.current = nodesRef.current.map((n) => {
             const o = p.origin[n.id];
             if (!o) return n;
@@ -881,7 +996,17 @@ export function CanvasEditor({
       return;
     }
     if (d.mode === "shape" && d.id) {
-      patch(d.id, { x: Math.min(d.x, w.x), y: Math.min(d.y, w.y), w: Math.max(1, Math.abs(w.x - d.x)), h: Math.max(1, Math.abs(w.y - d.y)) }, false);
+      let x = Math.min(d.x, w.x);
+      let y = Math.min(d.y, w.y);
+      let ww = Math.max(1, Math.abs(w.x - d.x));
+      let hh = Math.max(1, Math.abs(w.y - d.y));
+      if (e.shiftKey) {
+        const s = Math.max(ww, hh);
+        ww = hh = s;
+        x = w.x < d.x ? d.x - s : d.x;
+        y = w.y < d.y ? d.y - s : d.y;
+      }
+      patch(d.id, { x, y, w: ww, h: hh }, false);
       return;
     }
     if (d.mode === "resize" && d.id && d.handle) {
@@ -890,8 +1015,13 @@ export function CanvasEditor({
       const ow = d.ow ?? 160;
       const oh = d.oh ?? 160;
       if (d.opoints && d.ox != null && d.oy != null) {
-        const nw = d.handle === "s" ? ow : Math.max(8, ow + dx);
-        const nh = d.handle === "e" ? oh : Math.max(8, oh + dy);
+        let nw = d.handle === "s" ? ow : Math.max(8, ow + dx);
+        let nh = d.handle === "e" ? oh : Math.max(8, oh + dy);
+        if (e.shiftKey && d.handle === "se") {
+          const s = Math.max(nw / ow, nh / oh);
+          nw = Math.max(8, ow * s);
+          nh = Math.max(8, oh * s);
+        }
         const sx = ow < 1 ? 1 : nw / ow;
         const sy = oh < 1 ? 1 : nh / oh;
         const points = d.opoints.map((p) => ({
@@ -901,8 +1031,14 @@ export function CanvasEditor({
         patch(d.id, { ...penBounds(points), points }, false);
         return;
       }
-      if (d.handle === "se") patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) }, false);
-      else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) }, false);
+      if (d.handle === "se") {
+        if (e.shiftKey) {
+          const s = Math.max((ow + dx) / ow, (oh + dy) / oh);
+          patch(d.id, { w: Math.max(80, ow * s), h: Math.max(80, oh * s) }, false);
+        } else {
+          patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) }, false);
+        }
+      } else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) }, false);
       else patch(d.id, { h: Math.max(80, oh + dy) }, false);
       return;
     }
@@ -943,8 +1079,8 @@ export function CanvasEditor({
       setSelected(hits);
     }
     if (d?.mode === "move" && d.ids && d.origin) {
-      const dx = w.x - d.x;
-      const dy = w.y - d.y;
+      const dx = pendingMove.current?.dx ?? w.x - d.x;
+      const dy = pendingMove.current?.dy ?? w.y - d.y;
       collab.doc.transact(() => {
         for (const id of d.ids!) {
           const cur = collab.map.get(id);
@@ -1006,9 +1142,12 @@ export function CanvasEditor({
       if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
     }
     drag.current = null;
+    pendingMove.current = null;
     setMarquee(null);
     setLineFrom(null);
     setLineHover(null);
+    setGuides({ v: [], h: [] });
+    setPanning(false);
     setBusy(false);
   }
 
@@ -1042,6 +1181,44 @@ export function CanvasEditor({
         return;
       }
       if (editing || typing) return;
+      if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+" || e.code === "Equal")) {
+        e.preventDefault();
+        zoomBy(1.25);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "-" || e.code === "Minus")) {
+        e.preventDefault();
+        zoomBy(0.8);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        zoomToLevel(1);
+        return;
+      }
+      if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === "Digit1") {
+        e.preventDefault();
+        fitContent();
+        return;
+      }
+      if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === "Digit2" && selected.length) {
+        e.preventDefault();
+        fitContent(selected);
+        return;
+      }
+      if (e.key === "Enter" && selected.length === 1) {
+        const n = nodesRef.current.find((x) => x.id === selected[0]);
+        if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) {
+          e.preventDefault();
+          startEdit(n.id);
+          return;
+        }
+      }
+      if ((e.key === "]" || e.key === "[") && selected.length) {
+        e.preventDefault();
+        restack(selected, e.metaKey || e.ctrlKey ? (e.key === "]" ? "front" : "back") : e.key === "]" ? "forward" : "backward");
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) collab.undo.redo();
@@ -1113,25 +1290,131 @@ export function CanvasEditor({
     };
   }, [editing, editable, selected, collab]);
 
-  function zoomBy(factor: number) {
+  function animateCam(to: { x: number; y: number; z: number }) {
     stopCamAnim();
-    const el = boardRef.current;
     const from = { ...camRef.current };
+    const t0 = performance.now();
+    const dur = 160;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const ease = 1 - (1 - t) ** 3;
+      paintCam(
+        {
+          x: from.x + (to.x - from.x) * ease,
+          y: from.y + (to.y - from.y) * ease,
+          z: from.z + (to.z - from.z) * ease,
+        },
+        t >= 1,
+      );
+      if (t < 1) camAnim.current = requestAnimationFrame(tick);
+      else camAnim.current = null;
+    };
+    camAnim.current = requestAnimationFrame(tick);
+  }
+
+  function zoomBy(factor: number) {
+    const el = boardRef.current;
+    const from = camRef.current;
     const r = el?.getBoundingClientRect();
     const sx = r ? r.width / 2 : 0;
     const sy = r ? r.height / 2 : 0;
     const targetZ = clampZ(from.z * factor);
     if (targetZ === from.z) return;
-    const t0 = performance.now();
-    const dur = 90;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - t0) / dur);
-      const ease = 1 - (1 - t) ** 3;
-      paintCam(zoomAround(from, sx, sy, from.z + (targetZ - from.z) * ease), t >= 1);
-      if (t < 1) camAnim.current = requestAnimationFrame(tick);
-      else camAnim.current = null;
-    };
-    camAnim.current = requestAnimationFrame(tick);
+    animateCam(zoomAround(from, sx, sy, targetZ));
+  }
+
+  function zoomToLevel(z: number) {
+    const el = boardRef.current;
+    const from = camRef.current;
+    const r = el?.getBoundingClientRect();
+    const sx = r ? r.width / 2 : 0;
+    const sy = r ? r.height / 2 : 0;
+    animateCam(zoomAround(from, sx, sy, clampZ(z)));
+  }
+
+  function fitContent(ids?: string[]) {
+    const want = ids ? new Set(ids) : null;
+    const boxes = nodesRef.current.filter((n) => n.kind !== "line" && (!want || want.has(n.id))).map(boundsOf);
+    const uni = unionBoxes(boxes);
+    const el = boardRef.current;
+    if (!uni || !el || uni.w < 1 || uni.h < 1) {
+      zoomToLevel(1);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const pad = 96;
+    const z = clampZ(Math.min((r.width - pad) / uni.w, (r.height - pad) / uni.h, 1.25));
+    animateCam({
+      z,
+      x: (r.width - uni.w * z) / 2 - uni.x * z,
+      y: (r.height - uni.h * z) / 2 - uni.y * z,
+    });
+  }
+
+  function restack(ids: string[], mode: "front" | "back" | "forward" | "backward") {
+    const set = new Set(ids);
+    const order = collab.order.toArray().filter((id) => collab.map.has(id));
+    const picked = order.filter((id) => set.has(id));
+    if (!picked.length) return;
+    let next = order.filter((id) => !set.has(id));
+    if (mode === "front") next = [...next, ...picked];
+    else if (mode === "back") next = [...picked, ...next];
+    else if (mode === "forward") {
+      const last = Math.max(...picked.map((id) => order.indexOf(id)));
+      const after = order.slice(last + 1).find((id) => !set.has(id));
+      if (!after) next = [...next, ...picked];
+      else {
+        const i = next.indexOf(after);
+        next = [...next.slice(0, i + 1), ...picked, ...next.slice(i + 1)];
+      }
+    } else {
+      const first = Math.min(...picked.map((id) => order.indexOf(id)));
+      const before = [...order.slice(0, first)].reverse().find((id) => !set.has(id));
+      if (!before) next = [...picked, ...next];
+      else {
+        const i = next.indexOf(before);
+        next = [...next.slice(0, i), ...picked, ...next.slice(i)];
+      }
+    }
+    collab.doc.transact(() => {
+      if (collab.order.length) collab.order.delete(0, collab.order.length);
+      if (next.length) collab.order.push(next);
+    }, ORIGIN);
+    refresh();
+  }
+
+  function alignSelected(how: "left" | "center" | "right" | "top" | "middle" | "bottom") {
+    const items = selected
+      .map((id) => nodesRef.current.find((n) => n.id === id))
+      .filter((n): n is JamNode => !!n && n.kind !== "line");
+    if (items.length < 2) return;
+    const boxes = items.map((n) => ({ n, b: boundsOf(n) }));
+    const uni = unionBoxes(boxes.map((x) => x.b));
+    if (!uni) return;
+    collab.doc.transact(() => {
+      for (const { n, b } of boxes) {
+        let dx = 0;
+        let dy = 0;
+        if (how === "left") dx = uni.x - b.x;
+        if (how === "center") dx = uni.x + uni.w / 2 - (b.x + b.w / 2);
+        if (how === "right") dx = uni.x + uni.w - (b.x + b.w);
+        if (how === "top") dy = uni.y - b.y;
+        if (how === "middle") dy = uni.y + uni.h / 2 - (b.y + b.h / 2);
+        if (how === "bottom") dy = uni.y + uni.h - (b.y + b.h);
+        if (dx || dy) collab.map.set(n.id, clone(shiftNode(n, dx, dy)));
+      }
+    }, ORIGIN);
+    refresh();
+  }
+
+  function bumpFont(id: string, dir: 1 | -1) {
+    const n = nodesRef.current.find((x) => x.id === id);
+    if (!isJam(n)) return;
+    const cur = n.fontSize ?? (n.kind === "text" ? 28 : 18);
+    const next = Math.max(12, Math.min(96, cur + dir * (cur >= 36 ? 8 : 4)));
+    if (n.kind === "sticky") patch(id, { fontSize: next, h: stickyH(n.text, n.w, next) });
+    else if (n.kind === "text") patch(id, { fontSize: next, h: Math.max(36, Math.round(next * 1.45)) });
+    else patch(id, { fontSize: next });
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -1153,9 +1436,24 @@ export function CanvasEditor({
           return { l: ((ends.p1.x + ends.p2.x) / 2) * cam.z + cam.x, t: ((ends.p1.y + ends.p2.y) / 2) * cam.z + cam.y };
         })()
       : null;
+  const multiBox =
+    selected.length > 1
+      ? (() => {
+          const uni = unionBoxes(
+            selected
+              .map((id) => byId.get(id))
+              .filter((n): n is JamNode => !!n && n.kind !== "line")
+              .map(boundsOf),
+          );
+          return uni
+            ? { l: uni.x * cam.z + cam.x, t: uni.y * cam.z + cam.y, w: uni.w * cam.z, h: uni.h * cam.z }
+            : null;
+        })()
+      : null;
+  const multiStickies = selected.length > 1 && selected.every((id) => byId.get(id)?.kind === "sticky");
 
   return (
-    <div className={`jam ${activeTool === "hand" ? "is-hand" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}>
+    <div className={`jam ${activeTool === "hand" || panning ? "is-hand" : ""} ${panning ? "is-grabbing" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}>
       <div
         ref={boardRef}
         className="jam-stage"
@@ -1163,19 +1461,23 @@ export function CanvasEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => paintGhost(null)}
+        onPointerLeave={() => {
+          paintGhost(null);
+          setHoverId(null);
+        }}
       >
       <div ref={dotsRef} className="jam-dots" />
       <div ref={worldRef} className="jam-world">
         <svg className="jam-svg" aria-hidden>
           {nodes.map((n) => {
             const on = selected.includes(n.id);
+            const hover = hoverId === n.id && !on;
             if (n.kind === "pen" && n.points?.length) {
               if (n.points.length === 1) {
                 const p = n.points[0];
                 return (
                   <g key={n.id}>
-                    {on && <circle cx={p.x} cy={p.y} r={8} fill="none" stroke={SELECT} strokeWidth={3} />}
+                    {(on || hover) && <circle cx={p.x} cy={p.y} r={8} fill="none" stroke={SELECT} strokeWidth={on ? 3 : 2} />}
                     <circle cx={p.x} cy={p.y} r={3} fill={n.stroke || INK} />
                   </g>
                 );
@@ -1183,14 +1485,15 @@ export function CanvasEditor({
               const pts = n.points.map((p) => `${p.x},${p.y}`).join(" ");
               return (
                 <g key={n.id}>
-                  {on && (
+                  {(on || hover) && (
                     <polyline
                       fill="none"
                       stroke={SELECT}
-                      strokeWidth={8}
+                      strokeWidth={on ? 8 : 6}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       points={pts}
+                      opacity={on ? 1 : 0.45}
                     />
                   )}
                   <polyline
@@ -1213,7 +1516,7 @@ export function CanvasEditor({
               const stroke = n.stroke || LINE;
               return (
                 <g key={n.id}>
-                  {on && <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={SELECT} strokeWidth={7} strokeLinecap="round" />}
+                  {(on || hover) && <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={SELECT} strokeWidth={on ? 7 : 5} strokeLinecap="round" opacity={on ? 1 : 0.45} />}
                   <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={2} />
                   <polygon
                     fill={stroke}
@@ -1235,12 +1538,13 @@ export function CanvasEditor({
         {nodes.map((n) => {
           if (n.kind === "pen" || n.kind === "line") return null;
           const on = selected.includes(n.id);
+          const hover = hoverId === n.id && !on;
           const cls =
             n.kind === "sticky"
-              ? `jam-sticky ${on ? "is-on" : ""}`
+              ? `jam-sticky ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`
               : n.kind === "text"
-                ? `jam-label ${on ? "is-on" : ""}`
-                : `jam-shape is-${n.variant ?? "round"} ${on ? "is-on" : ""}`;
+                ? `jam-label ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`
+                : `jam-shape is-${n.variant ?? "round"} ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`;
           return (
             <div
               key={n.id}
@@ -1281,6 +1585,16 @@ export function CanvasEditor({
           );
         })}
         {marquee && <div className="jam-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+        {(guides.v.length > 0 || guides.h.length > 0) && (
+          <svg className="jam-svg jam-guides" aria-hidden>
+            {guides.v.map((x) => (
+              <line key={`v${x}`} x1={x} y1={-20000} x2={x} y2={20000} stroke={GUIDE} vectorEffect="non-scaling-stroke" />
+            ))}
+            {guides.h.map((y) => (
+              <line key={`h${y}`} x1={-20000} y1={y} x2={20000} y2={y} stroke={GUIDE} vectorEffect="non-scaling-stroke" />
+            ))}
+          </svg>
+        )}
       </div>
 
       {cursors.map((c) => (
@@ -1295,7 +1609,7 @@ export function CanvasEditor({
       {empty && (
         <div className="jam-empty">
           <p>付箋を置いて、線でつなぐ</p>
-          <p>S 付箋　T 文字　R 図形　L コネクタ</p>
+          <p>S 付箋　T 文字　R 図形　L コネクタ　Shift+1 全体</p>
         </div>
       )}
       {box && solo && activeTool === "select" && editable && !busy && (
@@ -1349,11 +1663,79 @@ export function CanvasEditor({
               <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
             </div>
           )}
+          {solo.kind === "shape" && (
+            <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
+              {SHAPE_FILLS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`jam-swatch ${solo.fill === c ? "is-on" : ""}`}
+                  style={{ background: c }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    patch(solo.id, { fill: c });
+                  }}
+                />
+              ))}
+              <span className="jam-float-sep" />
+              <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
+            </div>
+          )}
+          {(solo.kind === "text" || solo.kind === "sticky") && (
+            <div
+              className="jam-float"
+              style={
+                solo.kind === "text"
+                  ? { left: box.l + box.w / 2, top: box.t }
+                  : { left: box.l + box.w / 2, top: box.t + box.h, transform: "translate(-50%, 12px)" }
+              }
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button type="button" className="jam-mini" title="小さく" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); bumpFont(solo.id, -1); }}>
+                <Minus size={12} />
+              </button>
+              <span className="jam-mini-label">{solo.fontSize ?? (solo.kind === "text" ? 28 : 18)}</span>
+              <button type="button" className="jam-mini" title="大きく" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); bumpFont(solo.id, 1); }}>
+                <Plus size={12} />
+              </button>
+            </div>
+          )}
         </>
       )}
       {lineMid && solo?.kind === "line" && activeTool === "select" && editable && !busy && (
         <div className="jam-float" style={{ left: lineMid.l, top: lineMid.t }} onPointerDown={(e) => e.stopPropagation()}>
           <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
+        </div>
+      )}
+      {multiBox && activeTool === "select" && editable && !busy && !editing && (
+        <div className="jam-float jam-align" style={{ left: multiBox.l + multiBox.w / 2, top: multiBox.t }} onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" title="左揃え" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("left"); }}><AlignLeft size={14} /></button>
+          <button type="button" title="左右中央" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("center"); }}><AlignCenter size={14} /></button>
+          <button type="button" title="右揃え" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("right"); }}><AlignRight size={14} /></button>
+          <span className="jam-float-sep" />
+          <button type="button" title="上揃え" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("top"); }}><AlignStartVertical size={14} /></button>
+          <button type="button" title="上下中央" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("middle"); }}><AlignCenterVertical size={14} /></button>
+          <button type="button" title="下揃え" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); alignSelected("bottom"); }}><AlignEndVertical size={14} /></button>
+          {multiStickies && (
+            <>
+              <span className="jam-float-sep" />
+              {STICKY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="jam-swatch"
+                  style={{ background: c }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    for (const id of selected) patch(id, { fill: c });
+                    setStickyColor(c);
+                  }}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
       </div>
@@ -1399,12 +1781,37 @@ export function CanvasEditor({
       </div>
 
       <div className="jam-zoom">
+        {editable && (
+          <>
+            <button type="button" title="元に戻す（⌘Z）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); collab.undo.undo(); refresh(); }} aria-label="元に戻す">
+              <Undo2 size={14} />
+            </button>
+            <button type="button" title="やり直す（⌘⇧Z）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); collab.undo.redo(); refresh(); }} aria-label="やり直す">
+              <Redo2 size={14} />
+            </button>
+            <span className="jam-zoom-sep" />
+          </>
+        )}
         <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(0.8); }} aria-label="縮小">
           <Minus size={14} />
         </button>
-        <span ref={zoomLabelRef}>{Math.round(cam.z * 100)}%</span>
+        <button
+          type="button"
+          className="jam-zoom-pct"
+          title="100%に戻す（⌘0）"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zoomToLevel(1);
+          }}
+        >
+          <span ref={zoomLabelRef}>{Math.round(cam.z * 100)}%</span>
+        </button>
         <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); zoomBy(1.25); }} aria-label="拡大">
           <Plus size={14} />
+        </button>
+        <button type="button" title="全体を表示（Shift+1）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); fitContent(); }} aria-label="全体を表示">
+          <Scan size={14} />
         </button>
       </div>
     </div>
