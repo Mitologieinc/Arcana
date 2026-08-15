@@ -65,6 +65,40 @@ const SHAPE_FILLS = ["#ffffff", "#FFE299", "#FFB8A8", "#D3BDFF", "#A8DAFF", "#B3
 const SELECT = "#0d99ff";
 const GUIDE = "#f24822";
 const SNAP = 8;
+const GRID = 16;
+
+function gridFade(screen: number) {
+  if (screen < 7) return 0;
+  if (screen < 13) return (screen - 7) / 6;
+  if (screen < 28) return 1;
+  if (screen < 46) return (46 - screen) / 18;
+  return 0;
+}
+
+function paintGrid(el: HTMLDivElement, x: number, y: number, z: number) {
+  let step = GRID;
+  const ideal = 20 / z;
+  while (step < ideal * 0.85) step *= 2;
+  while (step / 2 >= ideal * 0.85 && step > 0.5) step /= 2;
+  const coarse = step * z;
+  const fine = (step / 2) * z;
+  const oc = gridFade(coarse);
+  const of = gridFade(fine);
+  const layers: string[] = [];
+  const sizes: string[] = [];
+  if (oc > 0.02) {
+    layers.push(`radial-gradient(circle 1.2px at 0 0, rgba(var(--jam-dot), ${0.85 * oc}) 1.05px, transparent 1.25px)`);
+    sizes.push(`${coarse}px ${coarse}px`);
+  }
+  if (of > 0.02) {
+    layers.push(`radial-gradient(circle 1.05px at 0 0, rgba(var(--jam-dot), ${0.42 * of}) 0.95px, transparent 1.15px)`);
+    sizes.push(`${fine}px ${fine}px`);
+  }
+  const pos = layers.map(() => `${x}px ${y}px`).join(", ");
+  el.style.backgroundImage = layers.length ? layers.join(", ") : "none";
+  el.style.backgroundSize = sizes.join(", ");
+  el.style.backgroundPosition = pos;
+}
 
 type Pt = { x: number; y: number };
 
@@ -414,10 +448,7 @@ export function CanvasEditor({
   function paintCam(c: { x: number; y: number; z: number }, commit = false) {
     camRef.current = c;
     if (worldRef.current) worldRef.current.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.z})`;
-    if (dotsRef.current) {
-      dotsRef.current.style.backgroundSize = `${24 * c.z}px ${24 * c.z}px`;
-      dotsRef.current.style.backgroundPosition = `${c.x}px ${c.y}px`;
-    }
+    if (dotsRef.current) paintGrid(dotsRef.current, c.x, c.y, c.z);
     if (zoomLabelRef.current) zoomLabelRef.current.textContent = `${Math.round(c.z * 100)}%`;
     if (commit) {
       if (camSync.current) window.clearTimeout(camSync.current);

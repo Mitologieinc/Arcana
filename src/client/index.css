@@ -1548,10 +1548,9 @@ html[data-theme="dark"] .arcana-presence {
 }
 
 .jam-dots {
+  --jam-dot: 180, 180, 176;
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(#d4d4d4 1.15px, transparent 1.25px);
-  background-size: 24px 24px;
   pointer-events: none;
 }
 
@@ -2014,7 +2013,7 @@ html[data-theme="dark"] .jam {
 }
 
 html[data-theme="dark"] .jam-dots {
-  background-image: radial-gradient(#3a3a37 1.15px, transparent 1.25px);
+  --jam-dot: 78, 78, 74;
 }
 
 html[data-theme="dark"] .jam-bar,
