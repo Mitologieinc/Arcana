@@ -51,6 +51,10 @@ const INK = "#1e1e1e";
 const LINE = "#b3b3b3";
 const SHAPE_STROKE = "#b3b3b3";
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
+const STROKE_COLORS = [INK, "#5c5c5c", LINE, "#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#ffffff"];
+const SELECT = "#0d99ff";
+
+type Pt = { x: number; y: number };
 
 type Tool = "select" | "hand" | "sticky" | "shape" | "text" | "line" | "pen";
 type ShapeKind = "round" | "ellipse" | "diamond";
@@ -91,9 +95,80 @@ function isJam(n: unknown): n is JamNode {
   return k === "sticky" || k === "shape" || k === "text" || k === "pen" || k === "line";
 }
 
-function hit(n: JamNode, x: number, y: number) {
-  if (n.kind === "line" || n.kind === "pen") return false;
+function hitBox(n: JamNode, x: number, y: number) {
   return x >= n.x && y >= n.y && x <= n.x + n.w && y <= n.y + n.h;
+}
+
+function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-8) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function penBounds(points: Pt[]) {
+  if (!points.length) return { x: 0, y: 0, w: 1, h: 1 };
+  let minX = points[0].x;
+  let minY = points[0].y;
+  let maxX = points[0].x;
+  let maxY = points[0].y;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
+}
+
+function boundsOf(n: JamNode) {
+  if (n.kind === "pen" && n.points?.length) return penBounds(n.points);
+  return { x: n.x, y: n.y, w: n.w, h: n.h };
+}
+
+function connectorEnds(n: JamNode, get: (id: string) => JamNode | undefined) {
+  const a = n.fromId ? get(n.fromId) : undefined;
+  const b = n.toId ? get(n.toId) : undefined;
+  if (!a || !b) return null;
+  const ac = center(a);
+  const bc = center(b);
+  return { p1: edgeToward(a, bc.x, bc.y), p2: edgeToward(b, ac.x, ac.y) };
+}
+
+function hitStroke(n: JamNode, x: number, y: number, pad: number, get: (id: string) => JamNode | undefined) {
+  if (n.kind === "pen") {
+    const pts = n.points;
+    if (!pts?.length) return false;
+    if (pts.length === 1) return Math.hypot(x - pts[0].x, y - pts[0].y) <= pad;
+    for (let i = 1; i < pts.length; i++) {
+      if (distToSeg(x, y, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y) <= pad) return true;
+    }
+    return false;
+  }
+  if (n.kind === "line") {
+    const ends = connectorEnds(n, get);
+    if (!ends) return false;
+    return distToSeg(x, y, ends.p1.x, ends.p1.y, ends.p2.x, ends.p2.y) <= pad;
+  }
+  return false;
+}
+
+function inRect(x: number, y: number, r: { x: number; y: number; w: number; h: number }) {
+  return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
+}
+
+function boxesOverlap(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function shiftNode(n: JamNode, dx: number, dy: number): JamNode {
+  if (n.kind === "line") return n;
+  if (n.kind === "pen" && n.points) {
+    return { ...n, x: n.x + dx, y: n.y + dy, points: n.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+  }
+  return { ...n, x: n.x + dx, y: n.y + dy };
 }
 
 function center(n: JamNode) {
@@ -170,15 +245,18 @@ export function CanvasEditor({
     sy: number;
     id?: string;
     ids?: string[];
-    origin?: Record<string, { x: number; y: number }>;
+    origin?: Record<string, { x: number; y: number; points?: Pt[] }>;
     editOnUp?: boolean;
     handle?: "se" | "e" | "s";
     ow?: number;
     oh?: number;
+    ox?: number;
+    oy?: number;
+    opoints?: Pt[];
     side?: Side;
   }>(null);
   const moveRaf = useRef<number | null>(null);
-  const pendingMove = useRef<null | { ids: string[]; origin: Record<string, { x: number; y: number }>; dx: number; dy: number }>(null);
+  const pendingMove = useRef<null | { ids: string[]; origin: Record<string, { x: number; y: number; points?: Pt[] }>; dx: number; dy: number }>(null);
   const indexTimer = useRef<number | null>(null);
   const [nodes, setNodes] = useState<JamNode[]>([]);
   const [cam, setCam] = useState({ x: 48, y: 48, z: 1 });
@@ -402,10 +480,18 @@ export function CanvasEditor({
 
   function topAt(x: number, y: number) {
     const list = nodesRef.current;
+    const get = (id: string) => list.find((n) => n.id === id);
+    const pad = Math.max(6, 10 / camRef.current.z);
+    let stroke: JamNode | null = null;
     for (let i = list.length - 1; i >= 0; i--) {
-      if (hit(list[i], x, y)) return list[i];
+      const n = list[i];
+      if (n.kind === "pen" || n.kind === "line") {
+        if (!stroke && hitStroke(n, x, y, pad, get)) stroke = n;
+        continue;
+      }
+      if (hitBox(n, x, y)) return n;
     }
-    return null;
+    return stroke;
   }
 
   function startEdit(id: string) {
@@ -434,11 +520,7 @@ export function CanvasEditor({
       const id = nid();
       idMap.set(n.id, id);
       next.id = id;
-      if (next.kind !== "line") {
-        next.x += dx;
-        next.y += dy;
-      }
-      return next;
+      return next.kind === "line" ? next : shiftNode(next, dx, dy);
     });
     for (const n of copies) {
       if (n.fromId) n.fromId = idMap.get(n.fromId) ?? n.fromId;
@@ -529,10 +611,26 @@ export function CanvasEditor({
   function beginResize(e: ReactPointerEvent, id: string, handle: "se" | "e" | "s") {
     e.preventDefault();
     e.stopPropagation();
-    const n = collab.map.get(id);
+    const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
     if (!isJam(n)) return;
     const w = worldFromClient(e.clientX, e.clientY);
-    drag.current = { mode: "resize", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id, handle, ow: n.w, oh: n.h };
+    const b = boundsOf(n);
+    drag.current = {
+      mode: "resize",
+      x: w.x,
+      y: w.y,
+      cx: camRef.current.x,
+      cy: camRef.current.y,
+      sx: e.clientX,
+      sy: e.clientY,
+      id,
+      handle,
+      ow: b.w,
+      oh: b.h,
+      ox: b.x,
+      oy: b.y,
+      opoints: n.points?.map((p) => ({ ...p })),
+    };
     setBusy(true);
     boardRef.current?.setPointerCapture(e.pointerId);
   }
@@ -711,6 +809,7 @@ export function CanvasEditor({
       const already = !e.shiftKey && selected.length === 1 && selected[0] === t.id;
       const ids = e.shiftKey || selected.includes(t.id) ? Array.from(new Set([...selected, t.id])) : [t.id];
       setSelected(ids);
+      if (t.kind === "line") return;
       if (e.detail >= 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
         startEdit(t.id);
         return;
@@ -720,10 +819,10 @@ export function CanvasEditor({
         idsMove = duplicateIds(ids);
         setSelected(idsMove);
       }
-      const origin: Record<string, { x: number; y: number }> = {};
+      const origin: Record<string, { x: number; y: number; points?: Pt[] }> = {};
       for (const id of idsMove) {
-        const n = collab.map.get(id);
-        if (isJam(n)) origin[id] = { x: n.x, y: n.y };
+        const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
+        if (isJam(n) && n.kind !== "line") origin[id] = { x: n.x, y: n.y, points: n.points?.map((p) => ({ ...p })) };
       }
       drag.current = {
         mode: "move",
@@ -770,7 +869,11 @@ export function CanvasEditor({
           if (!p) return;
           nodesRef.current = nodesRef.current.map((n) => {
             const o = p.origin[n.id];
-            return o ? { ...n, x: o.x + p.dx, y: o.y + p.dy } : n;
+            if (!o) return n;
+            if (n.kind === "pen" && o.points) {
+              return { ...n, x: o.x + p.dx, y: o.y + p.dy, points: o.points.map((pt) => ({ x: pt.x + p.dx, y: pt.y + p.dy })) };
+            }
+            return { ...n, x: o.x + p.dx, y: o.y + p.dy };
           });
           setNodes(nodesRef.current);
         });
@@ -786,6 +889,18 @@ export function CanvasEditor({
       const dy = w.y - d.y;
       const ow = d.ow ?? 160;
       const oh = d.oh ?? 160;
+      if (d.opoints && d.ox != null && d.oy != null) {
+        const nw = d.handle === "s" ? ow : Math.max(8, ow + dx);
+        const nh = d.handle === "e" ? oh : Math.max(8, oh + dy);
+        const sx = ow < 1 ? 1 : nw / ow;
+        const sy = oh < 1 ? 1 : nh / oh;
+        const points = d.opoints.map((p) => ({
+          x: d.ox! + (p.x - d.ox!) * sx,
+          y: d.oy! + (p.y - d.oy!) * sy,
+        }));
+        patch(d.id, { ...penBounds(points), points }, false);
+        return;
+      }
       if (d.handle === "se") patch(d.id, { w: Math.max(80, ow + dx), h: Math.max(80, oh + dy) }, false);
       else if (d.handle === "e") patch(d.id, { w: Math.max(80, ow + dx) }, false);
       else patch(d.id, { h: Math.max(80, oh + dy) }, false);
@@ -813,7 +928,18 @@ export function CanvasEditor({
     const w = worldFromClient(e.clientX, e.clientY);
     if (d?.mode === "pan") setCam({ ...camRef.current });
     if (d?.mode === "marquee" && marquee) {
-      const hits = nodesRef.current.filter((n) => n.kind !== "line" && n.kind !== "pen" && n.x < marquee.x + marquee.w && n.y < marquee.y + marquee.h && n.x + n.w > marquee.x && n.y + n.h > marquee.y).map((n) => n.id);
+      const r = marquee;
+      const get = (id: string) => nodesRef.current.find((n) => n.id === id);
+      const hits = nodesRef.current
+        .filter((n) => {
+          if (n.kind === "pen") return n.points?.some((p) => inRect(p.x, p.y, r)) || boxesOverlap(boundsOf(n), r);
+          if (n.kind === "line") {
+            const ends = connectorEnds(n, get);
+            return ends ? inRect(ends.p1.x, ends.p1.y, r) || inRect(ends.p2.x, ends.p2.y, r) || boxesOverlap({ x: Math.min(ends.p1.x, ends.p2.x), y: Math.min(ends.p1.y, ends.p2.y), w: Math.abs(ends.p2.x - ends.p1.x), h: Math.abs(ends.p2.y - ends.p1.y) }, r) : false;
+          }
+          return boxesOverlap(n, r);
+        })
+        .map((n) => n.id);
       setSelected(hits);
     }
     if (d?.mode === "move" && d.ids && d.origin) {
@@ -823,7 +949,13 @@ export function CanvasEditor({
         for (const id of d.ids!) {
           const cur = collab.map.get(id);
           const o = d.origin![id];
-          if (isJam(cur) && o) collab.map.set(id, clone({ ...cur, x: o.x + dx, y: o.y + dy }));
+          if (isJam(cur) && o) {
+            if (cur.kind === "pen" && o.points) {
+              collab.map.set(id, clone({ ...cur, x: o.x + dx, y: o.y + dy, points: o.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) }));
+            } else if (cur.kind !== "line") {
+              collab.map.set(id, clone({ ...cur, x: o.x + dx, y: o.y + dy }));
+            }
+          }
         }
       }, ORIGIN);
     }
@@ -839,7 +971,10 @@ export function CanvasEditor({
     }
     if (d?.mode === "pen" && d.id) {
       const cur = nodesRef.current.find((n) => n.id === d.id);
-      if (isJam(cur)) patch(d.id, { points: cur.points });
+      if (isJam(cur) && cur.points?.length) {
+        patch(d.id, { ...penBounds(cur.points), points: cur.points });
+        setSelected([d.id]);
+      }
     }
     if (d?.mode === "port" && d.id && d.side) {
       const src = nodesRef.current.find((n) => n.id === d.id) ?? collab.map.get(d.id);
@@ -917,7 +1052,7 @@ export function CanvasEditor({
       if (!editable) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
         e.preventDefault();
-        setSelected(nodesRef.current.filter((n) => n.kind !== "line").map((n) => n.id));
+        setSelected(nodesRef.current.map((n) => n.id));
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c") {
@@ -953,8 +1088,8 @@ export function CanvasEditor({
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         for (const id of selected) {
-          const n = collab.map.get(id);
-          if (isJam(n)) patch(id, { x: n.x + dx, y: n.y + dy });
+          const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
+          if (isJam(n) && n.kind !== "line") patch(id, shiftNode(n, dx, dy));
         }
         return;
       }
@@ -1004,8 +1139,19 @@ export function CanvasEditor({
   const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text";
   const solo = selected.length === 1 ? byId.get(selected[0]) : undefined;
   const box =
-    solo && solo.kind !== "line" && solo.kind !== "pen"
-      ? { l: solo.x * cam.z + cam.x, t: solo.y * cam.z + cam.y, w: solo.w * cam.z, h: solo.h * cam.z }
+    solo && solo.kind !== "line"
+      ? (() => {
+          const b = boundsOf(solo);
+          return { l: b.x * cam.z + cam.x, t: b.y * cam.z + cam.y, w: Math.max(10, b.w * cam.z), h: Math.max(10, b.h * cam.z) };
+        })()
+      : null;
+  const lineMid =
+    solo?.kind === "line"
+      ? (() => {
+          const ends = connectorEnds(solo, (id) => byId.get(id));
+          if (!ends) return null;
+          return { l: ((ends.p1.x + ends.p2.x) / 2) * cam.z + cam.x, t: ((ends.p1.y + ends.p2.y) / 2) * cam.z + cam.y };
+        })()
       : null;
 
   return (
@@ -1023,34 +1169,54 @@ export function CanvasEditor({
       <div ref={worldRef} className="jam-world">
         <svg className="jam-svg" aria-hidden>
           {nodes.map((n) => {
-            if (n.kind === "pen" && n.points && n.points.length > 1) {
+            const on = selected.includes(n.id);
+            if (n.kind === "pen" && n.points?.length) {
+              if (n.points.length === 1) {
+                const p = n.points[0];
+                return (
+                  <g key={n.id}>
+                    {on && <circle cx={p.x} cy={p.y} r={8} fill="none" stroke={SELECT} strokeWidth={3} />}
+                    <circle cx={p.x} cy={p.y} r={3} fill={n.stroke || INK} />
+                  </g>
+                );
+              }
+              const pts = n.points.map((p) => `${p.x},${p.y}`).join(" ");
               return (
-                <polyline
-                  key={n.id}
-                  fill="none"
-                  stroke={n.stroke}
-                  strokeWidth={3}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  points={n.points.map((p) => `${p.x},${p.y}`).join(" ")}
-                />
+                <g key={n.id}>
+                  {on && (
+                    <polyline
+                      fill="none"
+                      stroke={SELECT}
+                      strokeWidth={8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      points={pts}
+                    />
+                  )}
+                  <polyline
+                    fill="none"
+                    stroke={n.stroke || INK}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points={pts}
+                  />
+                </g>
               );
             }
             if (n.kind === "line") {
-              const a = n.fromId ? byId.get(n.fromId) : null;
-              const b = n.toId ? byId.get(n.toId) : null;
-              if (!a || !b) return null;
-              const ac = center(a);
-              const bc = center(b);
-              const p1 = edgeToward(a, bc.x, bc.y);
-              const p2 = edgeToward(b, ac.x, ac.y);
+              const ends = connectorEnds(n, (id) => byId.get(id));
+              if (!ends) return null;
+              const { p1, p2 } = ends;
               const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
               const ah = 10;
+              const stroke = n.stroke || LINE;
               return (
                 <g key={n.id}>
-                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={n.stroke || LINE} strokeWidth={2} />
+                  {on && <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={SELECT} strokeWidth={7} strokeLinecap="round" />}
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={2} />
                   <polygon
-                    fill={n.stroke || LINE}
+                    fill={stroke}
                     points={`${p2.x},${p2.y} ${p2.x - ah * Math.cos(ang - 0.4)},${p2.y - ah * Math.sin(ang - 0.4)} ${p2.x - ah * Math.cos(ang + 0.4)},${p2.y - ah * Math.sin(ang + 0.4)}`}
                   />
                 </g>
@@ -1134,7 +1300,7 @@ export function CanvasEditor({
       )}
       {box && solo && activeTool === "select" && editable && !busy && (
         <>
-          {!editing &&
+          {!editing && solo.kind !== "pen" &&
             (["top", "right", "bottom", "left"] as Side[]).map((side) => (
               <button
                 key={side}
@@ -1178,7 +1344,17 @@ export function CanvasEditor({
               ))}
             </div>
           )}
+          {solo.kind === "pen" && (
+            <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
+              <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
+            </div>
+          )}
         </>
+      )}
+      {lineMid && solo?.kind === "line" && activeTool === "select" && editable && !busy && (
+        <div className="jam-float" style={{ left: lineMid.l, top: lineMid.t }} onPointerDown={(e) => e.stopPropagation()}>
+          <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
+        </div>
       )}
       </div>
 
@@ -1261,5 +1437,25 @@ function ToolBtn({
     >
       <Icon size={18} strokeWidth={1.8} />
     </button>
+  );
+}
+
+function StrokeSwatches({ value, onPick }: { value: string; onPick: (c: string) => void }) {
+  return (
+    <>
+      {STROKE_COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className={`jam-swatch ${value === c ? "is-on" : ""}`}
+          style={{ background: c }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPick(c);
+          }}
+        />
+      ))}
+    </>
   );
 }
