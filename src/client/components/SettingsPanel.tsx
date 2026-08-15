@@ -295,15 +295,15 @@ export function SettingsPanel({
       zIndex={50}
       onClose={() => (confirm ? setConfirm(null) : onClose())}
     >
-      <div className="flex min-h-0 flex-1">
-        <nav className="flex w-[148px] shrink-0 flex-col gap-0.5 overflow-auto border-r border-line p-2">
+      <div className="flex min-h-0 flex-1 max-[720px]:flex-col">
+        <nav className="flex w-[148px] shrink-0 flex-col gap-0.5 overflow-auto border-r border-line p-2 max-[720px]:w-full max-[720px]:flex-row max-[720px]:border-r-0 max-[720px]:border-b">
           {tabs.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 type="button"
-                className={`flex h-8 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] ${
+                className={`flex h-8 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] max-[720px]:shrink-0 ${
                   tab === item.id ? "bg-hover font-medium" : "text-muted hover:bg-hover hover:text-ink"
                 }`}
                 onClick={() => setTab(item.id)}
@@ -562,7 +562,7 @@ export function SettingsPanel({
                     const removable = canRemoveMember(role, m.role, self);
                     const resettable = canResetMemberPassword(role, m.role, self);
                     return (
-                      <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+                      <li key={m.userId} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-[13px]">
                         <Avatar name={m.name} seed={m.userId} size={26} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">

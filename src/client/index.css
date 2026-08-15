@@ -18,11 +18,13 @@ html,
 body,
 #root {
   height: 100%;
+  height: 100dvh;
   margin: 0;
   color: var(--color-ink);
   background: #fff;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html[data-theme="dark"] {
@@ -109,6 +111,14 @@ html[data-theme="dark"] .arcana-rail {
 html[data-theme="dark"] .arcana-nav {
   background: #191919;
   border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .arcana-shell {
+  background: #191919;
+}
+
+html[data-theme="dark"] .arcana-nav-backdrop {
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .arcana-logo {
@@ -225,30 +235,16 @@ html[data-theme="dark"] .arcana-nav {
   text-align: center;
 }
 
-@media (max-width: 720px) {
-  .arcana-nav {
-    position: absolute;
-    inset: 0 0 0 56px;
-    z-index: 20;
-    width: min(280px, calc(100vw - 56px));
-    box-shadow: 8px 0 32px rgba(15, 15, 15, 0.12);
-  }
+.arcana-shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #fff;
+}
 
-  .arcana-nav.is-collapsed {
-    width: 0;
-    box-shadow: none;
-  }
-
-  .arcana-doc {
-    padding-left: 48px;
-    padding-right: 16px;
-  }
-
-  .arcana-db-table th:first-child,
-  .arcana-db-table td:first-child {
-    padding-left: 16px;
-    min-width: 160px;
-  }
+.arcana-nav-backdrop {
+  display: none;
 }
 
 * {
@@ -1432,6 +1428,8 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
   gap: 1px;
   padding: 4px;
   border-radius: 8px;
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
 }
 
 .bubble-menu > button,
@@ -2425,5 +2423,163 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
   .arcana-doc {
     padding-left: 52px;
     padding-right: 24px;
+  }
+}
+
+@media (max-width: 720px) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+
+  .arcana-shell {
+    flex-direction: column;
+  }
+
+  .arcana-shell > main {
+    order: 1;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .arcana-rail {
+    order: 2;
+    z-index: 30;
+    width: 100%;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 0;
+    padding: 4px 4px env(safe-area-inset-bottom, 0px);
+    border-right: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .arcana-rail-grow {
+    display: none;
+  }
+
+  .arcana-rail-home {
+    margin-bottom: 0;
+  }
+
+  .arcana-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    border: 0;
+    background: rgba(15, 15, 15, 0.28);
+  }
+
+  .arcana-nav {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(320px, 86vw);
+    padding-top: env(safe-area-inset-top, 0px);
+    box-shadow: 8px 0 32px rgba(15, 15, 15, 0.16);
+  }
+
+  .arcana-nav.is-collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+
+  .arcana-sheet {
+    width: 100% !important;
+    border-left: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .arcana-doc {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: 24vh;
+  }
+
+  .arcana-block-handle {
+    display: none;
+  }
+
+  .arcana-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .arcana-db-table th:first-child,
+  .arcana-db-table td:first-child {
+    padding-left: 16px;
+    min-width: 160px;
+  }
+
+  .arcana-callout-picker,
+  .slash-menu {
+    width: min(324px, calc(100vw - 16px));
+  }
+
+  .kbd {
+    display: none;
+  }
+
+  .arcana-toast {
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-backdrop {
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    align-items: flex-end;
+  }
+
+  .modal-panel {
+    max-height: min(720px, calc(100dvh - 24px));
+    width: 100%;
+  }
+
+  .jam-bar {
+    left: 8px;
+    right: 8px;
+    bottom: 12px;
+    transform: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    max-width: none;
+  }
+
+  .jam-zoom {
+    right: 8px;
+    bottom: auto;
+    top: 12px;
+  }
+
+  .jam-title {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    max-width: min(420px, calc(100% - 168px));
+  }
+
+  .jam-help {
+    bottom: 72px;
+  }
+
+  .jam-follow {
+    top: calc(56px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (hover: none) {
+  .cover-actions {
+    opacity: 1;
+  }
+
+  .arcana-db-table .arcana-grip,
+  .arcana-db-table tbody .btn-ghost {
+    opacity: 1;
   }
 }

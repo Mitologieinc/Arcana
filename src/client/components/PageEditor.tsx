@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, SmilePlus, Star, Trash2 } from "lucide-react";
+import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, PanelLeft, SmilePlus, Star, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Member, Page, Permission, SavedTemplate, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
@@ -22,6 +22,7 @@ import { PresencePile, type PresenceUser } from "./PresencePile";
 import { BrandMark } from "./Brand";
 import { pageTypeIcon, permissionLabel } from "../lib/format";
 import { CanvasEditor } from "./CanvasEditor";
+import { useIsMobile } from "../lib/media";
 
 type Props = {
   pageId: string;
@@ -51,6 +52,7 @@ export function PageEditor({
   canSaveTemplate,
 }: Props) {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const titleRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<Page | null>(fallback ?? null);
   const [permission, setPermission] = useState<Permission>(forcedPermission ?? (shareToken ? "view" : "edit"));
@@ -277,7 +279,7 @@ export function PageEditor({
 
   if (!page) {
     return (
-      <div className="mx-auto max-w-[900px] px-24 pt-28">
+      <div className="mx-auto max-w-[900px] px-24 pt-28 max-[720px]:px-4 max-[720px]:pt-16">
         <div className="skeleton mb-6 h-16 w-16 rounded-xl" />
         <div className="skeleton h-10 w-2/3" />
         <div className="skeleton mt-8 h-4 w-full" />
@@ -302,17 +304,17 @@ export function PageEditor({
               <BrandMark className="h-5 w-auto" />
             </a>
           ) : (
-            page.type !== "canvas" && sidebarCollapsed && (
+            page.type !== "canvas" && (sidebarCollapsed || isMobile) && (
             <button
               className="btn-ghost mr-1 h-7 w-7 p-0 text-muted"
               onClick={onExpandSidebar}
               title="サイドバーを開く"
             >
-              <ChevronsRight size={15} />
+              {isMobile ? <PanelLeft size={15} /> : <ChevronsRight size={15} />}
             </button>
             )
           )}
-          {page.type !== "canvas" && crumbs.map((c) => (
+          {page.type !== "canvas" && !isMobile && crumbs.map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
               <button
                 className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
@@ -445,13 +447,13 @@ export function PageEditor({
                 <BrandMark className="h-5 w-auto" />
               </a>
             ) : (
-              sidebarCollapsed && (
+              (sidebarCollapsed || isMobile) && (
                 <button
                   className="jam-title-icon"
                   onClick={onExpandSidebar}
                   title="サイドバーを開く"
                 >
-                  <ChevronsRight size={16} />
+                  {isMobile ? <PanelLeft size={16} /> : <ChevronsRight size={16} />}
                 </button>
               )
             )}
@@ -481,7 +483,7 @@ export function PageEditor({
               }}
             />
             {iconOpen && (
-              <div className="menu-panel absolute left-0 top-11 z-20 w-80 p-2" onClick={(e) => e.stopPropagation()}>
+              <div className="menu-panel absolute left-0 top-11 z-20 w-[min(20rem,calc(100vw-2rem))] p-2" onClick={(e) => e.stopPropagation()}>
                 <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
                 <EmojiPicker
                   onPick={(emo) => {
@@ -522,7 +524,7 @@ export function PageEditor({
         <div className="group/cover relative h-48 w-full bg-canvas">
           <CoverVisual cover={page.coverR2Key} className="h-48 w-full object-cover" />
           {editable && (
-            <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
+            <div className="cover-actions absolute right-3 top-3 flex gap-1 opacity-0 group-hover/cover:opacity-100">
               <button
                 className="rounded-[6px] bg-white/90 px-2 py-1 text-[12px] text-muted"
                 onClick={(e) => {
@@ -558,7 +560,7 @@ export function PageEditor({
         }
       >
         <div
-          className={`relative px-24 max-[860px]:px-6 ${
+          className={`relative px-24 max-[860px]:px-6 max-[720px]:px-4 ${
             page.coverR2Key
               ? page.icon
                 ? "pt-11"
@@ -572,8 +574,8 @@ export function PageEditor({
             <div
               className={`absolute z-[3] flex flex-wrap gap-1 ${
                 page.icon
-                  ? "left-[182px] max-[860px]:left-[110px]"
-                  : "left-24 max-[860px]:left-6"
+                  ? "left-[182px] max-[860px]:left-[110px] max-[720px]:left-[84px]"
+                  : "left-24 max-[860px]:left-6 max-[720px]:left-4"
               } ${page.coverR2Key && page.icon ? "top-1" : "top-0"}`}
             >
               {!page.icon && (
@@ -605,9 +607,9 @@ export function PageEditor({
           )}
           {page.icon ? (
             <button
-              className={`rounded-xl text-[78px] leading-none transition hover:bg-hover ${
+              className={`rounded-xl text-[78px] leading-none transition hover:bg-hover max-[720px]:text-[52px] ${
                 page.coverR2Key
-                  ? "absolute left-24 top-[-42px] z-[2] max-[860px]:left-6"
+                  ? "absolute left-24 top-[-42px] z-[2] max-[860px]:left-6 max-[720px]:left-4"
                   : "mb-1 block"
               }`}
               onClick={() => {
@@ -617,14 +619,14 @@ export function PageEditor({
               }}
               disabled={!editable}
             >
-              <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={78} />
+              <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={isMobile ? 52 : 78} />
             </button>
           ) : (
             editable && !page.coverR2Key && <div className="h-8" />
           )}
           {iconOpen && (
             <div
-              className={`menu-panel absolute left-24 z-20 w-80 p-2 max-[860px]:left-6 ${
+              className={`menu-panel absolute left-24 z-20 w-[min(20rem,calc(100vw-2rem))] p-2 max-[860px]:left-6 max-[720px]:left-4 ${
                 page.coverR2Key && page.icon ? "top-12" : "top-[5.5rem]"
               }`}
               onClick={(e) => e.stopPropagation()}
@@ -654,7 +656,7 @@ export function PageEditor({
           )}
           {coverOpen && !page.coverR2Key && (
             <div
-              className="menu-panel absolute left-24 top-[5.5rem] z-20 w-[min(420px,calc(100%-3rem))] p-2 max-[860px]:left-6"
+              className="menu-panel absolute left-24 top-[5.5rem] z-20 w-[min(420px,calc(100%-2rem))] p-2 max-[860px]:left-6 max-[720px]:left-4"
               onClick={(e) => e.stopPropagation()}
             >
               <CoverPicker
@@ -718,9 +720,9 @@ export function PageEditor({
         ) : (
           <>
             {parentFields.length > 0 && (
-              <div className="mt-4 space-y-0.5 px-24 max-[860px]:px-6">
+              <div className="mt-4 space-y-0.5 px-24 max-[860px]:px-6 max-[720px]:px-4">
                 {parentFields.map((p) => (
-                  <div key={p.id} className="flex min-h-8 items-center gap-4">
+                  <div key={p.id} className="flex min-h-8 items-center gap-4 max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:gap-1">
                     <span className="flex w-32 shrink-0 items-center gap-1.5 truncate text-[13px] text-muted">
                       <PropertyIcon type={p.type} />
                       {p.name}
@@ -807,7 +809,7 @@ export function PageEditor({
         />
       )}
       {shareToken && (
-        <footer className="mx-auto flex max-w-[900px] items-center gap-2.5 px-24 pb-16 pt-10 max-[860px]:px-6">
+        <footer className="mx-auto flex max-w-[900px] items-center gap-2.5 px-24 pb-16 pt-10 max-[860px]:px-6 max-[720px]:px-4">
           <BrandMark className="h-5 w-auto" />
           <span className="text-[12px] text-muted">Arcana で共有されたページ</span>
         </footer>

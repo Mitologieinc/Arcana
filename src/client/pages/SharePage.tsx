@@ -57,7 +57,7 @@ export function SharePage() {
   if (!page || !token) return null;
 
   return (
-    <div className="h-full">
+    <div className={`h-full ${page.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
       <PageEditor
         key={page.id}
         pageId={page.id}

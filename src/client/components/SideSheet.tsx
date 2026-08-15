@@ -32,7 +32,7 @@ export function SideSheet({
     <div className="fixed inset-0 flex justify-end" style={{ zIndex }}>
       <button className="flex-1 bg-[rgba(15,15,15,0.08)]" onClick={onClose} aria-label="閉じる" />
       <aside
-        className="flex h-full flex-col border-l border-line bg-white"
+        className="arcana-sheet flex h-full flex-col border-l border-line bg-white"
         style={{ width: `min(${width}px, 92vw)` }}
       >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3">

@@ -61,7 +61,7 @@ export function RowPeek({
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <button className="h-full flex-1 bg-[rgba(15,15,15,0.08)]" onClick={onClose} aria-label="閉じる" />
-      <aside className="flex h-full w-[min(720px,92vw)] flex-col border-l border-line bg-white">
+      <aside className="arcana-sheet flex h-full w-[min(720px,92vw)] flex-col border-l border-line bg-white">
         <header className="flex h-11 shrink-0 items-center justify-between px-3">
           <button className="btn-ghost h-8 gap-1.5 px-2 text-[13px] text-muted" onClick={onOpenPage}>
             <Maximize2 size={14} />

@@ -185,7 +185,7 @@ export function DatabaseView({
   onOpenRow,
   onChanged,
 }: Props) {
-  const gutter = embedded ? "" : "px-24 max-[860px]:px-6";
+  const gutter = embedded ? "" : "px-24 max-[860px]:px-6 max-[720px]:px-4";
   const [viewId, setViewId] = useState(views[0]?.id);
   const view = views.find((v) => v.id === viewId) ?? views[0];
   const [filterMenu, setFilterMenu] = useState<DOMRect | null>(null);

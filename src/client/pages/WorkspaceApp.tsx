@@ -14,10 +14,12 @@ import { SettingsPanel } from "../components/SettingsPanel";
 import { TrashPanel } from "../components/TrashPanel";
 import { NotifPanel } from "../components/NotifPanel";
 import { hideBootSplash } from "../components/Brand";
+import { useIsMobile } from "../lib/media";
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
   const nav = useNavigate();
+  const isMobile = useIsMobile();
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -25,7 +27,11 @@ export function WorkspaceApp() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
-  const [navOpen, setNavOpen] = useState(() => localStorage.getItem("arcana.sidebar") === "0");
+  const [navOpen, setNavOpen] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches
+      ? false
+      : localStorage.getItem("arcana.sidebar") === "0",
+  );
   const [trashOpen, setTrashOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [favorites, setFavorites] = useState<Page[]>([]);
@@ -35,9 +41,20 @@ export function WorkspaceApp() {
   function toggleNav() {
     setNavOpen((v) => {
       const next = !v;
-      localStorage.setItem("arcana.sidebar", next ? "0" : "1");
+      if (!window.matchMedia("(max-width: 720px)").matches) {
+        localStorage.setItem("arcana.sidebar", next ? "0" : "1");
+      }
       return next;
     });
+  }
+
+  function closeNavIfMobile() {
+    if (window.matchMedia("(max-width: 720px)").matches) setNavOpen(false);
+  }
+
+  function openPage(id: string) {
+    closeNavIfMobile();
+    nav(`/page/${id}`);
   }
 
   async function refresh() {
@@ -108,6 +125,7 @@ export function WorkspaceApp() {
       }),
     });
     await refresh();
+    closeNavIfMobile();
     nav(`/page/${res.page.id}`, { state: { focusTitle: !seed?.title && !seed?.templateId } });
   }
 
@@ -117,6 +135,10 @@ export function WorkspaceApp() {
     setSettingsOpen(true);
   }
 
+  useEffect(() => {
+    if (isMobile) setNavOpen(false);
+  }, [isMobile]);
+
   useLayoutEffect(() => {
     if (ready) hideBootSplash();
   }, [ready]);
@@ -124,13 +146,16 @@ export function WorkspaceApp() {
   if (!ready || !user || !workspace) return null;
 
   return (
-    <div className="flex h-full bg-white">
+    <div className="arcana-shell">
       <AppRail
         user={user}
         home={!pageId}
         navOpen={navOpen}
         unread={unread}
-        onHome={() => nav("/")}
+        onHome={() => {
+          closeNavIfMobile();
+          nav("/");
+        }}
         onSearch={() => setSearchOpen(true)}
         onToggleNav={toggleNav}
         onNewPage={() => void createPage(null, "page")}
@@ -138,6 +163,9 @@ export function WorkspaceApp() {
         onTrash={() => setTrashOpen(true)}
         onNotifs={() => setNotifOpen(true)}
       />
+      {navOpen && isMobile && (
+        <button className="arcana-nav-backdrop" onClick={toggleNav} aria-label="メニューを閉じる" />
+      )}
       <aside className={`arcana-nav ${navOpen ? "" : "is-collapsed"}`} aria-hidden={!navOpen}>
           <div className="flex h-11 items-center justify-between px-3">
             <div className="flex min-w-0 items-center gap-1">
@@ -161,7 +189,7 @@ export function WorkspaceApp() {
                 <button
                   key={p.id}
                   className="flex h-[30px] w-full items-center gap-1.5 rounded-[6px] px-2 text-left text-[13px] hover:bg-hover"
-                  onClick={() => nav(`/page/${p.id}`)}
+                  onClick={() => openPage(p.id)}
                 >
                   <PageIcon icon={p.icon} fallback="⭐" size={15} />
                   <span className="min-w-0 truncate">{p.title || "無題"}</span>
@@ -173,7 +201,7 @@ export function WorkspaceApp() {
             <SidebarTree
               pages={pages}
               currentId={pageId}
-              onOpen={(id) => nav(`/page/${id}`)}
+              onOpen={openPage}
               onCreateChild={(id) => createPage(id, "page")}
               onMove={async (id, parentId, position) => {
                 await api(`/api/pages/${id}`, {
@@ -196,7 +224,7 @@ export function WorkspaceApp() {
             sidebarCollapsed={!navOpen}
             onExpandSidebar={toggleNav}
             onPagesChanged={refresh}
-            onOpenPage={(id) => nav(id ? `/page/${id}` : "/")}
+            onOpenPage={(id) => (id ? openPage(id) : nav("/"))}
             canSaveTemplate={workspace.role !== "guest"}
           />
         ) : (
@@ -205,8 +233,10 @@ export function WorkspaceApp() {
             favorites={favorites}
             recent={recent}
             templates={templates}
+            showMenu
+            onMenu={toggleNav}
             onSearch={() => setSearchOpen(true)}
-            onOpen={(id) => nav(`/page/${id}`)}
+            onOpen={openPage}
             onMemo={() => void createPage(null, "page", { title: "メモ", icon: "📝" })}
             onMeeting={() => void createPage(null, "page", { title: "会議メモ", icon: "📅" })}
             onTasks={() => void createPage(null, "database", { title: "タスク", icon: "✅" })}
@@ -223,7 +253,7 @@ export function WorkspaceApp() {
           onClose={() => setSearchOpen(false)}
           onOpen={(id) => {
             setSearchOpen(false);
-            nav(`/page/${id}`);
+            openPage(id);
           }}
           onCreate={(type) => {
             setSearchOpen(false);
@@ -245,7 +275,7 @@ export function WorkspaceApp() {
           }}
           onOpen={(id) => {
             setNotifOpen(false);
-            nav(`/page/${id}`);
+            openPage(id);
           }}
         />
       )}
@@ -279,6 +309,8 @@ function Home({
   favorites,
   recent,
   templates,
+  showMenu,
+  onMenu,
   onSearch,
   onOpen,
   onMemo,
@@ -291,6 +323,8 @@ function Home({
   favorites: Page[];
   recent: Page[];
   templates: SavedTemplate[];
+  showMenu?: boolean;
+  onMenu?: () => void;
   onSearch: () => void;
   onOpen: (id: string) => void;
   onMemo: () => void;
@@ -304,7 +338,16 @@ function Home({
   const empty = favorites.length === 0 && recent.length === 0;
 
   return (
-    <div className="mx-auto max-w-[640px] px-10 py-16">
+    <>
+      {showMenu && onMenu && (
+        <div className="sticky top-0 z-[5] hidden h-11 items-center gap-2 bg-white/75 px-3 backdrop-blur-md max-[720px]:flex">
+          <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onMenu} title="ページ一覧">
+            <PanelLeft size={18} strokeWidth={1.6} />
+          </button>
+          <span className="text-[14px] font-medium">ホーム</span>
+        </div>
+      )}
+    <div className="mx-auto max-w-[640px] px-10 py-16 max-[720px]:px-4 max-[720px]:py-6">
       <button
         className="flex h-11 w-full items-center gap-3 rounded-full border border-line bg-white px-4 text-left text-[14px] text-muted hover:bg-canvas"
         onClick={onSearch}
@@ -313,7 +356,7 @@ function Home({
         <span className="flex-1">検索</span>
         <kbd className="kbd">{modSymbol()}K</kbd>
       </button>
-      <h1 className="mt-12 text-[22px] font-medium tracking-tight">
+      <h1 className="mt-12 text-[22px] font-medium tracking-tight max-[720px]:mt-6">
         {greeting()}、{userName}
       </h1>
       {empty ? (
@@ -378,6 +421,7 @@ function Home({
         </>
       )}
     </div>
+    </>
   );
 }
 

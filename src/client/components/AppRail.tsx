@@ -46,7 +46,7 @@ export function AppRail({
   return (
     <nav className="arcana-rail" aria-label="メイン">
       <button
-        className={`mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] ${home ? "bg-hover" : ""}`}
+        className={`arcana-rail-home mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] ${home ? "bg-hover" : ""}`}
         onClick={onHome}
         title="ホーム"
       >
@@ -58,7 +58,7 @@ export function AppRail({
       <button className="arcana-rail-btn" onClick={onNewPage} title="新規ページ">
         <Plus size={18} strokeWidth={1.6} />
       </button>
-      <div className="flex-1" />
+      <div className="arcana-rail-grow flex-1" />
       <button className="arcana-rail-btn relative" onClick={onNotifs} title="通知">
         <Bell size={18} strokeWidth={1.6} />
         {unread > 0 && <span className="arcana-badge">{unread > 9 ? "9+" : unread}</span>}
@@ -76,7 +76,7 @@ export function AppRail({
         </button>
         {menu && (
           <div
-            className="menu-panel absolute bottom-0 left-[calc(100%+8px)] z-30 w-44 p-1"
+            className="menu-panel absolute bottom-0 left-[calc(100%+8px)] z-30 w-44 p-1 max-[720px]:bottom-[calc(100%+8px)] max-[720px]:left-auto max-[720px]:right-0"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -103,7 +103,7 @@ export function AppRail({
         )}
       </div>
       {!navOpen && (
-        <button className="arcana-rail-btn" onClick={onToggleNav} title="サイドバーを開く">
+        <button className="arcana-rail-btn max-[720px]:hidden" onClick={onToggleNav} title="サイドバーを開く">
           <PanelLeft size={18} strokeWidth={1.6} />
         </button>
       )}
