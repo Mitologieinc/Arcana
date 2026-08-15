@@ -55,7 +55,7 @@ export type DbView = {
   id: string;
   pageId: string;
   name: string;
-  type: "table" | "board" | "calendar" | "gallery";
+  type: "table" | "board" | "calendar" | "gallery" | "card";
   config: {
     groupBy?: string;
     filters?: DbFilter[];

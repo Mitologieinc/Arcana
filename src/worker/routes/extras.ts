@@ -370,9 +370,9 @@ extraRoutes.post("/api/pages/:id/views", async (c) => {
   const id = c.req.param("id");
   const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
   if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
-  const body = await c.req.json<{ name?: string; type?: "table" | "board" | "calendar" | "gallery"; groupBy?: string }>();
+  const body = await c.req.json<{ name?: string; type?: "table" | "board" | "calendar" | "gallery" | "card"; groupBy?: string }>();
   const type = body.type ?? "table";
-  const names: Record<string, string> = { table: "テーブル", board: "ボード", calendar: "カレンダー", gallery: "ギャラリー" };
+  const names: Record<string, string> = { table: "テーブル", board: "ボード", calendar: "カレンダー", gallery: "ギャラリー", card: "カード" };
   const existing = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.pageId, id));
   const position = existing.reduce((m, v) => Math.max(m, v.position), 0) + 1;
   const sch = await ctx.db.select().from(schema.databaseSchemas).where(eq(schema.databaseSchemas.pageId, id)).limit(1);

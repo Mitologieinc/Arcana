@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { CalendarDays, ChevronRight, Columns3, GripVertical, LayoutGrid, MoreHorizontal, Plus, Search, Table2, Trash2, X } from "lucide-react";
+import { CalendarDays, ChevronRight, Columns3, CreditCard, GripVertical, LayoutGrid, MoreHorizontal, Plus, Search, Table2, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "../lib/toast";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
@@ -603,7 +603,17 @@ export function DatabaseView({
             }`}
             onClick={() => setViewId(v.id)}
           >
-            {v.type === "board" ? <Columns3 size={14} /> : v.type === "calendar" ? <CalendarDays size={14} /> : v.type === "gallery" ? <LayoutGrid size={14} /> : <Table2 size={14} />}
+            {v.type === "board" ? (
+              <Columns3 size={14} />
+            ) : v.type === "calendar" ? (
+              <CalendarDays size={14} />
+            ) : v.type === "gallery" ? (
+              <LayoutGrid size={14} />
+            ) : v.type === "card" ? (
+              <CreditCard size={14} />
+            ) : (
+              <Table2 size={14} />
+            )}
             {v.name}
           </button>
         ))}
@@ -735,6 +745,47 @@ export function DatabaseView({
               onClick={() => void addRow()}
             >
               + 行を追加
+            </button>
+          )}
+        </div>
+      ) : view.type === "card" ? (
+        <div className={`grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 max-[720px]:grid-cols-1 ${gutter}`}>
+          {filtered.map((row) => {
+            const props = parseProps(row.properties);
+            return (
+              <button
+                key={row.id}
+                type="button"
+                className="overflow-hidden rounded-[14px] border border-line bg-white text-left shadow-[0_1px_2px_rgba(15,15,15,0.04)] hover:bg-hover"
+                onClick={() => onOpenRow(row.id)}
+              >
+                {row.coverR2Key && (
+                  <div className="h-28 bg-canvas">
+                    <CoverVisual cover={row.coverR2Key} className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <div className="p-3.5">
+                  <div className={`flex items-center gap-1.5 text-[15px] font-medium ${row.title ? "" : "text-muted"}`}>
+                    {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
+                    <span className="truncate">{row.title || "名前を入力"}</span>
+                  </div>
+                  <RowChips schema={schema} props={props} limit={6} members={members} />
+                </div>
+              </button>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="col-span-full px-1 py-8 text-center text-[13px] text-muted">
+              {equalsFilter || filterValue ? "条件に合う行はありません" : "カードを追加して、一覧を使い始めてください"}
+            </p>
+          )}
+          {editable && (
+            <button
+              type="button"
+              className="rounded-[14px] border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover"
+              onClick={() => void addRow()}
+            >
+              + カードを追加
             </button>
           )}
         </div>
@@ -1278,7 +1329,7 @@ export function DatabaseView({
 
       {addView && (
         <FloatMenu anchor={addView} onClose={() => setAddView(null)} width={200}>
-          {(["table", "board", "calendar", "gallery"] as const).map((t) => (
+          {(["table", "board", "card", "calendar", "gallery"] as const).map((t) => (
             <button
               key={t}
               className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
@@ -1292,7 +1343,7 @@ export function DatabaseView({
                 setViewId(d.id);
               }}
             >
-              {t === "table" ? "テーブル" : t === "board" ? "ボード" : t === "calendar" ? "カレンダー" : "ギャラリー"}
+              {t === "table" ? "テーブル" : t === "board" ? "ボード" : t === "card" ? "カード" : t === "calendar" ? "カレンダー" : "ギャラリー"}
             </button>
           ))}
           {isMobile && editable && views.length > 1 && (

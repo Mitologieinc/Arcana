@@ -165,7 +165,7 @@ export const databaseViews = sqliteTable("database_views", {
     .notNull()
     .references(() => pages.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  type: text("type").notNull().$type<"table" | "board" | "calendar" | "gallery">(),
+  type: text("type").notNull().$type<"table" | "board" | "calendar" | "gallery" | "card">(),
   config: text("config").notNull(),
   position: real("position").notNull().default(0),
 });
