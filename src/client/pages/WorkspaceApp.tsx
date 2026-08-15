@@ -256,6 +256,7 @@ export function WorkspaceApp() {
               currentId={pageId}
               onOpen={openPage}
               onCreateChild={(id) => createPage(id, "page")}
+              onCreateRoot={() => void createPage(null, "page")}
               onMove={async (id, parentId, position) => {
                 await api(`/api/pages/${id}`, {
                   method: "PATCH",

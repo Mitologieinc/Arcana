@@ -721,6 +721,11 @@ export function DatabaseView({
               </div>
             </button>
           ))}
+          {filtered.length === 0 && (
+            <p className="col-span-full px-1 py-8 text-center text-[13px] text-muted">
+              {equalsFilter || filterValue ? "条件に合う行はありません" : "カードを追加して、ギャラリーを使い始めてください"}
+            </p>
+          )}
           {editable && (
             <button className="rounded-[10px] border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover" onClick={() => void addRow()}>
               + 新規
@@ -746,6 +751,24 @@ export function DatabaseView({
               void updateRow(row, { properties: { ...parseProps(row.properties), [dateProp.id]: iso } });
             }}
           />
+        </div>
+      ) : view.type === "board" && !statusProp ? (
+        <div className={`${gutter} py-10 text-center`}>
+          <p className="mb-3 text-[13px] text-muted">ボードにはステータス列が必要です</p>
+          {editable && (
+            <button
+              type="button"
+              className="btn btn-secondary h-8 px-3 text-[13px]"
+              onClick={() => {
+                const prop = createProperty("status");
+                void saveSchema([...schema, prop]).then(() => {
+                  void saveView({ ...view.config, groupBy: prop.id });
+                });
+              }}
+            >
+              ステータス列を追加
+            </button>
+          )}
         </div>
       ) : view.type === "board" && statusProp ? (
         <div className={gutter}>

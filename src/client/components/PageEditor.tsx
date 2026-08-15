@@ -314,10 +314,10 @@ export function PageEditor({
             </button>
             )
           )}
-          {page.type !== "canvas" && !isMobile && crumbs.map((c) => (
+          {page.type !== "canvas" && (isMobile ? crumbs.slice(-1) : crumbs).map((c) => (
             <span key={c.id} className="flex min-w-0 items-center">
               <button
-                className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
+                className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover max-[720px]:max-w-[7.5rem]"
                 onClick={() => onOpenPage(c.id)}
               >
                 {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 align-middle" /> : `${pageTypeIcon(c.type)} `}
@@ -460,6 +460,11 @@ export function PageEditor({
           )}
         </div>
       </header>
+      {!editable && page.type !== "canvas" && (
+        <div className="border-b border-line bg-canvas px-24 py-2 text-[13px] text-muted max-[860px]:px-6 max-[720px]:px-4">
+          閲覧のみです。本文は編集できません
+        </div>
+      )}
       {page.type === "canvas" && (
         <div className="relative h-full min-h-0 flex-1">
           <div className="jam-title" onPointerDown={(e) => e.stopPropagation()}>

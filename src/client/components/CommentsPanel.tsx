@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { relativeTime } from "../lib/format";
+import { toast } from "../lib/toast";
 import type { Member } from "../lib/types";
 import { Avatar } from "./Avatar";
 import { SideSheet } from "./SideSheet";
@@ -63,6 +64,7 @@ export function CommentsPanel({
   const [mentionIds, setMentionIds] = useState<string[]>([]);
   const [hi, setHi] = useState(0);
   const [hideAt, setHideAt] = useState(false);
+  const [sending, setSending] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const at = hideAt ? null : mentionQuery(text, caret);
@@ -106,19 +108,26 @@ export function CommentsPanel({
           onSubmit={async (e) => {
             e.preventDefault();
             const body = text.trim();
-            if (!body) return;
+            if (!body || sending) return;
             const ids = mentionIds.filter((id) => {
               const m = members.find((x) => x.userId === id);
               return m && body.includes(`@${m.name}`);
             });
-            await api(`/api/pages/${pageId}/comments`, {
-              method: "POST",
-              body: JSON.stringify({ body, mentionIds: ids }),
-            });
-            setText("");
-            setMentionIds([]);
-            setCaret(0);
-            await load();
+            setSending(true);
+            try {
+              await api(`/api/pages/${pageId}/comments`, {
+                method: "POST",
+                body: JSON.stringify({ body, mentionIds: ids }),
+              });
+              setText("");
+              setMentionIds([]);
+              setCaret(0);
+              await load();
+            } catch {
+              toast("コメントを送れませんでした");
+            } finally {
+              setSending(false);
+            }
           }}
         >
           {hits.length > 0 && (
@@ -168,8 +177,8 @@ export function CommentsPanel({
               }
             }}
           />
-          <button className="btn btn-primary h-8 px-3 text-[13px]" type="submit">
-            送信
+          <button className="btn btn-primary h-8 px-3 text-[13px]" type="submit" disabled={sending}>
+            {sending ? "送信中…" : "送信"}
           </button>
         </form>
       }

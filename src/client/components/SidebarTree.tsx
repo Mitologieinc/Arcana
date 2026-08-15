@@ -10,6 +10,7 @@ type Props = {
   currentId?: string;
   onOpen: (id: string) => void;
   onCreateChild: (parentId: string) => void;
+  onCreateRoot?: () => void;
   onMove?: (id: string, parentId: string | null, position: number) => Promise<unknown>;
   compact?: boolean;
 };
@@ -20,7 +21,7 @@ type TreeDrag = {
   edge: "before" | "after" | "inside";
 };
 
-export function SidebarTree({ pages, currentId, onOpen, onCreateChild, onMove, compact }: Props) {
+export function SidebarTree({ pages, currentId, onOpen, onCreateChild, onCreateRoot, onMove, compact }: Props) {
   const roots = useMemo(
     () => pages.filter((p) => !p.parentId).sort((a, b) => a.position - b.position),
     [pages],
@@ -109,6 +110,16 @@ export function SidebarTree({ pages, currentId, onOpen, onCreateChild, onMove, c
       }}
       onDrop={() => void commit(true)}
     >
+      {roots.length === 0 && (
+        <div className="px-1 py-6 text-center">
+          <p className="mb-2 text-[13px] text-muted">まだページがありません</p>
+          {onCreateRoot && (
+            <button type="button" className="btn-ghost h-8 px-2 text-[13px] text-muted" onClick={onCreateRoot}>
+              ページを作る
+            </button>
+          )}
+        </div>
+      )}
       {roots.map((p) => (
         <TreeNode
           key={p.id}
@@ -227,7 +238,7 @@ function TreeNode({
           <span className={`min-w-0 truncate ${page.title ? "text-ink" : "text-muted"}`}>{page.title || "無題"}</span>
         </button>
         <button
-          className="hidden h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5 group-hover:flex"
+          className="arcana-tree-add hidden h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5 group-hover:flex"
           onClick={() => onCreateChild(page.id)}
           title="子ページを追加"
         >

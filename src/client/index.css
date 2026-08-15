@@ -2800,4 +2800,10 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
   .arcana-db-table tbody .btn-ghost {
     opacity: 1;
   }
+
+  .sidebar-scroll .arcana-grip,
+  .arcana-tree-add {
+    opacity: 1;
+    display: flex;
+  }
 }

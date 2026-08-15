@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { FilePlus, LayoutGrid, Search, StickyNote } from "lucide-react";
 import { api } from "../lib/api";
+import { toast } from "../lib/toast";
 import type { Page, PageType } from "../lib/types";
 import { pageTypeIcon } from "../lib/format";
 import { Modal } from "./Modal";
@@ -26,6 +27,8 @@ export function SearchModal({
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const recents = useMemo(
     () =>
@@ -39,11 +42,23 @@ export function SearchModal({
     const t = window.setTimeout(() => {
       if (!q.trim()) {
         setResults([]);
+        setLoading(false);
+        setFailed(false);
         return;
       }
+      setLoading(true);
+      setFailed(false);
       api<{ results: Result[] }>(`/api/search?q=${encodeURIComponent(q)}`)
-        .then((d) => setResults(d.results))
-        .catch(() => setResults([]));
+        .then((d) => {
+          setResults(d.results);
+          setFailed(false);
+        })
+        .catch(() => {
+          setResults([]);
+          setFailed(true);
+          toast("検索できませんでした");
+        })
+        .finally(() => setLoading(false));
     }, 160);
     return () => window.clearTimeout(t);
   }, [q]);
@@ -135,8 +150,19 @@ export function SearchModal({
         <kbd className="kbd">esc</kbd>
       </div>
       <ul className="max-h-80 overflow-auto py-1.5">
-        {rows.map((row, i) => (
+        {rows.map((row, i) => {
+          const prev = rows[i - 1];
+          const kicker =
+            row.kind === "action" && prev?.kind !== "action"
+              ? "作成"
+              : row.kind === "page" && prev?.kind !== "page"
+                ? q.trim()
+                  ? "検索結果"
+                  : "最近"
+                : null;
+          return (
           <li key={row.key}>
+            {kicker && <p className="slash-kicker px-3">{kicker}</p>}
             <button
               className={`flex w-full items-center gap-2.5 rounded-[6px] px-3 py-2 text-left text-[14px] ${
                 i === index ? "bg-hover" : "hover:bg-hover"
@@ -166,8 +192,15 @@ export function SearchModal({
               </span>
             </button>
           </li>
-        ))}
-        {q && rows.length === 0 && (
+          );
+        })}
+        {q && loading && (
+          <li className="px-3 py-6 text-center text-[13px] text-muted">検索中…</li>
+        )}
+        {q && !loading && failed && (
+          <li className="px-3 py-10 text-center text-[14px] text-muted">検索できませんでした</li>
+        )}
+        {q && !loading && !failed && rows.every((r) => r.kind !== "page") && (
           <li className="px-3 py-10 text-center text-[14px] text-muted">見つかりませんでした</li>
         )}
       </ul>
