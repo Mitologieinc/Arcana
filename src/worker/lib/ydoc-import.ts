@@ -58,6 +58,22 @@ const ImportPageLink = Node.create({
   },
 });
 
+const ImportUserMention = Node.create({
+  name: "userMention",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return { userId: { default: "" }, name: { default: "不明" } };
+  },
+  parseHTML() {
+    return [{ tag: "span[data-user-id].user-mention" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { "data-user-id": HTMLAttributes.userId, class: "user-mention" })];
+  },
+});
+
 const ImportDatabaseEmbed = Node.create({
   name: "databaseEmbed",
   group: "block",
@@ -128,6 +144,7 @@ const schema = getSchema([
   ImportCallout,
   ImportPageBlock,
   ImportPageLink,
+  ImportUserMention,
   ImportDatabaseEmbed,
   ImportFileBlock,
   ImportColumn,
@@ -165,8 +182,10 @@ export function normalizeTipTapDoc(raw: unknown): TipTapDoc | null {
 
 function walk(node: unknown, parts: string[]) {
   if (!node || typeof node !== "object") return;
-  const n = node as { text?: string; content?: unknown[] };
+  const n = node as { text?: string; content?: unknown[]; type?: string; attrs?: { name?: string; title?: string } };
   if (typeof n.text === "string") parts.push(n.text);
+  if (n.type === "userMention" && n.attrs?.name) parts.push(`@${n.attrs.name}`);
+  if (n.type === "pageLink" && n.attrs?.title) parts.push(n.attrs.title);
   if (Array.isArray(n.content)) {
     for (const child of n.content) walk(child, parts);
   }

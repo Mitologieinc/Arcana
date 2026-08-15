@@ -45,7 +45,8 @@ import { Column, ColumnList } from "./columns";
 import { BlockHandle } from "./BlockHandle";
 import { ColorButton, LinkButton } from "./FormatMenu";
 import { SlashCommand, uploadImage } from "./slash";
-import { PageBlock, PageLink, PageMention } from "./pageLink";
+import { AtMention, UserMention } from "./mention";
+import { PageBlock, PageLink } from "./pageLink";
 import { addNamedColumn } from "./simpleTable";
 import type { PresenceUser } from "../components/PresencePile";
 
@@ -183,7 +184,7 @@ export const TiptapEditor = forwardRef<
             if (name === "taskItem") return "ToDo";
             if (name === "listItem") return "項目";
           }
-          return "入力するか、'/' でコマンド";
+          return "入力するか、'/' でコマンド、'@' でメンション";
         },
       }),
       Highlight.configure({ multicolor: true }),
@@ -221,7 +222,8 @@ export const TiptapEditor = forwardRef<
       }),
       PageLink,
       PageBlock,
-      PageMention,
+      UserMention,
+      AtMention.configure({ pageId }),
       NodeRange.extend({
         addKeyboardShortcuts() {
           return {};

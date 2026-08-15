@@ -9,6 +9,56 @@ import type { AppEnv } from "../types";
 
 export const extraRoutes = new Hono<AppEnv>();
 
+type ExtraDb = ReturnType<typeof createDb>;
+
+function mentionIdsFrom(
+  text: string,
+  rawIds: string[] | undefined,
+  members: { userId: string; name: string }[],
+  actorId: string,
+) {
+  const byName = [...members].sort((a, b) => b.name.length - a.name.length);
+  const fromBody = byName.filter((m) => m.name && text.includes(`@${m.name}`)).map((m) => m.userId);
+  const allowed = new Set(members.map((m) => m.userId));
+  return [...new Set([...(rawIds ?? []), ...fromBody])].filter((id) => id && id !== actorId && allowed.has(id));
+}
+
+async function notifyMentions(
+  db: ExtraDb,
+  opts: {
+    actorId: string;
+    actorName: string;
+    pageId: string;
+    pageTitle: string;
+    userIds: string[];
+    memberIds: string[];
+  },
+) {
+  const allowed = new Set(opts.memberIds);
+  const unique = [...new Set(opts.userIds)].filter((id) => id && id !== opts.actorId && allowed.has(id));
+  if (!unique.length) return;
+  const recent = await db
+    .select()
+    .from(schema.notifications)
+    .where(and(eq(schema.notifications.actorId, opts.actorId), eq(schema.notifications.pageId, opts.pageId), eq(schema.notifications.type, "mention")));
+  const cutoff = Date.now() - 5 * 60 * 1000;
+  const now = new Date();
+  for (const userId of unique) {
+    const last = recent.find((n) => n.userId === userId);
+    const lastAt = last?.createdAt instanceof Date ? last.createdAt.getTime() : Number(last?.createdAt ?? 0);
+    if (last && lastAt > cutoff) continue;
+    await db.insert(schema.notifications).values({
+      id: crypto.randomUUID(),
+      userId,
+      actorId: opts.actorId,
+      pageId: opts.pageId,
+      type: "mention",
+      body: `${opts.actorName} が「${opts.pageTitle}」であなたをメンションしました`,
+      createdAt: now,
+    });
+  }
+}
+
 async function authed(c: Parameters<Parameters<typeof extraRoutes.use>[1]>[0]) {
   const user = await getSessionUser(c.env, c.req.raw);
   if (!user) return { error: c.json({ error: "未ログイン" }, 401) } as const;
@@ -129,8 +179,8 @@ extraRoutes.post("/api/pages/:id/comments", async (c) => {
   const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
   if (!canEdit(permission) && permission !== "view") return c.json({ error: "投稿できません" }, 403);
   if (!canView(permission)) return c.json({ error: "投稿できません" }, 403);
-  const body = await c.req.json<{ body: string }>();
-  const text = (body.body ?? "").trim();
+  const bodyJson = await c.req.json<{ body: string; mentionIds?: string[] }>();
+  const text = (bodyJson.body ?? "").trim();
   if (!text) return c.json({ error: "本文が空です" }, 400);
   const now = new Date();
   const commentId = crypto.randomUUID();
@@ -144,22 +194,57 @@ extraRoutes.post("/api/pages/:id/comments", async (c) => {
   const pageRows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
   const page = pageRows[0];
   const members = await ctx.db
-    .select()
+    .select({
+      userId: schema.workspaceMembers.userId,
+      name: schema.user.name,
+    })
     .from(schema.workspaceMembers)
+    .innerJoin(schema.user, eq(schema.user.id, schema.workspaceMembers.userId))
     .where(eq(schema.workspaceMembers.workspaceId, ctx.membership.workspaceId));
-  for (const m of members) {
-    if (m.userId === ctx.user.id) continue;
+  const mentioned = mentionIdsFrom(text, bodyJson.mentionIds, members, ctx.user.id);
+  const targets = mentioned.length ? mentioned : members.map((m) => m.userId).filter((uid) => uid !== ctx.user.id);
+  const title = page?.title || "無題";
+  for (const userId of targets) {
     await ctx.db.insert(schema.notifications).values({
       id: crypto.randomUUID(),
-      userId: m.userId,
+      userId,
       actorId: ctx.user.id,
       pageId: id,
-      type: "comment",
-      body: `${ctx.user.name} が「${page?.title || "無題"}」にコメントしました`,
+      type: mentioned.includes(userId) ? "mention" : "comment",
+      body: mentioned.includes(userId)
+        ? `${ctx.user.name} が「${title}」であなたをメンションしました`
+        : `${ctx.user.name} が「${title}」にコメントしました`,
       createdAt: now,
     });
   }
   return c.json({ ok: true, id: commentId });
+});
+
+extraRoutes.post("/api/pages/:id/mentions", async (c) => {
+  const ctx = await authed(c);
+  if ("error" in ctx) return ctx.error;
+  const id = c.req.param("id");
+  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
+  const body = await c.req.json<{ userIds?: string[] }>().catch(() => ({ userIds: [] as string[] }));
+  const pageRows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  const page = pageRows[0];
+  if (!page || page.workspaceId !== ctx.membership.workspaceId) {
+    return c.json({ error: "見つかりません" }, 404);
+  }
+  const members = await ctx.db
+    .select({ userId: schema.workspaceMembers.userId })
+    .from(schema.workspaceMembers)
+    .where(eq(schema.workspaceMembers.workspaceId, ctx.membership.workspaceId));
+  await notifyMentions(ctx.db, {
+    actorId: ctx.user.id,
+    actorName: ctx.user.name,
+    pageId: id,
+    pageTitle: page.title || "無題",
+    userIds: body.userIds ?? [],
+    memberIds: members.map((m) => m.userId),
+  });
+  return c.json({ ok: true });
 });
 
 extraRoutes.delete("/api/comments/:id", async (c) => {

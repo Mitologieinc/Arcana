@@ -816,7 +816,7 @@ export function PageEditor({
         />
       )}
       {commentsOpen && (
-        <CommentsPanel pageId={pageId} userId={user.id} onClose={() => setCommentsOpen(false)} />
+        <CommentsPanel pageId={pageId} userId={user.id} members={members} onClose={() => setCommentsOpen(false)} />
       )}
       {historyOpen && (
         <HistoryPanel

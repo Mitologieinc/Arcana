@@ -84,6 +84,11 @@ html[data-theme="dark"] .page-link:hover {
   background: rgba(255, 255, 255, 0.14);
 }
 
+html[data-theme="dark"] .user-mention {
+  background: rgba(35, 131, 226, 0.22);
+  color: #79b8f3;
+}
+
 html[data-theme="dark"] .page-title,
 html[data-theme="dark"] input,
 html[data-theme="dark"] textarea,
@@ -237,6 +242,20 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 
 .page-link:hover {
   background: rgba(55, 53, 47, 0.12);
+}
+
+.user-mention {
+  display: inline;
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: rgba(35, 131, 226, 0.12);
+  color: #2383e2;
+  font-weight: 510;
+  white-space: nowrap;
+}
+
+.arcana-doc [data-node-view-wrapper].user-mention {
+  display: inline;
 }
 
 .arcana-badge {
