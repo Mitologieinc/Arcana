@@ -211,13 +211,17 @@ function TreeNode({
             <GripVertical size={12} />
           </button>
         )}
-        <button
-          className={`flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5 ${children.length ? "" : "opacity-0 group-hover:opacity-100"}`}
-          onClick={() => setOpen((v) => !v)}
-          aria-label="展開"
-        >
-          <ChevronRight size={14} className={open && children.length ? "rotate-90 transition-transform" : "transition-transform"} />
-        </button>
+        {children.length > 0 ? (
+          <button
+            className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-black/5"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "折りたたむ" : "展開"}
+          >
+            <ChevronRight size={14} className={open ? "rotate-90 transition-transform" : "transition-transform"} />
+          </button>
+        ) : (
+          <span className="h-5 w-5 shrink-0" aria-hidden />
+        )}
         <button className="flex min-w-0 flex-1 items-center gap-1.5 px-0.5 text-left" onClick={() => onOpen(page.id)}>
           <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={15} />
           <span className={`min-w-0 truncate ${page.title ? "text-ink" : "text-muted"}`}>{page.title || "無題"}</span>
