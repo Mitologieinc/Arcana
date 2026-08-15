@@ -75,7 +75,6 @@ function AuthLayout({
     <div className="auth-page">
       <header className="auth-head">
         <BrandLockup className="h-8 w-auto max-w-full" />
-        <MadeBy className="auth-made" />
       </header>
       <main className="auth-main">
         <div className={`auth-card ${wide ? "is-wide" : ""}`}>
@@ -91,6 +90,9 @@ function AuthLayout({
           <div className="auth-body">{children}</div>
         </div>
       </main>
+      <footer className="auth-foot">
+        <MadeBy className="auth-made" />
+      </footer>
     </div>
   );
 }
@@ -165,6 +167,11 @@ export function LoginPage() {
 
   return (
     <AuthLayout title="ログイン">
+      <button type="button" className="auth-passkey" onClick={onPasskey} disabled={locked}>
+        {busy === "passkey" ? <Loader2 size={16} className="animate-spin" /> : <Fingerprint size={16} />}
+        {busy === "passkey" ? "確認しています…" : "パスキーで続ける"}
+      </button>
+      <div className="divider">または</div>
       <form onSubmit={onSubmit}>
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="username webauthn" />
         <Field
@@ -185,23 +192,16 @@ export function LoginPage() {
           }
         />
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-primary w-full" disabled={locked}>
+        <button type="submit" className="btn btn-secondary w-full" disabled={locked}>
           {busy === "email" && <Loader2 size={15} className="animate-spin" />}
-          {busy === "email" ? "入っています…" : "ログイン"}
+          {busy === "email" ? "入っています…" : "メールで続ける"}
         </button>
       </form>
-      <button type="button" className="auth-passkey" onClick={onPasskey} disabled={locked}>
-        <span className="auth-passkey-mark">
-          {busy === "passkey" ? <Loader2 size={15} className="animate-spin" /> : <Fingerprint size={15} />}
-        </span>
-        {busy === "passkey" ? "確認しています…" : "パスキーでログイン"}
-      </button>
-      <p className="auth-note">
-        パスワードを忘れた方は、管理者にリセットリンクを依頼してください。
-      </p>
       {!inviteOnly && (
         <p className="auth-note">
-          はじめての方は <Link className="auth-link" to="/signup">ユーザー登録</Link>
+          <Link className="auth-link" to="/signup">
+            アカウントを作成
+          </Link>
         </p>
       )}
       {environment && environment !== "production" && (
