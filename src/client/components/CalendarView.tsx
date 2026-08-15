@@ -1,7 +1,17 @@
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Plus } from "lucide-react";
 import type { DbProperty, Page } from "../lib/types";
+import { PageIcon } from "./PageIcon";
 import { parseProps } from "./PropertyValue";
+
+function EventLabel({ row, size = 14 }: { row: Page; size?: number }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1">
+      {row.icon ? <PageIcon icon={row.icon} size={size} /> : null}
+      <span className="truncate">{row.title || "無題"}</span>
+    </span>
+  );
+}
 
 const WEEK_MON = ["月", "火", "水", "木", "金", "土", "日"];
 const WEEK_SUN = ["日", "月", "火", "水", "木", "金", "土"];
@@ -153,7 +163,7 @@ export function CalendarView({
                       className="flex min-h-10 w-full items-center rounded-[6px] px-1 text-left text-[15px] active:bg-hover"
                       onClick={() => onOpen(r.id)}
                     >
-                      {r.title || "無題"}
+                      <EventLabel row={r} size={16} />
                     </button>
                   ))}
                 </li>
@@ -217,7 +227,7 @@ export function CalendarView({
                           key={r.id}
                           type="button"
                           draggable={editable}
-                          className="block w-full truncate rounded-[5px] bg-canvas px-1.5 py-0.5 text-left text-[12px] hover:bg-hover"
+                          className="flex w-full items-center truncate rounded-[5px] bg-canvas px-1.5 py-0.5 text-left text-[12px] hover:bg-hover"
                           onClick={() => {
                             if (dragged.current) {
                               dragged.current = false;
@@ -236,7 +246,7 @@ export function CalendarView({
                             }, 0);
                           }}
                         >
-                          {r.title || "無題"}
+                          <EventLabel row={r} size={12} />
                         </button>
                       ))}
                     </div>
@@ -256,7 +266,7 @@ export function CalendarView({
               <li key={r.id}>
                 <button
                   type="button"
-                  className="rounded-[6px] bg-canvas px-2 py-1 text-left text-[13px] hover:bg-hover"
+                  className="inline-flex items-center rounded-[6px] bg-canvas px-2 py-1 text-left text-[13px] hover:bg-hover"
                   onClick={() => onOpen(r.id)}
                   draggable={editable && !isMobile}
                   onDragStart={(e) => {
@@ -264,7 +274,7 @@ export function CalendarView({
                     e.dataTransfer.setData("text/plain", r.id);
                   }}
                 >
-                  {r.title || "無題"}
+                  <EventLabel row={r} />
                 </button>
               </li>
             ))}
