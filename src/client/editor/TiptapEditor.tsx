@@ -76,6 +76,8 @@ export type TiptapHandle = {
   isEmpty: () => boolean;
   applyDoc: (doc: object) => void;
   getJSON: () => { type: "doc"; content: unknown[] };
+  undo: () => boolean;
+  redo: () => boolean;
 };
 
 export const TiptapEditor = forwardRef<
@@ -320,6 +322,8 @@ export const TiptapEditor = forwardRef<
         if (!raw || raw.type !== "doc") return { type: "doc", content: [] };
         return { type: "doc", content: Array.isArray(raw.content) ? raw.content : [] };
       },
+      undo: () => editor?.commands.undo() ?? false,
+      redo: () => editor?.commands.redo() ?? false,
     }),
     [editor, onEmptyChange],
   );

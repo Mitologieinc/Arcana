@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, PanelLeft, SmilePlus, Star, Trash2 } from "lucide-react";
+import { ChevronsRight, ChevronRight, Clock, Download, ImagePlus, LayoutTemplate, Link2, MessageSquare, MoreHorizontal, PanelLeft, Redo2, SmilePlus, Star, Trash2, Undo2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DbProperty, DbView, Member, Page, Permission, SavedTemplate, User } from "../lib/types";
 import { DatabaseView } from "./DatabaseView";
@@ -389,6 +389,30 @@ export function PageEditor({
                   <MessageSquare size={14} />
                   コメント
                 </button>
+                {editable && page.type === "page" && (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        if (!editorRef.current?.undo()) toast("戻す操作はありません");
+                      }}
+                    >
+                      <Undo2 size={14} />
+                      元に戻す
+                    </button>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        if (!editorRef.current?.redo()) toast("やり直す操作はありません");
+                      }}
+                    >
+                      <Redo2 size={14} />
+                      やり直す
+                    </button>
+                  </>
+                )}
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
