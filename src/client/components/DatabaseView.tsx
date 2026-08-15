@@ -7,6 +7,7 @@ import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
 import { CoverVisual } from "../lib/covers";
 import { FloatMenu } from "./FloatMenu";
 import { PageIcon } from "./PageIcon";
+import { CalendarView } from "./CalendarView";
 import {
   optionClass,
   parseProps,
@@ -369,6 +370,8 @@ export function DatabaseView({
       await saveSchema([...schema, dateProp]);
     }
     const date = iso ?? localIso();
+    const [y, m] = date.split("-").map(Number);
+    if (y && m) setCalCursor({ y, m: m - 1 });
     await addRow({ date, datePropId: dateProp.id });
   }
 
@@ -726,135 +729,23 @@ export function DatabaseView({
         </div>
       ) : view.type === "calendar" ? (
         <div className={gutter}>
-          {(() => {
-            const dateProp = schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy);
-            const start = new Date(calCursor.y, calCursor.m, 1);
-            const startPad = (start.getDay() + 6) % 7;
-            const days = new Date(calCursor.y, calCursor.m + 1, 0).getDate();
-            const cells = [...Array(startPad + days)].map((_, i) => {
-              if (i < startPad) return null;
-              const day = i - startPad + 1;
-              const iso = `${calCursor.y}-${String(calCursor.m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const dayRows = dateProp
-                ? filtered.filter((r) => String(parseProps(r.properties)[dateProp.id] ?? "") === iso)
-                : [];
-              return { day, iso, dayRows };
-            });
-            return (
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <button
-                    className="btn-ghost h-7 px-2 text-[13px] text-muted max-[720px]:h-9 max-[720px]:px-3"
-                    onClick={() =>
-                      setCalCursor((c) => (c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }))
-                    }
-                  >
-                    ←
-                  </button>
-                  <p className="text-[13px] text-muted">
-                    {calCursor.y}年{calCursor.m + 1}月
-                  </p>
-                  <button
-                    className="btn-ghost h-7 px-2 text-[13px] text-muted max-[720px]:h-9 max-[720px]:px-3"
-                    onClick={() =>
-                      setCalCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))
-                    }
-                  >
-                    →
-                  </button>
-                </div>
-                {isMobile ? (
-                  <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
-                    {cells.filter((c) => c && c.dayRows.length).length === 0 && (
-                      <li className="px-3 py-8 text-center text-[13px] text-muted">この月の予定はありません</li>
-                    )}
-                    {cells.map((cell, i) => {
-                      if (!cell || cell.dayRows.length === 0) return null;
-                      return (
-                        <li key={i} className="px-3 py-2.5">
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="text-[12px] font-medium text-muted">
-                              {calCursor.m + 1}/{cell.day}
-                            </p>
-                            {editable && (
-                              <button
-                                type="button"
-                                className="text-[12px] text-muted"
-                                onClick={() => void addCalendarRow(cell.iso)}
-                              >
-                                + 追加
-                              </button>
-                            )}
-                          </div>
-                          {cell.dayRows.map((r) => (
-                            <button
-                              key={r.id}
-                              className="flex min-h-10 w-full items-center rounded-[6px] px-1 text-left text-[15px] active:bg-hover"
-                              onClick={() => onOpenRow(r.id)}
-                            >
-                              {r.title || "無題"}
-                            </button>
-                          ))}
-                        </li>
-                      );
-                    })}
-                    {editable && (
-                      <li>
-                        <button
-                          type="button"
-                          className="flex h-11 w-full items-center justify-center text-[14px] text-muted active:bg-hover"
-                          onClick={() => void addCalendarRow()}
-                        >
-                          + 予定を追加
-                        </button>
-                      </li>
-                    )}
-                  </ul>
-                ) : (
-                <div className="grid grid-cols-7 gap-px rounded-[8px] bg-line">
-                  {["月", "火", "水", "木", "金", "土", "日"].map((d) => (
-                    <div key={d} className="bg-white px-2 py-1 text-[11px] text-muted">{d}</div>
-                  ))}
-                  {cells.map((cell, i) => (
-                    <div
-                      key={i}
-                      className={`group/day min-h-24 bg-white p-1 ${editable && cell ? "cursor-pointer" : ""}`}
-                      onClick={() => {
-                        if (!editable || !cell) return;
-                        void addCalendarRow(cell.iso);
-                      }}
-                    >
-                      {cell && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-muted">{cell.day}</span>
-                            {editable && (
-                              <span className="flex h-4 w-4 items-center justify-center rounded text-muted opacity-0 group-hover/day:opacity-100">
-                                <Plus size={11} />
-                              </span>
-                            )}
-                          </div>
-                          {cell.dayRows.map((r) => (
-                            <button
-                              key={r.id}
-                              className="mt-0.5 block w-full truncate rounded px-1 text-left text-[12px] hover:bg-hover"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenRow(r.id);
-                              }}
-                            >
-                              {r.title || "無題"}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                )}
-              </div>
-            );
-          })()}
+          <CalendarView
+            rows={filtered}
+            dateProp={schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy)}
+            year={calCursor.y}
+            month={calCursor.m}
+            editable={editable}
+            isMobile={isMobile}
+            onMonth={setCalCursor}
+            onOpen={onOpenRow}
+            onAdd={(iso) => void addCalendarRow(iso)}
+            onMoveDate={(row, iso) => {
+              const dateProp =
+                schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy);
+              if (!dateProp) return;
+              void updateRow(row, { properties: { ...parseProps(row.properties), [dateProp.id]: iso } });
+            }}
+          />
         </div>
       ) : view.type === "board" && statusProp ? (
         <div className={gutter}>
