@@ -45,7 +45,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
                   key={`${item.e}-${i}`}
                   type="button"
                   title={item.k}
-                  className="rounded-[6px] p-1.5 text-[20px] leading-none hover:bg-hover"
+                  className="flex aspect-square items-center justify-center rounded-[6px] text-[20px] leading-none hover:bg-hover"
                   onClick={() => onPick(item.e)}
                 >
                   {item.e}

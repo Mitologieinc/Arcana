@@ -367,6 +367,10 @@ button:disabled {
   color: #6b6b6b;
 }
 
+.arcana-rail-btn svg {
+  display: block;
+}
+
 .arcana-rail-btn:hover {
   background: rgba(15, 15, 15, 0.06);
   color: var(--color-ink);
@@ -1413,6 +1417,7 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
   display: flex;
   height: 42px;
   width: 42px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--color-line);
@@ -1420,6 +1425,10 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 15, 15, 0.04);
   color: #787774;
+}
+
+.slash-icon svg {
+  display: block;
 }
 
 .bubble-menu {
@@ -1858,6 +1867,10 @@ html[data-theme="dark"] .jam-section textarea {
   border-radius: 8px;
   background: transparent;
   color: #1e1e1e;
+}
+
+.jam-tool svg {
+  display: block;
 }
 
 .jam-tool:hover {

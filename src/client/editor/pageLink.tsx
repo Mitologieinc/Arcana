@@ -150,7 +150,7 @@ const PageMenu = forwardRef<Handle, SuggestionProps<Hit, Hit>>(function PageMenu
           onMouseEnter={() => setIndex(i)}
           onClick={() => props.command(item)}
         >
-          <span className="slash-icon text-[16px]">{item.icon || "📄"}</span>
+          <span className="slash-icon text-[16px] leading-none">{item.icon || "📄"}</span>
           <span className="truncate text-[14px]">{item.title || "無題"}</span>
         </button>
       ))}

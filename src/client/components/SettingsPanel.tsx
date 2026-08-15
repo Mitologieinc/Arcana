@@ -700,7 +700,9 @@ export function SettingsPanel({
                   {templates.map((t) => (
                     <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-[13px]">
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0">{t.icon || "📄"}</span>
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[15px] leading-none">
+                          {t.icon || "📄"}
+                        </span>
                         {renameId === t.id ? (
                           <input
                             className="input h-7 min-w-0 flex-1 text-[13px]"

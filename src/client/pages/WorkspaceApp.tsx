@@ -468,7 +468,7 @@ function StartCard({
       className="rounded-[10px] border border-line px-3 py-3 text-left hover:bg-hover"
       onClick={onClick}
     >
-      <span className="text-muted">{icon}</span>
+      <span className="flex h-8 w-8 items-center justify-center text-muted">{icon}</span>
       <span className="mt-2 block text-[14px] font-medium">{label}</span>
       <span className="mt-0.5 block text-[12px] text-muted">{hint}</span>
     </button>

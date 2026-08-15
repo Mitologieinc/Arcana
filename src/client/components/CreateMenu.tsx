@@ -23,7 +23,9 @@ export function CreateMenuPanel({
         className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:min-h-11"
         onClick={() => onPick({ type: "page" })}
       >
-        <FileText size={15} className="text-muted" />
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted">
+          <FileText size={15} />
+        </span>
         ページ
       </button>
       <button
@@ -31,7 +33,9 @@ export function CreateMenuPanel({
         className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:min-h-11"
         onClick={() => onPick({ type: "database", title: "データベース", icon: "🗃️" })}
       >
-        <LayoutGrid size={15} className="text-muted" />
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted">
+          <LayoutGrid size={15} />
+        </span>
         データベース
       </button>
       <button
@@ -39,7 +43,9 @@ export function CreateMenuPanel({
         className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:min-h-11"
         onClick={() => onPick({ type: "canvas", title: "キャンバス", icon: "🎨" })}
       >
-        <StickyNote size={15} className="text-muted" />
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted">
+          <StickyNote size={15} />
+        </span>
         キャンバス
       </button>
       {templates.length > 0 && (
@@ -53,7 +59,9 @@ export function CreateMenuPanel({
               className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:min-h-11"
               onClick={() => onPick({ type: "page", title: t.title || t.name, icon: t.icon || "📄", templateId: t.id })}
             >
-              <span className="w-[15px] text-center">{t.icon || "📄"}</span>
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[15px] leading-none">
+                {t.icon || "📄"}
+              </span>
               <span className="min-w-0 truncate">{t.name}</span>
             </button>
           ))}

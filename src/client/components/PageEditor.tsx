@@ -320,7 +320,7 @@ export function PageEditor({
                 className="max-w-[140px] truncate rounded-[5px] px-1.5 py-0.5 hover:bg-hover"
                 onClick={() => onOpenPage(c.id)}
               >
-                {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 inline-block align-[-2px]" /> : `${pageTypeIcon(c.type)} `}
+                {c.icon ? <PageIcon icon={c.icon} size={14} className="mr-1 align-middle" /> : `${pageTypeIcon(c.type)} `}
                 {c.title || "無題"}
               </button>
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
@@ -328,7 +328,7 @@ export function PageEditor({
           ))}
           {page.type !== "canvas" && (
           <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
-            <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 inline-block align-[-2px]" />
+            <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 align-middle" />
             {title || "無題"}
           </span>
           )}
@@ -628,10 +628,10 @@ export function PageEditor({
           )}
           {page.icon ? (
             <button
-              className={`rounded-xl text-[78px] leading-none transition hover:bg-hover max-[720px]:text-[52px] ${
+              className={`inline-flex items-center justify-center rounded-xl leading-none transition hover:bg-hover ${
                 page.coverR2Key
-                  ? "absolute left-24 top-[-42px] z-[2] max-[860px]:left-6 max-[720px]:left-4"
-                  : "mb-1 block"
+                  ? "absolute left-24 top-[-42px] z-[2] h-[88px] w-[88px] max-[860px]:left-6 max-[720px]:left-4 max-[720px]:h-[60px] max-[720px]:w-[60px]"
+                  : "mb-1 h-[88px] w-[88px] max-[720px]:h-[60px] max-[720px]:w-[60px]"
               }`}
               onClick={() => {
                 if (!editable) return;

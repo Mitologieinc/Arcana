@@ -28,7 +28,10 @@ export function PageIcon({
     );
   }
   return (
-    <span className={`inline-flex shrink-0 items-center justify-center leading-none ${className}`} style={{ fontSize: size, width: size, height: size }}>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden text-center leading-none ${className}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.88) }}
+    >
       {icon || fallback}
     </span>
   );

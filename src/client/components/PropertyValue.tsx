@@ -196,7 +196,7 @@ export function PropertyValue({
                     onChange(next);
                   }}
                 >
-                  {on ? "✓ " : ""}<PageIcon icon={p.icon} size={14} className="mr-1 inline-block align-[-2px]" /> {p.title || "無題"}
+                  {on ? "✓ " : ""}<PageIcon icon={p.icon} size={14} className="mr-1 align-middle" /> {p.title || "無題"}
                 </button>
               );
             })}
