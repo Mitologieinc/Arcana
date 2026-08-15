@@ -835,20 +835,53 @@ button:disabled {
   padding: 48px 44px 44px;
   border-radius: 28px;
   background:
-    radial-gradient(1200px 520px at -10% 110%, rgba(0, 182, 158, 0.16), transparent 55%),
-    radial-gradient(800px 400px at 110% -10%, rgba(37, 140, 219, 0.14), transparent 50%),
-    #f4f1eb;
+    radial-gradient(80% 55% at 8% 100%, rgba(0, 182, 158, 0.2), transparent 58%),
+    radial-gradient(70% 48% at 100% 0%, rgba(37, 140, 219, 0.16), transparent 55%),
+    #f6f3ec;
+}
+
+.auth-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+.auth-hero-aurora {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 42% 34% at 16% 84%, rgba(0, 182, 158, 0.32), transparent 62%),
+    radial-gradient(ellipse 38% 32% at 88% 14%, rgba(37, 140, 219, 0.26), transparent 60%),
+    radial-gradient(ellipse 26% 22% at 52% 48%, rgba(255, 255, 255, 0.45), transparent 70%);
+  filter: blur(14px);
+  animation: auth-aurora 16s ease-in-out infinite alternate;
+}
+
+.auth-hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(55, 53, 47, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55, 53, 47, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, #000 10%, transparent 72%);
 }
 
 .auth-hero-ghost {
   position: absolute;
-  top: -6%;
-  right: -8%;
-  width: min(52vw, 420px);
+  top: 8%;
+  right: -6%;
+  width: min(58vw, 460px);
   height: auto;
-  opacity: 0.18;
+  opacity: 0.16;
   pointer-events: none;
-  transform: rotate(-12deg);
+  transform: rotate(-14deg);
 }
 
 .auth-hero-ghost .arcana-logo {
@@ -861,6 +894,15 @@ button:disabled {
   position: relative;
   z-index: 1;
   max-width: 420px;
+}
+
+@keyframes auth-aurora {
+  from {
+    transform: translate3d(-2%, 2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(3%, -3%, 0) scale(1.08);
+  }
 }
 
 .auth-main {
@@ -913,19 +955,25 @@ html[data-theme="dark"] .auth-split {
   background: #191919;
 }
 
-html[data-theme="dark"] .auth-hero {
-  background:
-    radial-gradient(1200px 520px at -10% 110%, rgba(0, 182, 158, 0.28), transparent 55%),
-    radial-gradient(800px 400px at 110% -10%, rgba(37, 140, 219, 0.2), transparent 50%),
-    #141413;
-}
-
 html[data-theme="dark"] .auth-main {
   background: #191919;
 }
 
+html[data-theme="dark"] .auth-hero {
+  background:
+    radial-gradient(80% 55% at 8% 100%, rgba(0, 182, 158, 0.22), transparent 58%),
+    radial-gradient(70% 48% at 100% 0%, rgba(37, 140, 219, 0.18), transparent 55%),
+    #2a2824;
+}
+
+html[data-theme="dark"] .auth-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
 html[data-theme="dark"] .auth-hero-ghost {
-  opacity: 0.28;
+  opacity: 0.2;
 }
 
 @media (max-width: 860px) {
@@ -944,10 +992,10 @@ html[data-theme="dark"] .auth-hero-ghost {
   }
 
   .auth-hero-ghost {
-    width: 220px;
-    top: -28%;
-    right: -12%;
-    opacity: 0.14;
+    width: 240px;
+    top: -18%;
+    right: -10%;
+    opacity: 0.12;
   }
 
   .auth-main {
@@ -960,6 +1008,10 @@ html[data-theme="dark"] .auth-hero-ghost {
 @media (prefers-reduced-motion: reduce) {
   .auth-hero-ghost {
     transform: none;
+  }
+
+  .auth-hero-aurora {
+    animation: none;
   }
 }
 

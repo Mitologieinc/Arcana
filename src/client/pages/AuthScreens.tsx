@@ -74,6 +74,8 @@ function AuthLayout({
   return (
     <div className="auth-split">
       <aside className="auth-hero">
+        <div className="auth-hero-aurora" aria-hidden />
+        <div className="auth-hero-grid" aria-hidden />
         <div className="auth-hero-ghost" aria-hidden>
           <BrandMark className="w-full" animate />
         </div>
