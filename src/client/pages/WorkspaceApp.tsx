@@ -300,8 +300,10 @@ export function WorkspaceApp() {
             recent={recent}
             templates={templates}
             canWrite={workspace.role !== "guest"}
+            unread={unread}
             showMenu
             onMenu={toggleNav}
+            onNotifs={() => setNotifOpen(true)}
             onSearch={() => setSearchOpen(true)}
             onOpen={openPage}
             onMemo={() => void createPage(null, "page", { title: "メモ", icon: "📝" })}
@@ -385,8 +387,10 @@ function Home({
   recent,
   templates,
   canWrite,
+  unread = 0,
   showMenu,
   onMenu,
+  onNotifs,
   onSearch,
   onOpen,
   onMemo,
@@ -402,8 +406,10 @@ function Home({
   recent: Page[];
   templates: SavedTemplate[];
   canWrite?: boolean;
+  unread?: number;
   showMenu?: boolean;
   onMenu?: () => void;
+  onNotifs?: () => void;
   onSearch: () => void;
   onOpen: (id: string) => void;
   onMemo: () => void;
@@ -417,9 +423,12 @@ function Home({
     [pages],
   );
   const featured = roots[0] ?? null;
-  const directory = roots.slice(1, 7);
-  const seen = new Set<string>([featured?.id, ...favorites.map((p) => p.id)].filter(Boolean) as string[]);
-  const continuePages = recent.filter((p) => !seen.has(p.id)).slice(0, 6);
+  const showHero = Boolean(featured && (featured.coverR2Key || (featured.title && featured.title !== "無題")));
+  const databases = useMemo(
+    () => pages.filter((p) => p.type === "database").sort((a, b) => a.position - b.position).slice(0, 8),
+    [pages],
+  );
+  const continuePages = recent.slice(0, 10);
 
   return (
     <>
@@ -438,74 +447,19 @@ function Home({
             <p className="arcana-home-kicker">
               {greeting()}、{userName}
               {pages.length > 0 && <span> · {pages.length} ページ</span>}
+              {unread > 0 && onNotifs && (
+                <button type="button" className="arcana-home-unread" onClick={onNotifs}>
+                  未読 {unread}
+                </button>
+              )}
             </p>
           </div>
           <button type="button" className="arcana-home-search" onClick={onSearch}>
             <Search size={16} strokeWidth={1.6} />
-            <span>検索</span>
+            <span>ページを探す</span>
             <kbd className="kbd">{modSymbol()}K</kbd>
           </button>
-        </header>
-
-        {featured && (
-          <button type="button" className="arcana-home-hero" onClick={() => onOpen(featured.id)}>
-            {featured.coverR2Key ? (
-              <CoverVisual cover={featured.coverR2Key} className="arcana-home-hero-cover" />
-            ) : (
-              <div className="arcana-home-hero-cover is-plain" />
-            )}
-            <span className="arcana-home-hero-body">
-              <PageIcon icon={featured.icon} fallback={pageTypeIcon(featured.type)} size={22} />
-              <span className="arcana-home-hero-copy">
-                <span className={`arcana-home-hero-name ${featured.title ? "" : "is-empty"}`}>
-                  {featured.title || "無題"}
-                </span>
-                <span className="arcana-home-hero-meta">{pageKind(featured.type)}</span>
-              </span>
-            </span>
-          </button>
-        )}
-
-        {directory.length > 0 && (
-          <section className="arcana-home-section">
-            <p className="arcana-home-label">ページ</p>
-            <div className="arcana-home-tiles">
-              {directory.map((p) => (
-                <button type="button" key={p.id} className="arcana-home-tile" onClick={() => onOpen(p.id)}>
-                  <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={18} />
-                  <span className={`arcana-home-tile-name ${p.title ? "" : "is-empty"}`}>{p.title || "無題"}</span>
-                  <span className="arcana-home-tile-meta">{pageKind(p.type)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {favorites.length > 0 && (
-          <section className="arcana-home-section">
-            <p className="arcana-home-label">お気に入り</p>
-            <ul>
-              {favorites.map((p) => (
-                <HomeRow key={p.id} page={p} onOpen={onOpen} />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {continuePages.length > 0 && (
-          <section className="arcana-home-section">
-            <p className="arcana-home-label">最近</p>
-            <ul>
-              {continuePages.map((p) => (
-                <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {canWrite && (
-          <section className="arcana-home-section">
-            <p className="arcana-home-label">書く</p>
+          {canWrite && (
             <div className="arcana-home-starts">
               <button type="button" onClick={onMemo}>
                 <FileText size={15} strokeWidth={1.6} />
@@ -530,6 +484,72 @@ function Home({
                 </button>
               ))}
             </div>
+          )}
+        </header>
+
+        {favorites.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">お気に入り</p>
+            <ul>
+              {favorites.map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {continuePages.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">続ける</p>
+            <ul>
+              {continuePages.map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {databases.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">データベース</p>
+            <ul>
+              {databases.map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {showHero && featured && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">入り口</p>
+            <button type="button" className="arcana-home-hero" onClick={() => onOpen(featured.id)}>
+              {featured.coverR2Key ? (
+                <CoverVisual cover={featured.coverR2Key} className="arcana-home-hero-cover" />
+              ) : (
+                <div className="arcana-home-hero-cover is-plain" />
+              )}
+              <span className="arcana-home-hero-body">
+                <PageIcon icon={featured.icon} fallback={pageTypeIcon(featured.type)} size={22} />
+                <span className="arcana-home-hero-copy">
+                  <span className={`arcana-home-hero-name ${featured.title ? "" : "is-empty"}`}>
+                    {featured.title || "無題"}
+                  </span>
+                  <span className="arcana-home-hero-meta">{pageKind(featured.type)}</span>
+                </span>
+              </span>
+            </button>
+          </section>
+        )}
+
+        {roots.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">トップ</p>
+            <ul>
+              {roots.slice(0, 12).map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} />
+              ))}
+            </ul>
           </section>
         )}
       </div>
@@ -556,7 +576,10 @@ function HomeRow({
         <span className={`min-w-0 flex-1 truncate ${page.title ? "" : "text-muted"}`}>
           {page.title || "無題"}
         </span>
-        {showTime && <span className="shrink-0 text-[12px] text-muted">{relativeTime(page.updatedAt)}</span>}
+        <span className="arcana-home-row-meta">
+          {pageKind(page.type)}
+          {showTime ? ` · ${relativeTime(page.updatedAt)}` : ""}
+        </span>
       </button>
     </li>
   );

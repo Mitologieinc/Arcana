@@ -334,9 +334,25 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .arcana-home-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin: 8px 0 0;
   color: var(--color-muted);
   font-size: 14px;
+}
+
+.arcana-home-unread {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-cf);
+  font-size: 13px;
+}
+
+.arcana-home-unread:hover {
+  color: var(--color-cf-hover);
 }
 
 .arcana-home-search {
@@ -365,7 +381,6 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 .arcana-home-hero {
   display: block;
   width: 100%;
-  margin-top: 36px;
   overflow: hidden;
   padding: 0;
   border: 0;
@@ -505,6 +520,12 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 
 .arcana-home-row:hover {
   background: var(--color-hover);
+}
+
+.arcana-home-row-meta {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 html[data-theme="dark"] .arcana-home-search,
