@@ -821,6 +821,9 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
   min-height: 100%;
+  padding: 16px;
+  gap: 16px;
+  background: #fff;
 }
 
 .auth-hero {
@@ -830,11 +833,11 @@ button:disabled {
   justify-content: flex-end;
   overflow: hidden;
   padding: 48px 44px 44px;
+  border-radius: 28px;
   background:
     radial-gradient(1200px 520px at -10% 110%, rgba(0, 182, 158, 0.16), transparent 55%),
     radial-gradient(800px 400px at 110% -10%, rgba(37, 140, 219, 0.14), transparent 50%),
     #f4f1eb;
-  border-right: 1px solid var(--color-line);
 }
 
 .auth-hero-ghost {
@@ -906,12 +909,15 @@ button:disabled {
   background: var(--color-hover);
 }
 
+html[data-theme="dark"] .auth-split {
+  background: #191919;
+}
+
 html[data-theme="dark"] .auth-hero {
   background:
     radial-gradient(1200px 520px at -10% 110%, rgba(0, 182, 158, 0.28), transparent 55%),
     radial-gradient(800px 400px at 110% -10%, rgba(37, 140, 219, 0.2), transparent 50%),
     #141413;
-  border-color: #3a3a37;
 }
 
 html[data-theme="dark"] .auth-main {
@@ -926,14 +932,15 @@ html[data-theme="dark"] .auth-hero-ghost {
   .auth-split {
     display: flex;
     flex-direction: column;
+    padding: 12px;
+    gap: 12px;
   }
 
   .auth-hero {
     justify-content: flex-end;
     min-height: 0;
     padding: 28px 24px 22px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-line);
+    border-radius: 20px;
   }
 
   .auth-hero-ghost {
