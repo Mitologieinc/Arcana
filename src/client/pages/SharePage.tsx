@@ -83,8 +83,8 @@ export function SharePage() {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
-        <BrandLockup className="h-12 w-auto" />
-        <h1 className="mt-6 text-[15px] font-medium">このリンクは開けません</h1>
+        <BrandLockup className="h-10 w-auto" />
+        <h1 className="mt-8 text-[16px] font-medium">このリンクは開けません</h1>
         <p className="max-w-[280px] text-[13px] leading-relaxed text-muted">
           無効か、公開が止められています。共有した人に新しいリンクを聞いてください。
         </p>
