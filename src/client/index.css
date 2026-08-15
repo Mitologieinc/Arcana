@@ -56,10 +56,38 @@ html[data-theme="dark"] .modal-panel {
   border-color: #3a3a37;
 }
 
-html[data-theme="dark"] .arcana-db-table th,
-html[data-theme="dark"] .arcana-db-table td,
-html[data-theme="dark"] .arcana-db-table tbody tr:hover td {
+html[data-theme="dark"] .arcana-db-frame,
+html[data-theme="dark"] .arcana-db-list,
+html[data-theme="dark"] .arcana-db-tile,
+html[data-theme="dark"] .arcana-board-card {
   background: #191919;
+  border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .arcana-db-table thead th {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html[data-theme="dark"] .arcana-db-tab.is-on {
+  background: #2a2a28;
+  box-shadow: 0 0 0 1px #3a3a37;
+}
+
+html[data-theme="dark"] .arcana-db-table th:first-child,
+html[data-theme="dark"] .arcana-db-table td:first-child {
+  background: #191919;
+}
+
+html[data-theme="dark"] .arcana-db-table thead th:first-child {
+  background: #202020;
+}
+
+html[data-theme="dark"] .arcana-db-table tbody tr:hover td:first-child {
+  background: #222;
+}
+
+html[data-theme="dark"] .arcana-board-col {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 html[data-theme="dark"] .arcana-doc .tableWrapper th {
@@ -1191,6 +1219,83 @@ html[data-theme="dark"] .arcana-toast {
   white-space: nowrap;
 }
 
+.arcana-db-toolbar {
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.arcana-db-tab {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.arcana-db-tab:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+.arcana-db-tab.is-on {
+  background: #fff;
+  color: var(--color-ink);
+  font-weight: 560;
+  box-shadow: 0 0 0 1px rgba(55, 53, 47, 0.08), 0 1px 2px rgba(15, 15, 15, 0.04);
+}
+
+.arcana-db-new {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-cf);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.arcana-db-new:hover {
+  background: var(--color-cf-hover);
+}
+
+.arcana-db-frame,
+.arcana-db-list {
+  overflow: hidden;
+  border: 1px solid rgba(55, 53, 47, 0.08);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.03);
+}
+
+.arcana-db-frame {
+  overflow-x: auto;
+}
+
+.arcana-db-tile {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(55, 53, 47, 0.08);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.03);
+  text-align: left;
+}
+
+.arcana-db-tile:hover,
+.arcana-db-list li:hover,
+.arcana-board-card:hover {
+  background: #f7f7f5;
+}
+
 .arcana-db-table {
   width: max-content;
   min-width: 100%;
@@ -1200,18 +1305,20 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-db-table th,
 .arcana-db-table td {
-  height: 37px;
-  padding: 0 8px;
+  height: 44px;
+  padding: 0 14px;
   vertical-align: middle;
-  background: #fff;
-  border-bottom: 1px solid var(--color-line);
-  border-right: 1px solid var(--color-line);
+  background: transparent;
+  border-bottom: 1px solid rgba(55, 53, 47, 0.06);
 }
 
-.arcana-db-table th {
-  font-size: 13px;
-  font-weight: 500;
+.arcana-db-table thead th {
+  height: 40px;
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
   color: var(--color-muted);
+  background: rgba(55, 53, 47, 0.025);
 }
 
 .arcana-db-table th:first-child,
@@ -1219,29 +1326,52 @@ html[data-theme="dark"] .arcana-toast {
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 280px;
-  padding-left: 96px;
-  box-shadow: 1px 0 0 var(--color-line);
+  min-width: 240px;
+  padding-left: 28px;
+  background: #fff;
+  box-shadow: 8px 0 16px -12px rgba(15, 15, 15, 0.12);
+}
+
+.arcana-db-table thead th:first-child {
+  background: #fafafa;
 }
 
 .arcana-db-table td:first-child .arcana-grip {
   position: absolute;
   top: 50%;
-  left: 72px;
+  left: 6px;
   z-index: 2;
   margin-top: -12px;
 }
 
 .arcana-db-table .arcana-db-add {
-  min-width: 40px;
-  width: 40px;
+  min-width: 44px;
+  width: 44px;
   padding: 0;
-  border-right: none;
   background: transparent;
 }
 
+.arcana-db-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .arcana-db-table tbody tr:hover td {
-  background: #fafafa;
+  background: rgba(55, 53, 47, 0.03);
+}
+
+.arcana-db-table tbody tr:hover td:first-child {
+  background: #f7f7f5;
+}
+
+.arcana-board-col {
+  border-radius: 16px;
+  background: rgba(55, 53, 47, 0.035);
+}
+
+.arcana-board-card {
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.05);
 }
 
 .arcana-db-table tbody tr.arcana-drop-before td {
@@ -1548,7 +1678,6 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-db-embed .arcana-db-table th:first-child,
 .arcana-db-embed .arcana-db-table td:first-child {
-  padding-left: 28px;
   min-width: 180px;
 }
 
@@ -2960,7 +3089,7 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     z-index: 4;
     padding-top: 4px;
     padding-bottom: 6px;
-    background: #fff;
+    background: var(--color-canvas);
   }
 
   .arcana-db-toolbar.is-embedded {

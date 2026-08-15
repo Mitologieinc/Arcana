@@ -599,9 +599,7 @@ export function DatabaseView({
         {views.map((v) => (
           <button
             key={v.id}
-            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] ${
-              v.id === view.id ? "bg-hover font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink"
-            }`}
+            className={`arcana-db-tab shrink-0 ${v.id === view.id ? "is-on" : ""}`}
             onClick={() => setViewId(v.id)}
           >
             {v.type === "board" ? (
@@ -666,10 +664,11 @@ export function DatabaseView({
         )}
         {editable && views.length > 1 && !isMobile && (
           <button
-            className="btn-ghost h-8 px-2 text-[12px] text-muted"
+            className="btn-ghost h-8 w-8 shrink-0 p-0 text-muted"
+            title="このビューを削除"
             onClick={() => void api(`/api/views/${view.id}`, { method: "DELETE" }).then(onChanged)}
           >
-            ビュー削除
+            <Trash2 size={14} />
           </button>
         )}
         {editable && isMobile && (
@@ -684,7 +683,8 @@ export function DatabaseView({
         </div>
         {editable && (
           <button
-            className="btn btn-primary ml-1 h-9 shrink-0 px-3 text-[13px]"
+            type="button"
+            className="arcana-db-new ml-1 shrink-0"
             onClick={() => void (view.type === "calendar" ? addCalendarRow() : addRow())}
           >
             新規
@@ -695,7 +695,7 @@ export function DatabaseView({
 
       {(isMobile || !editable) && view.type === "table" ? (
         <div className={`${gutter} pb-8`}>
-          <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
+          <ul className="arcana-db-list divide-y divide-line">
             {filtered.map((row) => {
               const props = parseProps(row.properties);
               return (
@@ -758,7 +758,7 @@ export function DatabaseView({
               <button
                 key={row.id}
                 type="button"
-                className="overflow-hidden rounded-[14px] border border-line bg-white text-left shadow-[0_1px_2px_rgba(15,15,15,0.04)] hover:bg-hover"
+                className="arcana-db-tile"
                 onClick={() => onOpenRow(row.id)}
               >
                 {row.coverR2Key && (
@@ -796,7 +796,7 @@ export function DatabaseView({
           {filtered.map((row) => (
             <button
               key={row.id}
-              className="overflow-hidden rounded-[10px] border border-line text-left hover:bg-hover max-[720px]:min-h-[9.5rem]"
+              className="arcana-db-tile max-[720px]:min-h-[9.5rem]"
               onClick={() => onOpenRow(row.id)}
             >
               <div className="h-24 bg-canvas">
@@ -898,7 +898,7 @@ export function DatabaseView({
                   ref={(el) => {
                     colRefs.current[col.id] = el;
                   }}
-                  className={`arcana-board-col w-[260px] shrink-0 rounded-[10px] bg-canvas p-2 ${
+                  className={`arcana-board-col w-[260px] shrink-0 p-2.5 ${
                     drag?.type === "card" && drag.overCol === col.id ? "arcana-drop-col" : ""
                   }`}
                   onDragOver={(e) => {
@@ -940,7 +940,7 @@ export function DatabaseView({
                           void commitCardDrop(col.status);
                         }}
                         onDragEnd={(e) => endDrag(e)}
-                        className={`relative mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa] max-[720px]:p-3 ${
+                        className={`arcana-board-card relative mb-2 cursor-pointer p-3 text-left max-[720px]:p-3.5 ${
                           drag?.id === row.id ? "opacity-40" : ""
                         }`}
                         onClick={() => {
@@ -1026,7 +1026,8 @@ export function DatabaseView({
           })()}
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className={gutter}>
+        <div className="arcana-db-frame">
           <table className="arcana-db-table">
             <thead>
               <tr>
@@ -1210,6 +1211,7 @@ export function DatabaseView({
               )}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 
