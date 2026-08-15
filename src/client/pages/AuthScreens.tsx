@@ -79,7 +79,6 @@ function AuthLayout({
         </div>
         <div className="auth-hero-copy">
           <BrandLockup className="h-10 w-auto max-w-full" />
-          <p className="auth-line">自分たちの場所で、書く。</p>
         </div>
       </aside>
       <main className="auth-main">
