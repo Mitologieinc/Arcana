@@ -46,7 +46,9 @@ export function Modal({
         <div
           className={
             hideHeader
-              ? "p-1.5"
+              ? flush
+                ? "min-h-0 overflow-hidden"
+                : "p-1.5"
               : flush
                 ? "min-h-0 flex-1 overflow-hidden"
                 : "min-h-0 flex-1 overflow-auto px-4 py-4"

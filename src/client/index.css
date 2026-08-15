@@ -284,6 +284,11 @@ button:disabled {
   outline-offset: 1px;
 }
 
+.modal-panel input:focus,
+.modal-panel input:focus-visible {
+  outline: none;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

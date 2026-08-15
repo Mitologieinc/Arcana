@@ -121,7 +121,7 @@ export function SearchModal({
   }
 
   return (
-    <Modal title="検索" onClose={onClose} wide hideHeader>
+    <Modal title="検索" onClose={onClose} wide hideHeader flush>
       <div className="flex items-center gap-2.5 border-b border-line px-3.5">
         <Search size={16} className="text-muted" />
         <input

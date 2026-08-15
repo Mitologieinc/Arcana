@@ -48,11 +48,19 @@ export function Tooltip({
     if (!open) return;
     place();
     const onMove = () => place();
+    const close = () => {
+      window.clearTimeout(timer.current);
+      setOpen(false);
+    };
     window.addEventListener("scroll", onMove, true);
     window.addEventListener("resize", onMove);
+    window.addEventListener("keydown", close, true);
+    window.addEventListener("pointerdown", close, true);
     return () => {
       window.removeEventListener("scroll", onMove, true);
       window.removeEventListener("resize", onMove);
+      window.removeEventListener("keydown", close, true);
+      window.removeEventListener("pointerdown", close, true);
     };
   }, [open, label]);
 
