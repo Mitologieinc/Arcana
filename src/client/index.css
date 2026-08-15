@@ -287,11 +287,10 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 0 20px;
-  background: rgba(250, 250, 250, 0.82);
-  backdrop-filter: blur(18px);
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  background: transparent;
 }
 
 .share-bar > nav {
@@ -300,13 +299,12 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .share-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 36px 16px 56px;
+  padding: 32px 16px 48px;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  opacity: 0.55;
 }
 
 .share-sheet {
@@ -442,10 +440,6 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 .share-sheet .btn {
   border-radius: 10px;
   height: 38px;
-}
-
-html[data-theme="dark"] .share-bar {
-  background: rgba(25, 25, 25, 0.78);
 }
 
 html[data-theme="dark"] .share-select {

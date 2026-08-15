@@ -19,7 +19,7 @@ import { ConfirmModal } from "./ConfirmModal";
 import { Modal } from "./Modal";
 import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
-import { BrandLockup, BrandMark } from "./Brand";
+import { BrandMark } from "./Brand";
 import { pageTypeIcon, permissionLabel } from "../lib/format";
 import { CanvasEditor } from "./CanvasEditor";
 import { useIsMobile } from "../lib/media";
@@ -323,14 +323,14 @@ export function PageEditor({
         {sharedDoc && (
           <button
             type="button"
-            className="flex shrink-0 items-center"
+            className="flex shrink-0 items-center opacity-40 hover:opacity-70"
             title="共有の先頭へ"
             onClick={() => onOpenPage("")}
           >
-            <BrandMark className="h-6 w-auto" />
+            <BrandMark className="h-5 w-auto" />
           </button>
         )}
-        <nav className={`flex min-w-0 items-center gap-0.5 text-[13px] text-muted ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
+        <nav className={`flex min-w-0 items-center gap-0.5 text-[12px] text-muted ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
           {!shareToken && page.type !== "canvas" && (sidebarCollapsed || isMobile) && (
             <button
               className="btn-ghost mr-1 h-7 w-7 p-0 text-muted"
@@ -352,7 +352,7 @@ export function PageEditor({
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
-          {page.type !== "canvas" && (
+          {page.type !== "canvas" && !shareToken && (
           <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
             <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 align-middle" />
             {title || "無題"}
@@ -360,17 +360,17 @@ export function PageEditor({
           )}
         </nav>
         <div className={`relative ml-auto flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
-          <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />
+          {!shareToken && <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />}
           {shareToken ? (
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-hover"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted opacity-50 hover:bg-hover hover:opacity-100"
+              title="リンクをコピー"
               onClick={() => {
                 void navigator.clipboard.writeText(window.location.href).then(() => toast("リンクをコピーしました"));
               }}
             >
-              <Link2 size={13} />
-              {isMobile ? "コピー" : "リンクをコピー"}
+              <Link2 size={14} />
             </button>
           ) : (
             !editable && <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
@@ -535,7 +535,7 @@ export function PageEditor({
         <div className="relative h-full min-h-0 flex-1">
           <div className="jam-title" onPointerDown={(e) => e.stopPropagation()}>
             {shareToken ? (
-              <span className="jam-title-icon" title="Arcana">
+              <span className="jam-title-icon opacity-40" title="Arcana">
                 <BrandMark className="h-5 w-auto" />
               </span>
             ) : (
@@ -907,10 +907,7 @@ export function PageEditor({
         />
       )}
       {shareToken && page.type !== "canvas" && (
-        <footer className="share-footer">
-          <BrandLockup className="h-5 w-[6.9rem]" animate={false} />
-          <span>Arcana で共有されたページ</span>
-        </footer>
+        <footer className="share-footer">Arcana</footer>
       )}
       {confirmDelete && (
         <ConfirmModal
