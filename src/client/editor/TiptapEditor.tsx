@@ -32,7 +32,9 @@ import {
   Columns3,
   Rows3,
   Trash2,
+  Plus,
 } from "lucide-react";
+import { useIsMobile } from "../lib/media";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
 import { EditorChromeContext } from "./chrome";
@@ -104,6 +106,7 @@ export const TiptapEditor = forwardRef<
   },
   ref,
 ) {
+  const isMobile = useIsMobile();
   const indexTimer = useRef<number | null>(null);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -449,6 +452,18 @@ export const TiptapEditor = forwardRef<
         </BubbleMenu>
       )}
       <EditorContent editor={editor} />
+      {editable && isMobile && !compact && (
+        <button
+          type="button"
+          className="arcana-mobile-plus"
+          title="ブロックを追加"
+          onClick={() => {
+            editor.chain().focus("end").insertContent("/").run();
+          }}
+        >
+          <Plus size={18} />
+        </button>
+      )}
     </div>
     </EditorChromeContext.Provider>
   );

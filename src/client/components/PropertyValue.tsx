@@ -90,6 +90,7 @@ export function PropertyValue({
   title = "",
   schema = [],
   allProps = {},
+  dense = false,
 }: {
   property: DbProperty;
   value: unknown;
@@ -101,6 +102,7 @@ export function PropertyValue({
   title?: string;
   schema?: DbProperty[];
   allProps?: Record<string, unknown>;
+  dense?: boolean;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -115,6 +117,8 @@ export function PropertyValue({
     setOpen(true);
   }
 
+  const hit = dense ? "" : "arcana-prop-hit ";
+
   if (property.type === "formula") {
     const snapshot = value == null ? "" : String(value);
     const shown = evalFormula(property.expression ?? "", { title, schema, values: allProps }, snapshot);
@@ -128,7 +132,7 @@ export function PropertyValue({
         <button
           type="button"
           disabled={!editable}
-          className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover"
+          className={`${hit}flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover`}
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -140,13 +144,13 @@ export function PropertyValue({
               <span className="truncate">{current.name}</span>
             </span>
           ) : (
-            <span className="text-transparent">空</span>
+            <span className="text-muted">未設定</span>
           )}
         </button>
         {open && anchor && (
           <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={220}>
             <button className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] text-muted hover:bg-hover" onClick={() => { onChange(null); setOpen(false); }}>
-              空
+              未設定
             </button>
             {members.map((m) => (
               <button key={m.userId} className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover" onClick={() => { onChange(m.userId); setOpen(false); }}>
@@ -169,7 +173,7 @@ export function PropertyValue({
         <button
           type="button"
           disabled={!editable}
-          className="arcana-prop-hit flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover"
+          className={`${hit}flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover`}
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -177,7 +181,7 @@ export function PropertyValue({
         >
           {linked.length ? linked.map((p) => (
             <span key={p.id} className="truncate rounded-[4px] bg-canvas px-1.5 py-0.5 text-[12px]">{p.title || "無題"}</span>
-          )) : <span className="text-transparent">空</span>}
+          )) : <span className="text-muted">未設定</span>}
         </button>
         {open && anchor && (
           <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={240}>
@@ -224,7 +228,7 @@ export function PropertyValue({
           ref={btnRef}
           type="button"
           disabled={!editable}
-          className="arcana-prop-hit flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
+          className={`${hit}flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent`}
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -232,7 +236,7 @@ export function PropertyValue({
         >
           {selected.length ? selected.map((o) => (
             <span key={o.id} className={`truncate rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(o.color)}`}>{o.name}</span>
-          )) : <span className="text-[13px] text-transparent">空</span>}
+          )) : <span className="text-[13px] text-muted">未設定</span>}
         </button>
         {open && anchor && (
           <FloatMenu anchor={anchor} onClose={() => setOpen(false)} width={220}>
@@ -284,7 +288,7 @@ export function PropertyValue({
           ref={btnRef}
           type="button"
           disabled={!editable}
-          className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
+          className={`${hit}flex h-7 w-full items-center rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent`}
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -295,7 +299,7 @@ export function PropertyValue({
               {current.name}
             </span>
           ) : (
-            <span className="text-[13px] text-transparent">空</span>
+            <span className="text-[13px] text-muted">未設定</span>
           )}
         </button>
         {open && anchor && (
@@ -307,7 +311,7 @@ export function PropertyValue({
                 setOpen(false);
               }}
             >
-              空
+              未設定
             </button>
             {(property.options ?? []).map((o) => (
               <button
@@ -355,9 +359,9 @@ export function PropertyValue({
       <input
         autoFocus
         type={property.type === "number" ? "number" : property.type === "date" ? "date" : "text"}
-        className="arcana-prop-hit h-7 w-full border-none bg-transparent text-[16px] outline-none max-[720px]:text-[16px]"
+        className={`${hit}h-7 w-full border-none bg-transparent text-[16px] outline-none`}
         value={draft}
-        placeholder="空"
+        placeholder="未設定"
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setOpen(false);
@@ -384,13 +388,13 @@ export function PropertyValue({
     <button
       type="button"
       disabled={!editable}
-      className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover disabled:hover:bg-transparent"
+      className={`${hit}flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover disabled:hover:bg-transparent`}
       onClick={(e) => {
         e.stopPropagation();
         openMenu(e.currentTarget);
       }}
     >
-      {label ? <span className="truncate">{label}</span> : <span className="text-transparent">空</span>}
+      {label ? <span className="truncate">{label}</span> : <span className="text-muted">未設定</span>}
     </button>
   );
 }

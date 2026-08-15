@@ -351,11 +351,11 @@ export function PageEditor({
             >
               <Star size={15} fill={favorited ? "currentColor" : "none"} />
             </button>
-            <button className="btn-ghost h-8 w-8 p-0 text-muted" title="コメント" onClick={() => setCommentsOpen(true)}>
+            <button className="btn-ghost h-8 w-8 p-0 text-muted max-[720px]:hidden" title="コメント" onClick={() => setCommentsOpen(true)}>
               <MessageSquare size={15} />
             </button>
             {editable && (
-              <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink" onClick={() => setShareOpen(true)}>
+              <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink max-[720px]:hidden" onClick={() => setShareOpen(true)}>
                 共有
               </button>
             )}
@@ -368,6 +368,27 @@ export function PageEditor({
             </button>
             {moreOpen && (
               <div className="menu-panel absolute right-0 top-9 z-20 w-56 p-1" onClick={(e) => e.stopPropagation()}>
+                {editable && (
+                  <button
+                    className="hidden w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:flex max-[720px]:min-h-11"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setShareOpen(true);
+                    }}
+                  >
+                    共有
+                  </button>
+                )}
+                <button
+                  className="hidden w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover max-[720px]:flex max-[720px]:min-h-11"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    setCommentsOpen(true);
+                  }}
+                >
+                  <MessageSquare size={14} />
+                  コメント
+                </button>
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {

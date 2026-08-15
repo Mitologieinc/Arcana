@@ -2501,6 +2501,29 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     max-height: 92dvh;
     border-radius: 16px 16px 0 0;
     padding-top: 0;
+    transition: transform 0.2s ease;
+    overscroll-behavior: contain;
+  }
+
+  .arcana-mobile-plus {
+    position: sticky;
+    bottom: 12px;
+    display: flex;
+    width: 44px;
+    height: 44px;
+    margin: 16px 0 8px auto;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-ink);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(15, 15, 15, 0.18);
+  }
+
+  html[data-theme="dark"] .arcana-mobile-plus {
+    background: #e8e6e3;
+    color: #191919;
   }
 
   .arcana-prop-hit {
