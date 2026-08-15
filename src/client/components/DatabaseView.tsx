@@ -1097,7 +1097,7 @@ export function DatabaseView({
                         {canReorderRows && (
                           <button
                             type="button"
-                            className="arcana-grip absolute left-[72px] z-[2] opacity-0 group-hover:opacity-100 max-[860px]:left-1"
+                            className="arcana-grip opacity-0 group-hover:opacity-100"
                             draggable
                             title="並べ替え"
                             onDragStart={(e) => beginDrag(e, "row", row.id)}

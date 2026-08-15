@@ -949,6 +949,14 @@ html[data-theme="dark"] .arcana-toast {
   box-shadow: 1px 0 0 var(--color-line);
 }
 
+.arcana-db-table td:first-child .arcana-grip {
+  position: absolute;
+  top: 50%;
+  left: 72px;
+  z-index: 2;
+  margin-top: -12px;
+}
+
 .arcana-db-table .arcana-db-add {
   min-width: 40px;
   width: 40px;
@@ -1019,6 +1027,10 @@ html[data-theme="dark"] .arcana-toast {
   .arcana-db-table th:first-child,
   .arcana-db-table td:first-child {
     padding-left: 24px;
+  }
+
+  .arcana-db-table td:first-child .arcana-grip {
+    left: 4px;
   }
 }
 
@@ -1261,8 +1273,12 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-db-embed .arcana-db-table th:first-child,
 .arcana-db-embed .arcana-db-table td:first-child {
-  padding-left: 8px;
+  padding-left: 28px;
   min-width: 180px;
+}
+
+.arcana-db-embed .arcana-db-table td:first-child .arcana-grip {
+  left: 4px;
 }
 
 .arcana-page-block {
