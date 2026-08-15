@@ -276,6 +276,7 @@ export function DatabaseView({
   const [rename, setRename] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const skipRenameBlur = useRef(false);
+  const [moveRow, setMoveRow] = useState<Page | null>(null);
   const [calCursor, setCalCursor] = useState(() => {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
@@ -872,6 +873,18 @@ export function DatabaseView({
                         {editingTitleId !== row.id && (
                           <RowChips schema={schema} props={props} skipId={statusProp.id} />
                         )}
+                        {editable && isMobile && editingTitleId !== row.id && (
+                          <button
+                            type="button"
+                            className="mt-2 text-[12px] text-muted"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMoveRow(row);
+                            }}
+                          >
+                            列を移動
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -887,6 +900,41 @@ export function DatabaseView({
               );
             })}
                 </div>
+                {moveRow && (
+                  <div
+                    className="fixed inset-0 z-40 bg-[rgba(15,15,15,0.28)]"
+                    onClick={() => setMoveRow(null)}
+                  >
+                    <div
+                      className="absolute inset-x-0 bottom-0 rounded-t-[16px] bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="px-2 pb-2 text-[13px] font-medium">移動先</p>
+                      {columns.map((col) => (
+                        <button
+                          key={col.id}
+                          type="button"
+                          className="flex min-h-11 w-full items-center rounded-[8px] px-2 text-left text-[15px] active:bg-hover"
+                          onClick={() => {
+                            const row = moveRow;
+                            setMoveRow(null);
+                            void updateRow(row, {
+                              properties: { ...parseProps(row.properties), [statusProp.id]: col.status ?? "" },
+                            });
+                          }}
+                        >
+                          {col.color ? (
+                            <span className={`rounded-[4px] px-1.5 py-0.5 text-[13px] ${optionClass(col.color)}`}>
+                              {col.name}
+                            </span>
+                          ) : (
+                            col.name
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             );
           })()}
