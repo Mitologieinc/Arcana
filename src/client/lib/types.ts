@@ -60,6 +60,7 @@ export type DbView = {
     groupBy?: string;
     filters?: DbFilter[];
     sorts?: { propertyId: string; dir: "asc" | "desc" }[];
+    rowOrder?: Record<string, number>;
   };
 };
 

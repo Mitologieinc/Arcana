@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { CalendarDays, ChevronRight, Columns3, GripVertical, LayoutGrid, MoreHorizontal, Plus, Search, Table2, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
+import { toast } from "../lib/toast";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
 import { useIsMobile } from "../lib/media";
 import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
@@ -55,8 +56,15 @@ function applyFilters(rows: Page[], schema: DbProperty[], filters: DbFilter[] | 
   });
 }
 
-function applySorts(rows: Page[], schema: DbProperty[], sorts: DbView["config"]["sorts"]) {
-  if (!sorts?.length) return [...rows].sort((a, b) => a.position - b.position);
+function applySorts(
+  rows: Page[],
+  schema: DbProperty[],
+  sorts: DbView["config"]["sorts"],
+  rowOrder?: Record<string, number>,
+) {
+  if (!sorts?.length) {
+    return [...rows].sort((a, b) => (rowOrder?.[a.id] ?? a.position) - (rowOrder?.[b.id] ?? b.position));
+  }
   return [...rows].sort((a, b) => {
     for (const s of sorts) {
       const prop = schema.find((p) => p.id === s.propertyId);
@@ -80,11 +88,13 @@ function RowChips({
   props,
   skipId,
   limit = 4,
+  members = [],
 }: {
   schema: DbProperty[];
   props: Record<string, unknown>;
   skipId?: string;
   limit?: number;
+  members?: Member[];
 }) {
   const extras = schema.filter((p) => p.type !== "title" && p.id !== skipId && hasPropValue(props[p.id])).slice(0, limit);
   if (!extras.length) return null;
@@ -120,9 +130,11 @@ function RowChips({
           );
         }
         if (p.type === "person") {
+          const id = String(props[p.id] ?? "");
+          const name = members.find((m) => m.userId === id)?.name;
           return (
             <span key={p.id} className="text-[12px] text-muted">
-              {p.name}
+              {name ?? (id ? "退会したメンバー" : p.name)}
             </span>
           );
         }
@@ -297,6 +309,7 @@ export function DatabaseView({
       applyFilters(rows, schema, [...(view?.config.filters ?? []), ...extra]),
       schema,
       view?.config.sorts,
+      view?.config.rowOrder,
     );
   }, [rows, schema, view, filterValue, equalsFilter]);
 
@@ -384,15 +397,23 @@ export function DatabaseView({
     row: Page,
     patch: { title?: string; properties?: Record<string, unknown>; position?: number },
   ) {
-    await api(`/api/pages/${row.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        title: patch.title ?? row.title,
-        properties: patch.properties ?? parseProps(row.properties),
-        position: patch.position,
-      }),
-    });
+    try {
+      await api(`/api/pages/${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: patch.title ?? row.title,
+          properties: patch.properties ?? parseProps(row.properties),
+          position: patch.position,
+          ifUpdatedAt: row.updatedAt,
+        }),
+      });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "更新できませんでした");
+      await onChanged();
+      return false;
+    }
     await onChanged();
+    return true;
   }
 
   async function deleteRow(id: string) {
@@ -462,16 +483,20 @@ export function DatabaseView({
       return;
     }
     const nextProps = { [statusProp.id]: colStatus ?? "" };
+    const order = view.config.rowOrder;
     const colRows = rows
       .filter((r) => {
         if (r.id === row.id) return true;
         const raw = String(parseProps(r.properties)[statusProp.id] ?? "");
         return colStatus ? raw === colStatus : !raw;
       })
+      .map((r) => ({ ...r, position: order?.[r.id] ?? r.position }))
       .sort((a, b) => a.position - b.position);
     const position = computePosition(colRows, current.id, current.overId, current.overId ? current.edge : "after");
     endDrag();
-    await updateRow(row, { properties: nextProps, position });
+    if (await updateRow(row, { properties: nextProps })) {
+      await saveView({ ...view.config, rowOrder: { ...order, [row.id]: position } });
+    }
   }
 
   async function commitRowDrop() {
@@ -485,10 +510,13 @@ export function DatabaseView({
       endDrag();
       return;
     }
-    const ordered = [...rows].sort((a, b) => a.position - b.position);
+    const order = view.config.rowOrder;
+    const ordered = [...rows]
+      .map((r) => ({ ...r, position: order?.[r.id] ?? r.position }))
+      .sort((a, b) => a.position - b.position);
     const position = computePosition(ordered, current.id, current.overId, current.edge);
     endDrag();
-    await updateRow(row, { position });
+    await saveView({ ...view.config, rowOrder: { ...order, [row.id]: position } });
   }
 
   async function commitColDrop() {
@@ -669,7 +697,7 @@ export function DatabaseView({
                       {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
                       <span className="truncate">{row.title || "名前を入力"}</span>
                     </span>
-                    <RowChips schema={schema} props={props} skipId={statusProp?.id} limit={3} />
+                    <RowChips schema={schema} props={props} skipId={statusProp?.id} limit={3} members={members} />
                   </button>
                   {statusProp && (
                     <div className="w-[7.5rem] shrink-0">
@@ -876,7 +904,7 @@ export function DatabaseView({
                           <div className={`text-[15px] ${row.title ? "" : "text-muted"}`}>{row.title || "無題"}</div>
                         )}
                         {editingTitleId !== row.id && (
-                          <RowChips schema={schema} props={props} skipId={statusProp.id} />
+                          <RowChips schema={schema} props={props} skipId={statusProp.id} members={members} />
                         )}
                         {editable && isMobile && editingTitleId !== row.id && (
                           <button

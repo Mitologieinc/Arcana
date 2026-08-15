@@ -249,10 +249,22 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
     position?: number;
     properties?: Record<string, unknown> | null;
     coverR2Key?: string | null;
+    ifUpdatedAt?: string | number;
   }>();
 
   const current = await db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
   if (!current[0]) return c.json({ error: "見つかりません" }, 404);
+
+  if (body.ifUpdatedAt != null) {
+    const incoming = new Date(body.ifUpdatedAt).getTime();
+    const stored =
+      current[0].updatedAt instanceof Date
+        ? current[0].updatedAt.getTime()
+        : new Date(current[0].updatedAt as unknown as string).getTime();
+    if (Number.isFinite(incoming) && Number.isFinite(stored) && incoming !== stored) {
+      return c.json({ error: "他の人が先に更新しました", conflict: true }, 409);
+    }
+  }
 
   const updates: Partial<typeof schema.pages.$inferInsert> = { updatedAt: new Date() };
   if (body.title !== undefined) updates.title = body.title;
