@@ -13,6 +13,7 @@ export default function App() {
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/invite/:token" element={<InvitePage />} />
       <Route path="/reset/:token" element={<ResetPasswordPage />} />
+      <Route path="/share/:token/:pageId" element={<SharePage />} />
       <Route path="/share/:token" element={<SharePage />} />
       <Route path="/page/:pageId" element={<WorkspaceApp />} />
       <Route path="/" element={<WorkspaceApp />} />

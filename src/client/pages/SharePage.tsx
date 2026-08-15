@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { toast } from "../lib/toast";
 import type { Page, Permission, User } from "../lib/types";
 import { PageEditor } from "../components/PageEditor";
 import { BrandLockup, hideBootSplash } from "../components/Brand";
@@ -19,10 +20,13 @@ function guestId() {
 }
 
 export function SharePage() {
-  const { token } = useParams();
+  const { token, pageId: routePageId } = useParams();
+  const nav = useNavigate();
   const [page, setPage] = useState<Page | null>(null);
+  const [pages, setPages] = useState<Page[]>([]);
   const [permission, setPermission] = useState<Permission>("view");
   const [error, setError] = useState("");
+  const opened = useRef(false);
   const guest = useMemo<User>(
     () => ({ id: guestId(), name: "ゲスト", email: "" }),
     [],
@@ -30,14 +34,47 @@ export function SharePage() {
 
   useEffect(() => {
     if (!token) return;
-    api<{ page: Page | null; permission: Permission }>(`/api/share/${token}`)
-      .then((d) => {
-        if (!d.page) throw new Error("リンクが無効です");
+    let cancelled = false;
+    async function load() {
+      try {
+        const id = routePageId;
+        if (id) {
+          const d = await api<{ page: Page; permission: Permission; ancestors?: Page[] }>(
+            `/api/pages/${id}?token=${encodeURIComponent(token!)}`,
+          );
+          if (cancelled) return;
+          setPage(d.page);
+          setPermission(d.permission);
+          setPages([...(d.ancestors ?? []), d.page]);
+          setError("");
+          opened.current = true;
+          return;
+        }
+        const shared = await api<{ page: Page; permission: Permission }>(`/api/share/${token}`);
+        if (!shared.page) throw new Error("リンクが無効です");
+        const d = await api<{ page: Page; ancestors?: Page[] }>(
+          `/api/pages/${shared.page.id}?token=${encodeURIComponent(token!)}`,
+        ).catch(() => ({ page: shared.page, ancestors: [] as Page[] }));
+        if (cancelled) return;
         setPage(d.page);
-        setPermission(d.permission);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "リンクが無効です"));
-  }, [token]);
+        setPermission(shared.permission);
+        setPages([...(d.ancestors ?? []), d.page]);
+        setError("");
+        opened.current = true;
+      } catch (e) {
+        if (cancelled) return;
+        if (opened.current) {
+          toast("このページは開けません");
+          return;
+        }
+        setError(e instanceof Error ? e.message : "リンクが無効です");
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, routePageId]);
 
   useLayoutEffect(() => {
     if (page || error) hideBootSplash();
@@ -63,10 +100,18 @@ export function SharePage() {
         pageId={page.id}
         user={guest}
         shareToken={token}
+        pages={pages}
         fallback={page}
         forcedPermission={permission}
         onPagesChanged={async () => undefined}
-        onOpenPage={() => undefined}
+        onOpenPage={(id) => {
+          if (!id) {
+            nav(`/share/${token}`);
+            return;
+          }
+          if (id === page.id) return;
+          nav(`/share/${token}/${id}`);
+        }}
       />
     </div>
   );

@@ -211,7 +211,25 @@ pageRoutes.get("/api/pages/:id", async (c) => {
     }
   }
 
-  return c.json({ page, children, database, parentDatabase, permission, workspaceId });
+  const ancestors: typeof page[] = [];
+  let parentId = page.parentId;
+  const seen = new Set<string>([page.id]);
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parents = await db.select().from(schema.pages).where(eq(schema.pages.id, parentId)).limit(1);
+    const parent = parents[0];
+    if (!parent || parent.archivedAt) break;
+    const parentPerm = await resolvePagePermission(db, {
+      pageId: parent.id,
+      userId: user?.id,
+      shareToken,
+    });
+    if (!canView(parentPerm.permission)) break;
+    ancestors.unshift(parent);
+    parentId = parent.parentId;
+  }
+
+  return c.json({ page, children, database, parentDatabase, permission, workspaceId, ancestors });
 });
 
 pageRoutes.patch("/api/pages/:id", async (c) => {
