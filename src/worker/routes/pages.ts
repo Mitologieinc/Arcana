@@ -4,6 +4,8 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, listVisiblePages, resolvePagePermission } from "../lib/acl";
+import { applySchemaChange, mergePageProperties } from "../lib/db-props";
+import { archiveSubtree } from "../lib/page-tree";
 import { normalizeTipTapDoc, plainTextFromDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 import { DEFAULT_DB_PROPERTIES_JSON } from "./workspace";
@@ -249,12 +251,15 @@ pageRoutes.patch("/api/pages/:id", async (c) => {
     coverR2Key?: string | null;
   }>();
 
+  const current = await db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
+  if (!current[0]) return c.json({ error: "見つかりません" }, 404);
+
   const updates: Partial<typeof schema.pages.$inferInsert> = { updatedAt: new Date() };
   if (body.title !== undefined) updates.title = body.title;
   if (body.icon !== undefined) updates.icon = body.icon;
   if (body.position !== undefined) updates.position = body.position;
   if (body.properties !== undefined) {
-    updates.properties = body.properties ? JSON.stringify(body.properties) : null;
+    updates.properties = mergePageProperties(current[0].properties, body.properties);
   }
   if (body.parentId !== undefined) {
     if (body.parentId === null) {
@@ -299,8 +304,7 @@ pageRoutes.delete("/api/pages/:id", async (c) => {
   const id = c.req.param("id");
   const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (permission !== "full") return c.json({ error: "削除できません" }, 403);
-  await db.update(schema.pages).set({ archivedAt: new Date() }).where(eq(schema.pages.id, id));
-  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  await archiveSubtree(db, c.env, id);
   return c.json({ ok: true });
 });
 
@@ -332,11 +336,8 @@ pageRoutes.put("/api/pages/:id/schema", async (c) => {
   const { permission } = await resolvePagePermission(db, { pageId: id, userId: user.id });
   if (!canEdit(permission)) return c.json({ error: "編集できません" }, 403);
   const body = await c.req.json<{ properties: unknown }>();
-  await db
-    .update(schema.databaseSchemas)
-    .set({ properties: JSON.stringify(body.properties) })
-    .where(eq(schema.databaseSchemas.pageId, id));
-  return c.json({ ok: true });
+  const applied = await applySchemaChange(db, id, body.properties);
+  return c.json({ ok: true, properties: applied.properties });
 });
 
 pageRoutes.patch("/api/views/:id", async (c) => {

@@ -4,6 +4,7 @@ import { createDb } from "../db/client";
 import * as schema from "../db/schema";
 import { getMembership, getSessionUser } from "../auth";
 import { canEdit, canView, resolvePagePermission } from "../lib/acl";
+import { purgeSubtree, restoreSubtree } from "../lib/page-tree";
 import { plainTextToDoc, tiptapJsonToUpdate } from "../lib/ydoc-import";
 import type { AppEnv } from "../types";
 
@@ -114,23 +115,28 @@ extraRoutes.get("/api/trash", async (c) => {
     .from(schema.pages)
     .where(and(eq(schema.pages.workspaceId, ctx.membership.workspaceId), isNotNull(schema.pages.archivedAt)))
     .orderBy(desc(schema.pages.archivedAt));
-  return c.json({ pages });
+  const archived = new Set(pages.map((p) => p.id));
+  return c.json({
+    pages: pages.filter((p) => !p.parentId || !archived.has(p.parentId)),
+  });
 });
 
 extraRoutes.post("/api/pages/:id/restore", async (c) => {
   const ctx = await authed(c);
   if ("error" in ctx) return ctx.error;
   const id = c.req.param("id");
-  const { permission } = await resolvePagePermission(ctx.db, { pageId: id, userId: ctx.user.id });
+  const { permission } = await resolvePagePermission(ctx.db, {
+    pageId: id,
+    userId: ctx.user.id,
+    allowArchived: true,
+  });
   if (permission !== "full") return c.json({ error: "復元できません" }, 403);
   const rows = await ctx.db.select().from(schema.pages).where(eq(schema.pages.id, id)).limit(1);
   const page = rows[0];
-  if (!page) return c.json({ error: "見つかりません" }, 404);
-  await ctx.db.update(schema.pages).set({ archivedAt: null, updatedAt: new Date() }).where(eq(schema.pages.id, id));
-  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
-  await c.env.DB.prepare("INSERT INTO page_search (page_id, title, body_text) VALUES (?, ?, ?)")
-    .bind(id, page.title, "")
-    .run();
+  if (!page || page.workspaceId !== ctx.membership.workspaceId) {
+    return c.json({ error: "見つかりません" }, 404);
+  }
+  await restoreSubtree(ctx.db, c.env, id);
   return c.json({ ok: true });
 });
 
@@ -146,8 +152,7 @@ extraRoutes.delete("/api/pages/:id/purge", async (c) => {
   if (!page || page.workspaceId !== ctx.membership.workspaceId) {
     return c.json({ error: "見つかりません" }, 404);
   }
-  await ctx.db.delete(schema.pages).where(eq(schema.pages.id, id));
-  await c.env.DB.prepare("DELETE FROM page_search WHERE page_id = ?").bind(id).run();
+  await purgeSubtree(ctx.db, c.env, id);
   return c.json({ ok: true });
 });
 
@@ -361,13 +366,41 @@ extraRoutes.post("/api/pages/:id/views", async (c) => {
   const names: Record<string, string> = { table: "テーブル", board: "ボード", calendar: "カレンダー", gallery: "ギャラリー" };
   const existing = await ctx.db.select().from(schema.databaseViews).where(eq(schema.databaseViews.pageId, id));
   const position = existing.reduce((m, v) => Math.max(m, v.position), 0) + 1;
+  const sch = await ctx.db.select().from(schema.databaseSchemas).where(eq(schema.databaseSchemas.pageId, id)).limit(1);
+  let props: { id: string; type: string; name: string }[] = [];
+  try {
+    props = sch[0] ? (JSON.parse(sch[0].properties) as { id: string; type: string; name: string }[]) : [];
+  } catch {
+    props = [];
+  }
+  let groupBy = body.groupBy;
+  if (type === "board") {
+    groupBy =
+      groupBy ??
+      props.find((p) => p.type === "status" || p.id === "status")?.id ??
+      props.find((p) => p.type === "select")?.id;
+  }
+  if (type === "calendar") {
+    let date = props.find((p) => p.type === "date");
+    if (!date) {
+      date = { id: crypto.randomUUID().slice(0, 8), type: "date", name: "日付" };
+      props = [...props, date];
+      if (sch[0]) {
+        await ctx.db
+          .update(schema.databaseSchemas)
+          .set({ properties: JSON.stringify(props) })
+          .where(eq(schema.databaseSchemas.pageId, id));
+      }
+    }
+    groupBy = groupBy ?? date.id;
+  }
   const viewId = crypto.randomUUID();
   await ctx.db.insert(schema.databaseViews).values({
     id: viewId,
     pageId: id,
     name: body.name ?? names[type] ?? "ビュー",
     type,
-    config: JSON.stringify({ groupBy: body.groupBy ?? (type === "board" ? "status" : type === "calendar" ? "date" : undefined), filters: [], sorts: [] }),
+    config: JSON.stringify({ groupBy, filters: [], sorts: [] }),
     position,
   });
   return c.json({ id: viewId });

@@ -67,7 +67,7 @@ export function RowPeek({
   async function saveProp(id: string, value: unknown) {
     await api(`/api/pages/${page.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ properties: { ...props, [id]: value } }),
+      body: JSON.stringify({ properties: { [id]: value } }),
     });
     await onChanged();
   }

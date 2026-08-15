@@ -44,14 +44,16 @@ export async function resolvePagePermission(
     pageId: string;
     userId?: string | null;
     shareToken?: string | null;
+    allowArchived?: boolean;
   },
 ): Promise<{ permission: Permission; workspaceId: string; role: MemberRole | null }> {
   const pageRows = await db.select().from(pages).where(eq(pages.id, opts.pageId)).limit(1);
   const page = pageRows[0];
-  if (!page || page.archivedAt) {
-    return { permission: "none", workspaceId: "", role: null };
+  if (!page || (page.archivedAt && !opts.allowArchived)) {
+    return { permission: "none", workspaceId: page?.workspaceId ?? "", role: null };
   }
 
+  let sharePerm: Permission | null = null;
   if (opts.shareToken) {
     const links = await db
       .select()
@@ -61,14 +63,11 @@ export async function resolvePagePermission(
     const link = links[0];
     if (link && shareLinkUnexpired(link) && (await workspaceAllowsShareLinks(db, page.workspaceId))) {
       const chain = await collectPageChain(db, page.id);
-      if (chain.some((p) => p.id === link.pageId) || link.pageId === page.id) {
+      const linked = chain.find((p) => p.id === link.pageId);
+      if ((linked && !linked.archivedAt) || (link.pageId === page.id && !page.archivedAt) || (opts.allowArchived && linked)) {
         const inherited = await permissionFromAncestors(db, page.id, opts.userId ?? null, null);
-        const sharePerm = link.permission;
-        const best =
-          PERMISSION_RANK[sharePerm] >= PERMISSION_RANK[inherited]
-            ? sharePerm
-            : inherited;
-        return { permission: best, workspaceId: page.workspaceId, role: null };
+        sharePerm =
+          PERMISSION_RANK[link.permission] >= PERMISSION_RANK[inherited] ? link.permission : inherited;
       }
     }
   }
@@ -88,13 +87,20 @@ export async function resolvePagePermission(
     role = members[0]?.role ?? null;
   }
 
-  let permission = await permissionFromAncestors(db, page.id, opts.userId ?? null, role);
+  let memberPerm = await permissionFromAncestors(db, page.id, opts.userId ?? null, role);
   if (role === "owner" || role === "admin") {
-    if (PERMISSION_RANK[permission] < PERMISSION_RANK.full) permission = "full";
+    if (PERMISSION_RANK[memberPerm] < PERMISSION_RANK.full) memberPerm = "full";
   } else if (opts.userId && page.createdBy === opts.userId && role && role !== "guest") {
-    if (PERMISSION_RANK[permission] < PERMISSION_RANK.edit) permission = "edit";
+    if (PERMISSION_RANK[memberPerm] < PERMISSION_RANK.edit) memberPerm = "edit";
   }
-  return { permission, workspaceId: page.workspaceId, role };
+
+  if (sharePerm && memberPerm !== "none") {
+    const permission =
+      PERMISSION_RANK[sharePerm] >= PERMISSION_RANK[memberPerm] ? sharePerm : memberPerm;
+    return { permission, workspaceId: page.workspaceId, role };
+  }
+  if (sharePerm) return { permission: sharePerm, workspaceId: page.workspaceId, role };
+  return { permission: memberPerm, workspaceId: page.workspaceId, role };
 }
 
 async function collectPageChain(db: Database, pageId: string) {

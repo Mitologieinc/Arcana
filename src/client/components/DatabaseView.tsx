@@ -151,7 +151,7 @@ function createProperty(type: Exclude<DbProperty["type"], "title">): DbProperty 
       { id: "done", name: "完了", color: "green" },
     ];
   }
-  if (type === "formula") prop.expression = "{名前}";
+  if (type === "formula") prop.expression = "{title}";
   return prop;
 }
 
@@ -350,7 +350,11 @@ export function DatabaseView({
   async function addRow(init?: string | { groupValue?: string; date?: string; datePropId?: string }) {
     const opts = typeof init === "string" ? { groupValue: init } : init ?? {};
     const properties: Record<string, unknown> = {};
-    const groupId = view?.config.groupBy ?? "status";
+    const groupId =
+      schema.find((p) => p.id === (view?.config.groupBy ?? "status"))?.id ??
+      schema.find((p) => p.type === "select" || p.type === "status")?.id ??
+      view?.config.groupBy ??
+      "status";
     if (opts.groupValue) properties[groupId] = opts.groupValue;
     const datePropId = opts.datePropId ?? schema.find((p) => p.type === "date")?.id;
     if (opts.date && datePropId) properties[datePropId] = opts.date;
@@ -367,7 +371,7 @@ export function DatabaseView({
   async function addCalendarRow(iso?: string) {
     let dateProp = schema.find((p) => p.type === "date");
     if (!dateProp) {
-      dateProp = { id: crypto.randomUUID(), type: "date", name: "日付" };
+      dateProp = { id: crypto.randomUUID().slice(0, 8), type: "date", name: "日付" };
       await saveSchema([...schema, dateProp]);
     }
     const date = iso ?? localIso();
@@ -457,7 +461,7 @@ export function DatabaseView({
       endDrag();
       return;
     }
-    const nextProps = { ...parseProps(row.properties), [statusProp.id]: colStatus ?? "" };
+    const nextProps = { [statusProp.id]: colStatus ?? "" };
     const colRows = rows
       .filter((r) => {
         if (r.id === row.id) return true;
@@ -526,7 +530,8 @@ export function DatabaseView({
               const next = e.currentTarget.value;
               void (async () => {
                 if (next !== row.title) await updateRow(row, { title: next });
-                const groupId = view?.config.groupBy ?? "status";
+                const groupId =
+                  statusProp?.id ?? view?.config.groupBy ?? "status";
                 const groupValue = String(parseProps(row.properties)[groupId] ?? "") || undefined;
                 await addRow(view?.type === "board" ? groupValue : undefined);
               })();
@@ -678,7 +683,7 @@ export function DatabaseView({
                         title={row.title}
                         schema={schema}
                         allProps={props}
-                        onChange={(v) => void updateRow(row, { properties: { ...props, [statusProp.id]: v } })}
+                        onChange={(v) => void updateRow(row, { properties: { [statusProp.id]: v } })}
                         onUpdateOptions={(options) =>
                           void saveSchema(schema.map((s) => (s.id === statusProp.id ? { ...s, options } : s)))
                         }
@@ -749,7 +754,7 @@ export function DatabaseView({
               const dateProp =
                 schema.find((p) => p.type === "date") ?? schema.find((p) => p.id === view.config.groupBy);
               if (!dateProp) return;
-              void updateRow(row, { properties: { ...parseProps(row.properties), [dateProp.id]: iso } });
+              void updateRow(row, { properties: { [dateProp.id]: iso } });
             }}
           />
         </div>
@@ -919,7 +924,7 @@ export function DatabaseView({
                             const row = moveRow;
                             setMoveRow(null);
                             void updateRow(row, {
-                              properties: { ...parseProps(row.properties), [statusProp.id]: col.status ?? "" },
+                              properties: { [statusProp.id]: col.status ?? "" },
                             });
                           }}
                         >
@@ -1095,7 +1100,7 @@ export function DatabaseView({
                           title={row.title}
                           schema={schema}
                           allProps={props}
-                          onChange={(v) => void updateRow(row, { properties: { ...props, [p.id]: v } })}
+                          onChange={(v) => void updateRow(row, { properties: { [p.id]: v } })}
                           onUpdateOptions={(options) =>
                             void saveSchema(schema.map((s) => (s.id === p.id ? { ...s, options } : s)))
                           }
@@ -1178,7 +1183,7 @@ export function DatabaseView({
             <input
               className="mb-1 h-8 w-full rounded-[6px] bg-canvas px-2 text-[13px] outline-none"
               defaultValue={headerMenuProp.expression ?? ""}
-              placeholder="{名前} や {プロパティ名}"
+              placeholder="{title} や {列名}"
               onBlur={(e) => {
                 const expression = e.target.value;
                 if (expression !== (headerMenuProp.expression ?? "")) {

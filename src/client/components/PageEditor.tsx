@@ -256,7 +256,7 @@ export function PageEditor({
     setPage({ ...page, properties: JSON.stringify(next) });
     await api(`/api/pages/${pageId}`, {
       method: "PATCH",
-      body: JSON.stringify({ properties: next }),
+      body: JSON.stringify({ properties: { [id]: value } }),
     });
     await onPagesChanged();
   }

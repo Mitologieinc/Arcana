@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { hc } from "hono/client";
 import { YDurableObjects, type YDurableObjectsAppType } from "y-durableobjects";
 import { upgrade } from "y-durableobjects/helpers/upgrade";
-import { applyUpdate, encodeStateAsUpdate } from "yjs";
+import { applyUpdate, encodeStateAsUpdate, XmlElement, XmlFragment, XmlText } from "yjs";
 import { createAuth, getSessionUser } from "./auth";
 import { createDb } from "./db/client";
 import { canEdit, canView, resolvePagePermission } from "./lib/acl";
@@ -66,6 +66,22 @@ export class PageRoom extends YDurableObjects<AppEnv> {
     if (xml.length > 0) xml.delete(0, xml.length);
     applyUpdate(this.doc, update);
     await this.storage.storeUpdate(encodeStateAsUpdate(this.doc));
+  }
+
+  async exportText() {
+    const parts: string[] = [];
+    const walk = (node: XmlFragment | XmlElement | XmlText) => {
+      if (node instanceof XmlText) {
+        const t = node.toString();
+        if (t) parts.push(t);
+        return;
+      }
+      for (const child of node.toArray()) {
+        if (child instanceof XmlText || child instanceof XmlElement) walk(child);
+      }
+    };
+    walk(this.doc.getXmlFragment("prosemirror"));
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   }
 }
 

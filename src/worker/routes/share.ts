@@ -130,7 +130,7 @@ shareRoutes.get("/api/share/:token", async (c) => {
     return c.json({ error: "リンクが無効です" }, 404);
   }
   const page = await db.select().from(schema.pages).where(eq(schema.pages.id, link.pageId)).limit(1);
-  if (!page[0] || !(await workspaceAllowsShareLinks(db, page[0].workspaceId))) {
+  if (!page[0] || page[0].archivedAt || !(await workspaceAllowsShareLinks(db, page[0].workspaceId))) {
     return c.json({ error: "リンクが無効です" }, 404);
   }
   return c.json({ page: page[0], permission: link.permission, token });

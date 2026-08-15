@@ -5,6 +5,7 @@ import type { Page } from "../lib/types";
 import { relativeTime } from "../lib/format";
 import { SideSheet } from "./SideSheet";
 import { PageIcon } from "./PageIcon";
+import { ConfirmModal } from "./ConfirmModal";
 
 export function TrashPanel({
   onClose,
@@ -14,6 +15,7 @@ export function TrashPanel({
   onChanged: () => Promise<unknown>;
 }) {
   const [pages, setPages] = useState<Page[]>([]);
+  const [purgeId, setPurgeId] = useState<string | null>(null);
 
   async function load() {
     const d = await api<{ pages: Page[] }>("/api/trash");
@@ -48,17 +50,29 @@ export function TrashPanel({
             <button
               className="btn-ghost h-7 w-7 shrink-0 p-0 text-danger"
               title="完全削除"
-              onClick={async () => {
-                await api(`/api/pages/${p.id}/purge`, { method: "DELETE" });
-                await load();
-                await onChanged();
-              }}
+              onClick={() => setPurgeId(p.id)}
             >
               <Trash2 size={13} />
             </button>
           </div>
         ))}
       </div>
+      {purgeId && (
+        <ConfirmModal
+          title="完全に削除"
+          body="子ページも含めて元に戻せません。コメントや履歴も消えます。"
+          confirmLabel="削除"
+          danger
+          onClose={() => setPurgeId(null)}
+          onConfirm={async () => {
+            const id = purgeId;
+            setPurgeId(null);
+            await api(`/api/pages/${id}/purge`, { method: "DELETE" });
+            await load();
+            await onChanged();
+          }}
+        />
+      )}
     </SideSheet>
   );
 }
