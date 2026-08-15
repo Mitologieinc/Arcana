@@ -20,7 +20,7 @@ import { Modal } from "./Modal";
 import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
 import { BrandMark } from "./Brand";
-import { pageTypeIcon, permissionLabel } from "../lib/format";
+import { pageTypeIcon } from "../lib/format";
 import { CanvasEditor } from "./CanvasEditor";
 import { useIsMobile } from "../lib/media";
 
@@ -300,7 +300,14 @@ export function PageEditor({
   }, [page, pages]);
 
   const pageProps = parseProps(page?.properties ?? null);
-  const parentFields = parentSchema.filter((p) => p.type !== "title");
+  const parentFields = parentSchema.filter((p) => {
+    if (p.type === "title") return false;
+    if (editable) return true;
+    const value = pageProps[p.id];
+    if (value == null || value === "") return false;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  });
   const peekRow = children.find((r) => r.id === peekId) ?? null;
 
   if (!page) {
@@ -370,8 +377,8 @@ export function PageEditor({
           )}
         </nav>
         <div className={`relative ml-auto flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
-          {!shareToken && <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />}
-          {shareToken ? (
+          {!shareToken && editable && <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />}
+          {shareToken && (
             <button
               type="button"
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted opacity-50 hover:bg-hover hover:opacity-100"
@@ -382,8 +389,6 @@ export function PageEditor({
             >
               <Link2 size={14} />
             </button>
-          ) : (
-            !editable && <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
           )}
           {!shareToken && (
             <>
@@ -470,7 +475,7 @@ export function PageEditor({
                   <Link2 size={14} />
                   リンクをコピー
                 </button>
-                {page.type !== "canvas" && (
+                {editable && page.type !== "canvas" && (
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={() => {
@@ -482,7 +487,7 @@ export function PageEditor({
                   履歴
                 </button>
                 )}
-                {page.type !== "canvas" && (
+                {editable && page.type !== "canvas" && (
                 <button
                   className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] hover:bg-hover"
                   onClick={async () => {
@@ -531,14 +536,9 @@ export function PageEditor({
           )}
         </div>
       </header>
-      {syncStatus !== "connected" && (
+      {editable && syncStatus !== "connected" && (
         <div className="border-b border-line bg-canvas px-24 py-2 text-[13px] text-muted max-[860px]:px-6 max-[720px]:px-4">
           {syncStatus === "connecting" ? "再接続中…" : "オフライン（変更は未同期）"}
-        </div>
-      )}
-      {!editable && !shareToken && page.type !== "canvas" && (
-        <div className="border-b border-line bg-canvas px-24 py-2 text-[13px] text-muted max-[860px]:px-6 max-[720px]:px-4">
-          閲覧のみです。本文は編集できません
         </div>
       )}
       {page.type === "canvas" && (
@@ -569,11 +569,11 @@ export function PageEditor({
             >
               <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={20} />
             </button>
+            {editable ? (
             <input
               ref={titleRef}
               value={title}
               placeholder="無題のキャンバス"
-              readOnly={!editable}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => saveTitle(title)}
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
@@ -584,6 +584,9 @@ export function PageEditor({
                 }
               }}
             />
+            ) : (
+              <span className="jam-title-text">{title || "無題のキャンバス"}</span>
+            )}
             {iconOpen && (
               <div className="menu-panel absolute left-0 top-11 z-20 w-[min(20rem,calc(100vw-2rem))] p-2" onClick={(e) => e.stopPropagation()}>
                 <p className="px-1.5 pb-2 text-[11px] font-medium text-muted">アイコン</p>
@@ -710,6 +713,7 @@ export function PageEditor({
             </div>
           )}
           {page.icon ? (
+            editable ? (
             <button
               className={`inline-flex items-center justify-center rounded-xl leading-none transition hover:bg-hover ${
                 page.coverR2Key
@@ -717,14 +721,23 @@ export function PageEditor({
                   : "mb-1 h-[88px] w-[88px] max-[720px]:h-[60px] max-[720px]:w-[60px]"
               }`}
               onClick={() => {
-                if (!editable) return;
                 setCoverOpen(false);
                 setIconOpen((v) => !v);
               }}
-              disabled={!editable}
             >
               <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={isMobile ? 52 : 78} />
             </button>
+            ) : (
+            <span
+              className={`inline-flex items-center justify-center rounded-xl leading-none ${
+                page.coverR2Key
+                  ? "absolute left-24 top-[-42px] z-[2] h-[88px] w-[88px] max-[860px]:left-6 max-[720px]:left-4 max-[720px]:h-[60px] max-[720px]:w-[60px]"
+                  : "mb-1 h-[88px] w-[88px] max-[720px]:h-[60px] max-[720px]:w-[60px]"
+              }`}
+            >
+              <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={isMobile ? 52 : 78} />
+            </span>
+            )
           ) : (
             editable && !page.coverR2Key && <div className="h-8" />
           )}
@@ -827,10 +840,23 @@ export function PageEditor({
         ) : (
           <>
             {parentFields.length > 0 && (
-              <div className="mt-4 space-y-0.5 px-24 max-[860px]:px-6 max-[720px]:px-4">
+              <div
+                className={
+                  editable
+                    ? "mt-4 space-y-0.5 px-24 max-[860px]:px-6 max-[720px]:px-4"
+                    : "page-meta mt-3 px-24 max-[860px]:px-6 max-[720px]:px-4"
+                }
+              >
                 {parentFields.map((p) => (
-                  <div key={p.id} className="flex min-h-8 items-center gap-4 max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:gap-1">
-                    <span className="flex w-32 shrink-0 items-center gap-1.5 truncate text-[13px] text-muted">
+                  <div
+                    key={p.id}
+                    className={
+                      editable
+                        ? "flex min-h-8 items-center gap-4 max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:gap-1"
+                        : "page-meta-item"
+                    }
+                  >
+                    <span className={`flex items-center gap-1.5 truncate text-[13px] text-muted ${editable ? "w-32 shrink-0" : ""}`}>
                       <PropertyIcon type={p.type} />
                       {p.name}
                     </span>
@@ -859,9 +885,9 @@ export function PageEditor({
               title={title}
               onOpenPage={onOpenPage}
               onPagesChanged={onPagesChanged}
-              onPresence={setPresence}
+              onPresence={editable ? setPresence : undefined}
               onEmptyChange={setEditorEmpty}
-              onSyncStatus={setSyncStatus}
+              onSyncStatus={editable ? setSyncStatus : undefined}
             />
           </>
         )}

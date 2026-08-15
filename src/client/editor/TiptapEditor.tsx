@@ -191,6 +191,7 @@ export const TiptapEditor = forwardRef<
         showOnlyCurrent: true,
         includeChildren: true,
         placeholder: ({ editor, node, pos }) => {
+          if (!editable) return "";
           if (node.type.name === "heading") return `見出し ${node.attrs.level}`;
           if (node.type.name === "detailsSummary") return "クリックで開閉するタイトル";
           const $pos = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
@@ -259,7 +260,7 @@ export const TiptapEditor = forwardRef<
     ],
     editorProps: {
       attributes: {
-        class: compact ? "arcana-doc arcana-doc-peek" : "arcana-doc",
+        class: compact ? "arcana-doc arcana-doc-peek" : editable ? "arcana-doc" : "arcana-doc is-reading",
         spellcheck: "true",
       },
       handlePaste(view, event) {
@@ -290,6 +291,7 @@ export const TiptapEditor = forwardRef<
         return true;
       },
       handleKeyDown(view, event) {
+        if (!editable) return false;
         if (event.key !== "Backspace" && event.key !== "ArrowUp") return false;
         const { selection, doc } = view.state;
         if (!selection.empty) return false;
@@ -348,7 +350,11 @@ export const TiptapEditor = forwardRef<
 
   useEffect(() => {
     if (!editor) return;
-    const apply = () => editor.setEditable(editable);
+    const apply = () => {
+      editor.setEditable(editable);
+      editor.view.dom.classList.toggle("is-reading", !editable);
+      if (!editable) collab.provider.awareness.setLocalStateField("user", null);
+    };
     apply();
     collab.provider.on("sync", apply);
     collab.provider.on("status", apply);
@@ -373,8 +379,9 @@ export const TiptapEditor = forwardRef<
   return (
     <EditorChromeContext.Provider value={{ user, editable, shareToken, onOpenPage, onPagesChanged }}>
     <div
-      className={compact ? "arcana-editor" : "arcana-editor min-h-[55vh]"}
+      className={compact ? "arcana-editor" : editable ? "arcana-editor min-h-[55vh]" : "arcana-editor is-reading"}
       onClick={(e) => {
+        if (!editable) return;
         if (e.target === e.currentTarget) editor.chain().focus("end").run();
       }}
     >

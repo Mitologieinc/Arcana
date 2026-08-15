@@ -1106,6 +1106,46 @@ html[data-theme="dark"] .arcana-toast {
   padding: 4px 0 24vh;
 }
 
+.arcana-doc.is-reading {
+  min-height: 0;
+  padding-bottom: 5rem;
+  caret-color: transparent;
+}
+
+.arcana-doc.is-reading .is-empty::before,
+.arcana-doc.is-reading .is-editor-empty::before {
+  display: none;
+}
+
+.arcana-doc.is-reading .collaboration-carets__caret,
+.arcana-doc.is-reading .collaboration-carets__label,
+.arcana-doc.is-reading .collaboration-carets__selection {
+  display: none !important;
+}
+
+.page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.page-meta-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.jam-title-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #1e1e1e;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .arcana-db-table {
   width: max-content;
   min-width: 100%;
@@ -2637,6 +2677,7 @@ html[data-theme="dark"] .jam-cursor-chat {
 html[data-theme="dark"] .jam-tool,
 html[data-theme="dark"] .jam-zoom,
 html[data-theme="dark"] .jam-title input,
+html[data-theme="dark"] .jam-title-text,
 html[data-theme="dark"] .jam-pop > button {
   color: #e8e6e3;
 }

@@ -581,10 +581,10 @@ export function DatabaseView({
         >
           <span className="inline-flex items-center gap-1">
             {row.icon ? <PageIcon icon={row.icon} size={14} /> : null}
-            {row.title || "名前を入力"}
+            {row.title || (editable ? "名前を入力" : "無題")}
           </span>
         </button>
-        <span className="hidden shrink-0 text-[12px] text-muted group-hover/title:inline">開く</span>
+        {editable && <span className="hidden shrink-0 text-[12px] text-muted group-hover/title:inline">開く</span>}
       </div>
     );
   }
@@ -595,7 +595,7 @@ export function DatabaseView({
     <div className="mt-3">
       <div className={`arcana-db-toolbar mb-1 flex items-center gap-1 ${embedded ? "is-embedded" : ""} ${gutter}`}>
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {views.map((v) => (
+        {(editable || views.length > 1) && views.map((v) => (
           <button
             key={v.id}
             className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] ${
@@ -705,7 +705,7 @@ export function DatabaseView({
                   >
                     <span className={`flex items-center gap-1.5 text-[15px] ${row.title ? "" : "text-muted"}`}>
                       {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
-                      <span className="truncate">{row.title || "名前を入力"}</span>
+                      <span className="truncate">{row.title || (editable ? "名前を入力" : "無題")}</span>
                     </span>
                     <RowChips schema={schema} props={props} skipId={statusProp?.id} limit={3} members={members} />
                   </button>
@@ -735,7 +735,7 @@ export function DatabaseView({
           </ul>
           {filtered.length === 0 && (
             <p className="px-1 py-8 text-center text-[13px] leading-relaxed text-muted">
-              {equalsFilter || filterValue ? "条件に合う行はありません" : "まだ行がありません"}
+              {equalsFilter || filterValue ? "条件に合う行はありません" : "まだありません"}
             </p>
           )}
           {editable && (
@@ -767,7 +767,7 @@ export function DatabaseView({
                 <div className="p-3.5">
                   <div className={`flex items-center gap-1.5 text-[15px] font-medium ${row.title ? "" : "text-muted"}`}>
                     {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
-                    <span className="truncate">{row.title || "名前を入力"}</span>
+                    <span className="truncate">{row.title || (editable ? "名前を入力" : "無題")}</span>
                   </div>
                   <RowChips schema={schema} props={props} limit={6} members={members} />
                 </div>
@@ -776,7 +776,7 @@ export function DatabaseView({
           })}
           {filtered.length === 0 && (
             <p className="col-span-full px-1 py-8 text-center text-[13px] text-muted">
-              {equalsFilter || filterValue ? "条件に合う行はありません" : "カードを追加して、一覧を使い始めてください"}
+              {equalsFilter || filterValue ? "条件に合う行はありません" : editable ? "カードを追加して、一覧を使い始めてください" : "まだありません"}
             </p>
           )}
           {editable && (
@@ -808,7 +808,7 @@ export function DatabaseView({
           ))}
           {filtered.length === 0 && (
             <p className="col-span-full px-1 py-8 text-center text-[13px] text-muted">
-              {equalsFilter || filterValue ? "条件に合う行はありません" : "カードを追加して、ギャラリーを使い始めてください"}
+              {equalsFilter || filterValue ? "条件に合う行はありません" : editable ? "カードを追加して、ギャラリーを使い始めてください" : "まだありません"}
             </p>
           )}
           {editable && (
@@ -1108,7 +1108,7 @@ export function DatabaseView({
                 <tr>
                   <td colSpan={Math.max(1, dataProps.length + (editable ? 2 : 1))} className="!border-0">
                     <p className="px-6 py-10 text-center text-[13px] text-muted">
-                      {equalsFilter || filterValue ? "条件に合う行はありません" : "行を追加して、表を使い始めてください"}
+                      {equalsFilter || filterValue ? "条件に合う行はありません" : editable ? "行を追加して、表を使い始めてください" : "まだありません"}
                     </p>
                   </td>
                 </tr>
@@ -1169,7 +1169,7 @@ export function DatabaseView({
                       </div>
                     </td>
                     {dataProps.map((p) => (
-                      <td key={p.id} data-stop-row>
+                      <td key={p.id} {...(editable ? { "data-stop-row": true } : {})}>
                         <PropertyValue
                           property={p}
                           value={props[p.id]}
