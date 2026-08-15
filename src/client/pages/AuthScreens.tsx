@@ -6,18 +6,6 @@ import { api } from "../lib/api";
 import { BrandLockup, BrandMark, MadeBy, hideBootSplash } from "../components/Brand";
 import { NotionImport } from "../components/NotionImport";
 
-function PasskeyMark() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden>
-      <circle cx="9" cy="8" r="2.6" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M4.6 18.2c0-2.6 2-4.7 4.4-4.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="16.2" cy="14.2" r="2.35" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M17.9 15.9 21.4 19.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M19.7 17.7h1.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function Field({
   label,
   type = "text",
@@ -189,7 +177,7 @@ export function LoginPage() {
     <AuthLayout title={title}>
       <button type="button" className="auth-passkey" onClick={onPasskey} disabled={locked}>
         <span className="auth-passkey-mark">
-          {busy === "passkey" ? <Loader2 size={16} className="animate-spin" /> : <PasskeyMark />}
+          {busy === "passkey" ? <Loader2 size={15} className="animate-spin" /> : <Fingerprint size={15} />}
         </span>
         {busy === "passkey" ? "確認しています…" : "パスキーでログイン"}
       </button>

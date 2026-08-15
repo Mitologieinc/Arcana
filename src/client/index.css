@@ -1017,11 +1017,18 @@ button:disabled {
 .auth-passkey-mark {
   display: grid;
   place-items: center;
+  flex: 0 0 28px;
   width: 28px;
   height: 28px;
   border-radius: 99px;
   background: #1f1e1b;
   color: #fff;
+}
+
+.auth-passkey-mark svg {
+  display: block;
+  width: 15px;
+  height: 15px;
 }
 
 .auth-card .field {
