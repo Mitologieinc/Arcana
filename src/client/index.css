@@ -457,8 +457,16 @@ button:disabled {
   min-width: 252px;
 }
 
-.arcana-nav > .arcana-favs {
+.arcana-nav > .arcana-favs,
+.arcana-nav > .arcana-nav-search {
   min-width: 0;
+}
+
+.arcana-nav-search {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px 8px;
 }
 
 .sidebar-scroll {

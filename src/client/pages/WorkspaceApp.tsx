@@ -237,15 +237,17 @@ export function WorkspaceApp() {
               ))}
             </div>
           )}
-          <button
-            type="button"
-            className="mx-2 mb-2 flex h-8 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-muted hover:bg-hover"
-            onClick={() => setSearchOpen(true)}
-          >
-            <Search size={14} strokeWidth={1.6} />
-            <span className="flex-1">検索</span>
-            <kbd className="kbd">{modSymbol()}K</kbd>
-          </button>
+          <div className="arcana-nav-search">
+            <button
+              type="button"
+              className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-muted hover:bg-hover"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search size={14} strokeWidth={1.6} />
+              <span className="min-w-0 flex-1">検索</span>
+              <kbd className="kbd">{modSymbol()}K</kbd>
+            </button>
+          </div>
           <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-2 pb-3">
             <SidebarTree
               pages={pages}
