@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search, StickyNote } from "lucide-react";
 import { CreateMenuPanel, type CreateSeed } from "../components/CreateMenu";
@@ -292,6 +292,7 @@ export function WorkspaceApp() {
           />
         ) : (
           <Home
+            workspaceName={workspace.name}
             userName={user.name}
             favorites={favorites}
             recent={recent}
@@ -368,6 +369,7 @@ export function WorkspaceApp() {
 }
 
 function Home({
+  workspaceName,
   userName,
   favorites,
   recent,
@@ -382,6 +384,7 @@ function Home({
   onCanvas,
   onTemplate,
 }: {
+  workspaceName: string;
   userName: string;
   favorites: Page[];
   recent: Page[];
@@ -398,94 +401,73 @@ function Home({
 }) {
   const favIds = new Set(favorites.map((p) => p.id));
   const continuePages = recent.filter((p) => !favIds.has(p.id)).slice(0, 8);
-  const empty = favorites.length === 0 && recent.length === 0;
 
   return (
     <>
       {showMenu && onMenu && (
-        <div className="sticky top-0 z-[5] hidden h-11 items-center gap-2 bg-canvas/75 px-3 backdrop-blur-md max-[720px]:flex">
+        <div className="sticky top-0 z-[5] hidden h-11 items-center gap-2 border-b border-line bg-canvas px-3 max-[720px]:flex">
           <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onMenu} title="ページ一覧">
             <PanelLeft size={18} strokeWidth={1.6} />
           </button>
           <span className="text-[14px] font-medium">ホーム</span>
         </div>
       )}
-    <div className="mx-auto max-w-[640px] px-10 py-16 max-[720px]:px-4 max-[720px]:py-6">
-      <button
-        className="flex h-11 w-full items-center gap-3 rounded-full border border-line bg-white px-4 text-left text-[14px] text-muted hover:bg-canvas"
-        onClick={onSearch}
-      >
-        <Search size={16} strokeWidth={1.6} />
-        <span className="flex-1">検索</span>
-        <kbd className="kbd">{modSymbol()}K</kbd>
-      </button>
-      <h1 className="mt-12 text-[22px] font-medium tracking-tight max-[720px]:mt-6">
-        {greeting()}、{userName}
-      </h1>
-      <section className="mt-8">
-        <p className="mb-3 text-[13px] text-muted">{empty ? "どれかから書き始めてください。" : "新しく作る"}</p>
-        <div className="grid grid-cols-4 gap-2 max-[640px]:grid-cols-2">
-          <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
-          <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
-          <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
-          <StartCard icon={<StickyNote size={18} strokeWidth={1.6} />} label="キャンバス" hint="付箋と図" onClick={onCanvas} />
+      <div className="arcana-home">
+        <h1 className="arcana-home-title">{workspaceName}</h1>
+        <p className="arcana-home-kicker">
+          {greeting()}、{userName}
+        </p>
+        <button type="button" className="arcana-home-search" onClick={onSearch}>
+          <Search size={16} strokeWidth={1.6} />
+          <span>検索</span>
+          <kbd className="kbd">{modSymbol()}K</kbd>
+        </button>
+        <div className="arcana-home-starts">
+          <button type="button" onClick={onMemo}>
+            <FileText size={15} strokeWidth={1.6} />
+            メモ
+          </button>
+          <button type="button" onClick={onMeeting}>
+            <Calendar size={15} strokeWidth={1.6} />
+            会議
+          </button>
+          <button type="button" onClick={onTasks}>
+            <CheckSquare size={15} strokeWidth={1.6} />
+            タスク
+          </button>
+          <button type="button" onClick={onCanvas}>
+            <StickyNote size={15} strokeWidth={1.6} />
+            キャンバス
+          </button>
           {templates.map((t) => (
-            <StartCard
-              key={t.id}
-              icon={<span className="text-[18px] leading-none">{t.icon || "📄"}</span>}
-              label={t.name}
-              hint="テンプレート"
-              onClick={() => onTemplate(t)}
-            />
+            <button type="button" key={t.id} onClick={() => onTemplate(t)}>
+              <span>{t.icon || "📄"}</span>
+              {t.name}
+            </button>
           ))}
         </div>
-      </section>
-      {favorites.length > 0 && (
-        <section className="mt-8">
-          <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">お気に入り</p>
-          <ul>
-            {favorites.map((p) => (
-              <HomeRow key={p.id} page={p} onOpen={onOpen} />
-            ))}
-          </ul>
-        </section>
-      )}
-      {continuePages.length > 0 && (
-        <section className="mt-6">
-          <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">最近</p>
-          <ul>
-            {continuePages.map((p) => (
-              <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
+        {favorites.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">お気に入り</p>
+            <ul>
+              {favorites.map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} />
+              ))}
+            </ul>
+          </section>
+        )}
+        {continuePages.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">最近</p>
+            <ul>
+              {continuePages.map((p) => (
+                <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
     </>
-  );
-}
-
-function StartCard({
-  icon,
-  label,
-  hint,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="rounded-[10px] border border-line px-3 py-3 text-left hover:bg-hover"
-      onClick={onClick}
-    >
-      <span className="flex h-8 w-8 items-center justify-center text-muted">{icon}</span>
-      <span className="mt-2 block text-[14px] font-medium">{label}</span>
-      <span className="mt-0.5 block text-[12px] text-muted">{hint}</span>
-    </button>
   );
 }
 
@@ -501,7 +483,7 @@ function HomeRow({
   return (
     <li>
       <button
-        className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2.5 text-left text-[14px] hover:bg-hover"
+        className="arcana-home-row"
         onClick={() => onOpen(page.id)}
       >
         <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={15} />
