@@ -109,8 +109,9 @@ export function Brand({
 
 export function MadeBy({ className }: { className?: string }) {
   return (
-    <a className={className} href="https://mitologie.jp/" target="_blank" rel="noreferrer">
-      mitologie.jp がつくる
+    <a className={`made-by ${className ?? ""}`} href="https://mitologie.jp/" target="_blank" rel="noreferrer">
+      <span className="made-by-k">by</span>
+      Mitologie
     </a>
   );
 }
