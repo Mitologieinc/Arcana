@@ -88,7 +88,12 @@ export async function resolvePagePermission(
     role = members[0]?.role ?? null;
   }
 
-  const permission = await permissionFromAncestors(db, page.id, opts.userId ?? null, role);
+  let permission = await permissionFromAncestors(db, page.id, opts.userId ?? null, role);
+  if (role === "owner" || role === "admin") {
+    if (PERMISSION_RANK[permission] < PERMISSION_RANK.full) permission = "full";
+  } else if (opts.userId && page.createdBy === opts.userId && role && role !== "guest") {
+    if (PERMISSION_RANK[permission] < PERMISSION_RANK.edit) permission = "edit";
+  }
   return { permission, workspaceId: page.workspaceId, role };
 }
 

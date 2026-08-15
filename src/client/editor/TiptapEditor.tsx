@@ -323,8 +323,16 @@ export const TiptapEditor = forwardRef<
   );
 
   useEffect(() => {
-    editor?.setEditable(editable);
-  }, [editor, editable]);
+    if (!editor) return;
+    const apply = () => editor.setEditable(editable);
+    apply();
+    collab.provider.on("sync", apply);
+    collab.provider.on("status", apply);
+    return () => {
+      collab.provider.off("sync", apply);
+      collab.provider.off("status", apply);
+    };
+  }, [editor, collab, editable]);
 
   useEffect(() => {
     if (!editor || !onEmptyChange) return;

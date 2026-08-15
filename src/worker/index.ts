@@ -19,10 +19,10 @@ import { allowAttempt, clientIp } from "./lib/rate-limit";
 import type { AppEnv } from "./types";
 
 export class PageRoom extends YDurableObjects<AppEnv> {
-  private pendingReadOnly = false;
+  private pendingReadOnly: boolean[] = [];
 
   fetch(request: Request) {
-    this.pendingReadOnly = request.headers.get("X-Arcana-Collab") === "read";
+    this.pendingReadOnly.push(request.headers.get("X-Arcana-Collab") === "read");
     return super.fetch(request);
   }
 
@@ -33,7 +33,7 @@ export class PageRoom extends YDurableObjects<AppEnv> {
     server.serializeAttachment({
       roomId,
       connectedAt: new Date(),
-      readOnly: this.pendingReadOnly,
+      readOnly: this.pendingReadOnly.shift() ?? false,
     });
     this.state.acceptWebSocket(server);
     this.registerWebSocket(server);

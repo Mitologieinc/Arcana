@@ -335,7 +335,7 @@ export function PageEditor({
         </nav>
         <div className={`relative flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
           <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />
-          {shareToken && (
+          {!editable && (
             <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
           )}
           {!shareToken && (
