@@ -82,7 +82,7 @@ export function SharePage() {
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-white px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
         <BrandLockup className="h-12 w-auto" />
         <h1 className="mt-6 text-[15px] font-medium">このリンクは開けません</h1>
         <p className="max-w-[280px] text-[13px] leading-relaxed text-muted">
@@ -94,7 +94,7 @@ export function SharePage() {
   if (!page || !token) return null;
 
   return (
-    <div className={`h-full ${page.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
+    <div className={`h-full bg-canvas ${page.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
       <PageEditor
         key={page.id}
         pageId={page.id}

@@ -308,12 +308,12 @@ export function PageEditor({
   }
 
   return (
-    <div className={page.type === "canvas" ? "relative flex h-full min-h-0 flex-col" : "min-h-full"}>
+    <div className={page.type === "canvas" ? "relative flex h-full min-h-0 flex-col" : "min-h-full bg-canvas"}>
       <header
         className={
           page.type === "canvas"
             ? "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between px-3"
-            : "sticky top-0 z-[5] flex h-10 items-center justify-between bg-white/75 px-3 backdrop-blur-md"
+            : "sticky top-0 z-[5] flex h-10 items-center justify-between bg-canvas/75 px-3 backdrop-blur-md"
         }
       >
         <nav className={`flex min-w-0 items-center gap-0.5 text-[13px] text-muted ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>

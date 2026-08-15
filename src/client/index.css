@@ -278,7 +278,7 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  background: #fff;
+  background: var(--color-canvas);
 }
 
 .arcana-nav-backdrop {
