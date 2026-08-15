@@ -53,7 +53,7 @@ export function AppRail({
   return (
     <nav className="arcana-rail" aria-label="メイン">
       <button
-        className={`arcana-rail-home mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded ${home ? "bg-hover" : ""}`}
+        className={`arcana-rail-home mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] ${home ? "bg-hover" : ""}`}
         onClick={onHome}
         title="ホーム"
       >

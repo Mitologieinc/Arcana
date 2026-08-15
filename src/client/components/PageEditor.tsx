@@ -332,7 +332,7 @@ export function PageEditor({
             ? "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between px-3"
             : sharedDoc
               ? "share-bar"
-              : "sticky top-0 z-[5] flex h-10 items-center justify-between border-b border-line bg-canvas px-3"
+              : "sticky top-0 z-[5] flex h-10 items-center justify-between bg-canvas/75 px-3 backdrop-blur-md"
         }
       >
         {sharedDoc && (

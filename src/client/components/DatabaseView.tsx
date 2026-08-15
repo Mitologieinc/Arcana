@@ -784,7 +784,7 @@ export function DatabaseView({
           {editable && (
             <button
               type="button"
-              className="rounded border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover"
+              className="rounded-[14px] border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover"
               onClick={() => void addRow()}
             >
               + カードを追加
@@ -814,7 +814,7 @@ export function DatabaseView({
             </p>
           )}
           {editable && (
-            <button className="rounded border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover" onClick={() => void addRow()}>
+            <button className="rounded-[10px] border border-dashed border-line px-3 py-8 text-[13px] text-muted hover:bg-hover" onClick={() => void addRow()}>
               + 新規
             </button>
           )}
