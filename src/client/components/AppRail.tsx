@@ -3,7 +3,9 @@ import { Bell, PanelLeft, Plus, Search, Settings, Trash2 } from "lucide-react";
 import { BrandMark } from "./Brand";
 import { Avatar } from "./Avatar";
 import { CreateMenuPanel, type CreateSeed } from "./CreateMenu";
-import type { SavedTemplate, User } from "../lib/types";
+import { PageIcon } from "./PageIcon";
+import { pageTypeIcon } from "../lib/format";
+import type { Page, SavedTemplate, User } from "../lib/types";
 
 type Props = {
   user: User;
@@ -11,10 +13,13 @@ type Props = {
   navOpen: boolean;
   unread?: number;
   templates?: SavedTemplate[];
+  favorites?: Page[];
+  currentId?: string;
   onHome: () => void;
   onSearch: () => void;
   onToggleNav: () => void;
   onCreate: (seed: CreateSeed) => void;
+  onOpenPage?: (id: string) => void;
   onSettings: () => void;
   onTrash: () => void;
   onNotifs: () => void;
@@ -26,10 +31,13 @@ export function AppRail({
   navOpen,
   unread = 0,
   templates = [],
+  favorites = [],
+  currentId,
   onHome,
   onSearch,
   onToggleNav,
   onCreate,
+  onOpenPage,
   onSettings,
   onTrash,
   onNotifs,
@@ -89,6 +97,21 @@ export function AppRail({
           </div>
         )}
       </div>
+      {!navOpen && favorites.length > 0 && (
+        <div className="arcana-rail-favs max-[720px]:hidden" aria-label="お気に入り">
+          {favorites.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`arcana-rail-btn ${currentId === p.id ? "is-active" : ""}`}
+              title={p.title || "無題"}
+              onClick={() => onOpenPage?.(p.id)}
+            >
+              <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={18} />
+            </button>
+          ))}
+        </div>
+      )}
       <div className="arcana-rail-grow flex-1" />
       <button className="arcana-rail-btn relative" onClick={onNotifs} title="通知">
         <Bell size={18} strokeWidth={1.6} />
