@@ -83,6 +83,27 @@ npm run deploy:production
 
 任意で本番 URL を `BETTER_AUTH_URL` にしても構いません（未設定ならリクエストの Origin を使います）。
 
+## 更新
+
+GitHub の最新を取り込み直すときは、次のどれかです。設定 → **更新** でも、いまの版と差分を確認できます。
+
+**CLI**
+
+```bash
+git pull
+npm run deploy
+```
+
+または `npm run update`（fast-forward できるときだけ pull してデプロイします）。
+
+**GitHub Actions**
+
+リポジトリの Secrets に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を入れると、`main` への push と Actions の手動実行でデプロイします。トークンは Workers の編集と D1 のマイグレーションができる権限にしてください。
+
+**ワンタップで出した環境**
+
+フォークを [upstream](https://github.com/Mitologieinc/Arcana) に同期すると、Cloudflare の Git 連携が再デプロイします。
+
 ## 構成
 
 - Worker + 静的アセット（Vite / React / Hono）

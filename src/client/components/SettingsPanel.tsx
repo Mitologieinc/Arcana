@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, Import, KeyRound, LayoutTemplate, Monitor, Moon, Sun, Trash2, Users } from "lucide-react";
+import { Fingerprint, Import, KeyRound, LayoutTemplate, Monitor, Moon, RefreshCw, Sun, Trash2, Users } from "lucide-react";
+import { AppUpdate } from "./AppUpdate";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { toast } from "../lib/toast";
@@ -55,7 +56,7 @@ type PasskeyRow = {
   deviceType?: string;
 };
 
-type Tab = "account" | "appearance" | "team" | "templates" | "import";
+type Tab = "account" | "appearance" | "team" | "templates" | "import" | "update";
 
 export function SettingsPanel({
   user,
@@ -283,6 +284,7 @@ export function SettingsPanel({
     { id: "templates", label: "テンプレ", icon: LayoutTemplate },
   ];
   if (canInvite) tabs.push({ id: "import", label: "移行", icon: Import });
+  if (canInvite) tabs.push({ id: "update", label: "更新", icon: RefreshCw });
 
   return (
     <>
@@ -681,6 +683,7 @@ export function SettingsPanel({
           )}
 
           {tab === "import" && canInvite && <NotionImport onChanged={onChanged} />}
+          {tab === "update" && canInvite && <AppUpdate />}
 
           {tab === "templates" && (
             <div className="space-y-4">

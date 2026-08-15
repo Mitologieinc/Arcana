@@ -13,6 +13,7 @@
     "deploy": "node scripts/cf-deploy.mjs",
     "deploy:staging": "node scripts/cf-deploy.mjs --staging",
     "deploy:production": "node scripts/cf-deploy.mjs --production",
+    "update": "git pull --ff-only && npm install && npm run deploy",
     "types": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:staging": "wrangler d1 migrations apply DB --env staging --remote",
