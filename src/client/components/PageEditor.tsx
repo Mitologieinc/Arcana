@@ -355,7 +355,7 @@ export function PageEditor({
               <MessageSquare size={15} />
             </button>
             {editable && (
-              <button className="h-8 px-2.5 text-[13px] text-muted hover:text-ink max-[720px]:hidden" onClick={() => setShareOpen(true)}>
+              <button className="btn btn-secondary h-8 px-2.5 text-[13px] max-[720px]:hidden" onClick={() => setShareOpen(true)}>
                 共有
               </button>
             )}

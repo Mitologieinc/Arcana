@@ -487,7 +487,7 @@ export function DatabaseView({
           ref={titleInputRef}
           className="w-full border-none bg-transparent text-[14px] outline-none placeholder:text-muted"
           defaultValue={row.title}
-          placeholder="無題"
+          placeholder="名前を入力"
           onBlur={(e) => {
             if (skipTitleBlur.current) {
               skipTitleBlur.current = false;
@@ -526,18 +526,10 @@ export function DatabaseView({
         >
           <span className="inline-flex items-center gap-1">
             {row.icon ? <PageIcon icon={row.icon} size={14} /> : null}
-            {row.title || "無題"}
+            {row.title || "名前を入力"}
           </span>
         </button>
-        <button
-          className="hidden h-6 shrink-0 rounded-[4px] border border-line px-1.5 text-[11px] text-muted group-hover/title:inline-flex group-hover/title:items-center hover:bg-hover"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenRow(row.id);
-          }}
-        >
-          開く
-        </button>
+        <span className="hidden shrink-0 text-[12px] text-muted group-hover/title:inline">開く</span>
       </div>
     );
   }
@@ -626,7 +618,7 @@ export function DatabaseView({
         </div>
         {editable && (
           <button
-            className={`ml-1 shrink-0 ${isMobile ? "btn btn-primary h-9 px-3 text-[13px]" : "btn-ghost h-8 px-2.5 text-[13px]"}`}
+            className="btn btn-primary ml-1 h-9 shrink-0 px-3 text-[13px]"
             onClick={() => void addRow()}
           >
             新規
@@ -1005,12 +997,21 @@ export function DatabaseView({
               </tr>
             </thead>
             <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={Math.max(1, dataProps.length + (editable ? 2 : 1))} className="!border-0">
+                    <p className="px-6 py-10 text-center text-[13px] text-muted">
+                      {equalsFilter || filterValue ? "条件に合う行はありません" : "行を追加して、表を使い始めてください"}
+                    </p>
+                  </td>
+                </tr>
+              )}
               {filtered.map((row) => {
                 const props = parseProps(row.properties);
                 return (
                   <tr
                     key={row.id}
-                    className={`group ${
+                    className={`group cursor-pointer ${
                       drag?.type === "row" && drag.id === row.id ? "opacity-40" : ""
                     } ${
                       drag?.type === "row" && drag.overId === row.id
@@ -1019,6 +1020,10 @@ export function DatabaseView({
                           : "arcana-drop-after"
                         : ""
                     }`}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("input, select, textarea, button, [data-stop-row]")) return;
+                      onOpenRow(row.id);
+                    }}
                     onDragOver={(e) => canReorderRows && hoverDrag(e, row.id)}
                     onDrop={(e) => {
                       if (!canReorderRows) return;
@@ -1046,7 +1051,10 @@ export function DatabaseView({
                           <button
                             className="btn-ghost h-6 w-6 shrink-0 p-0 text-muted opacity-0 group-hover:opacity-100"
                             title="削除"
-                            onClick={() => void deleteRow(row.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void deleteRow(row.id);
+                            }}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -1054,7 +1062,7 @@ export function DatabaseView({
                       </div>
                     </td>
                     {dataProps.map((p) => (
-                      <td key={p.id}>
+                      <td key={p.id} data-stop-row>
                         <PropertyValue
                           property={p}
                           value={props[p.id]}

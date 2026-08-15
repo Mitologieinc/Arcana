@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Maximize2, Trash2, X } from "lucide-react";
+import { Maximize2, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useIsMobile } from "../lib/media";
 import type { DbProperty, Member, Page, User } from "../lib/types";
@@ -111,36 +111,25 @@ export function RowPeek({
           </div>
         )}
         <header className="flex h-12 shrink-0 items-center justify-between px-3">
-          {isMobile ? (
-            <button className="btn-ghost h-9 px-2 text-[15px] font-medium text-cf" onClick={onClose}>
-              完了
-            </button>
-          ) : (
+          <button
+            className={`btn-ghost h-9 px-2 ${isMobile ? "text-[15px] font-medium text-cf" : "text-[13px] text-muted"}`}
+            onClick={onClose}
+          >
+            {isMobile ? "完了" : "閉じる"}
+          </button>
+          <div className="flex items-center">
             <button className="btn-ghost h-9 gap-1.5 px-2 text-[13px] text-muted" onClick={onOpenPage}>
               <Maximize2 size={14} />
               ページとして開く
             </button>
-          )}
-          <div className="flex items-center">
-            {isMobile && (
-              <button className="btn-ghost h-9 gap-1 px-2 text-[13px] text-muted" onClick={onOpenPage}>
-                <Maximize2 size={14} />
-                開く
-              </button>
-            )}
             {editable && onDelete && (
               <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onDelete} title="削除">
                 <Trash2 size={15} />
               </button>
             )}
-            {!isMobile && (
-              <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onClose} aria-label="閉じる">
-                <X size={16} />
-              </button>
-            )}
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto px-12 pb-24 pt-6 max-[720px]:px-4 max-[720px]:pt-2">
+        <div className="min-h-0 flex-1 overflow-auto px-8 pb-24 pt-6 max-[720px]:px-4 max-[720px]:pt-2">
           <input
             autoFocus={!page.title}
             className="page-title text-[32px] max-[720px]:text-[26px]"

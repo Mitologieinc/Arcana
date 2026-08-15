@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search, StickyNote } from "lucide-react";
+import { CreateMenuPanel, type CreateSeed } from "../components/CreateMenu";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, modSymbol, pageTypeIcon, relativeTime } from "../lib/format";
@@ -37,6 +38,7 @@ export function WorkspaceApp() {
   const [favorites, setFavorites] = useState<Page[]>([]);
   const [unread, setUnread] = useState(0);
   const [templates, setTemplates] = useState<SavedTemplate[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
 
   function toggleNav() {
     setNavOpen((v) => {
@@ -109,6 +111,10 @@ export function WorkspaceApp() {
     [pages],
   );
 
+  function createFromMenu(seed: CreateSeed) {
+    void createPage(null, seed.type, seed);
+  }
+
   async function createPage(
     parentId?: string | null,
     type: PageType = "page",
@@ -139,6 +145,16 @@ export function WorkspaceApp() {
     if (isMobile) setNavOpen(false);
   }, [isMobile]);
 
+  useEffect(() => {
+    if (!createOpen) return;
+    const close = () => setCreateOpen(false);
+    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("click", close);
+    };
+  }, [createOpen]);
+
   useLayoutEffect(() => {
     if (ready) hideBootSplash();
   }, [ready]);
@@ -152,13 +168,14 @@ export function WorkspaceApp() {
         home={!pageId}
         navOpen={navOpen}
         unread={unread}
+        templates={templates}
         onHome={() => {
           closeNavIfMobile();
           nav("/");
         }}
         onSearch={() => setSearchOpen(true)}
         onToggleNav={toggleNav}
-        onNewPage={() => void createPage(null, "page")}
+        onCreate={createFromMenu}
         onSettings={() => void openSettings()}
         onTrash={() => setTrashOpen(true)}
         onNotifs={() => setNotifOpen(true)}
@@ -176,12 +193,44 @@ export function WorkspaceApp() {
               >
                 <PanelLeft size={15} strokeWidth={1.6} />
               </button>
-              <span className="text-[12px] font-medium tracking-wide text-muted">ページ</span>
+              <span className="min-w-0 truncate text-[13px] font-medium">{workspace.name}</span>
             </div>
-            <button className="btn-ghost h-7 w-7 p-0 text-muted" onClick={() => void createPage(null, "page")} title="新規ページ">
-              <Plus size={15} strokeWidth={1.6} />
-            </button>
+            <div className="relative">
+              <button
+                className="btn-ghost h-7 w-7 p-0 text-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCreateOpen((v) => !v);
+                }}
+                title="新規"
+              >
+                <Plus size={15} strokeWidth={1.6} />
+              </button>
+              {createOpen && (
+                <div
+                  className="menu-panel absolute right-0 top-8 z-30 w-56"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CreateMenuPanel
+                    templates={templates}
+                    onPick={(seed) => {
+                      setCreateOpen(false);
+                      createFromMenu(seed);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
+          <button
+            type="button"
+            className="mx-2 mb-2 flex h-8 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-muted hover:bg-hover"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search size={14} strokeWidth={1.6} />
+            <span className="flex-1">検索</span>
+            <kbd className="kbd">{modSymbol()}K</kbd>
+          </button>
           {favorites.length > 0 && (
             <div className="mb-2 px-2">
               <p className="px-2 pb-1 text-[11px] font-medium text-muted">お気に入り</p>
@@ -359,66 +408,43 @@ function Home({
       <h1 className="mt-12 text-[22px] font-medium tracking-tight max-[720px]:mt-6">
         {greeting()}、{userName}
       </h1>
-      {empty ? (
-        <div className="mt-8">
-          <p className="mb-3 text-[13px] text-muted">どれかから書き始めてください。</p>
-          <div className="grid grid-cols-3 gap-2 max-[520px]:grid-cols-1">
-            <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
-            <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
-            <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
-            <StartCard icon={<StickyNote size={18} strokeWidth={1.6} />} label="キャンバス" hint="付箋と図" onClick={onCanvas} />
-            {templates.map((t) => (
-              <StartCard
-                key={t.id}
-                icon={<span className="text-[18px] leading-none">{t.icon || "📄"}</span>}
-                label={t.name}
-                hint="テンプレート"
-                onClick={() => onTemplate(t)}
-              />
-            ))}
-          </div>
+      <section className="mt-8">
+        <p className="mb-3 text-[13px] text-muted">{empty ? "どれかから書き始めてください。" : "新しく作る"}</p>
+        <div className="grid grid-cols-4 gap-2 max-[640px]:grid-cols-2">
+          <StartCard icon={<FileText size={18} strokeWidth={1.6} />} label="メモ" hint="短い記録" onClick={onMemo} />
+          <StartCard icon={<Calendar size={18} strokeWidth={1.6} />} label="会議メモ" hint="議事と次の行動" onClick={onMeeting} />
+          <StartCard icon={<CheckSquare size={18} strokeWidth={1.6} />} label="タスク" hint="データベース" onClick={onTasks} />
+          <StartCard icon={<StickyNote size={18} strokeWidth={1.6} />} label="キャンバス" hint="付箋と図" onClick={onCanvas} />
+          {templates.map((t) => (
+            <StartCard
+              key={t.id}
+              icon={<span className="text-[18px] leading-none">{t.icon || "📄"}</span>}
+              label={t.name}
+              hint="テンプレート"
+              onClick={() => onTemplate(t)}
+            />
+          ))}
         </div>
-      ) : (
-        <>
-          {favorites.length > 0 && (
-            <section className="mt-8">
-              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">お気に入り</p>
-              <ul>
-                {favorites.map((p) => (
-                  <HomeRow key={p.id} page={p} onOpen={onOpen} />
-                ))}
-              </ul>
-            </section>
-          )}
-          {continuePages.length > 0 && (
-            <section className="mt-6">
-              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">最近</p>
-              <ul>
-                {continuePages.map((p) => (
-                  <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
-                ))}
-              </ul>
-            </section>
-          )}
-          {templates.length > 0 && (
-            <section className="mt-6">
-              <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">テンプレート</p>
-              <div className="flex flex-wrap gap-2">
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-muted hover:bg-hover hover:text-ink"
-                    onClick={() => onTemplate(t)}
-                  >
-                    <span>{t.icon || "📄"}</span>
-                    {t.name}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-        </>
+      </section>
+      {favorites.length > 0 && (
+        <section className="mt-8">
+          <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">お気に入り</p>
+          <ul>
+            {favorites.map((p) => (
+              <HomeRow key={p.id} page={p} onOpen={onOpen} />
+            ))}
+          </ul>
+        </section>
+      )}
+      {continuePages.length > 0 && (
+        <section className="mt-6">
+          <p className="mb-2 px-1.5 text-[11px] font-medium text-muted">最近</p>
+          <ul>
+            {continuePages.map((p) => (
+              <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
+            ))}
+          </ul>
+        </section>
       )}
     </div>
     </>
@@ -461,7 +487,7 @@ function HomeRow({
   return (
     <li>
       <button
-        className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2 text-left text-[14px] hover:bg-hover"
+        className="flex w-full items-center gap-3 rounded-[8px] px-1.5 py-2.5 text-left text-[14px] hover:bg-hover"
         onClick={() => onOpen(page.id)}
       >
         <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={15} />
