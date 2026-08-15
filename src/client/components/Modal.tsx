@@ -30,7 +30,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`modal-panel menu-panel flex max-h-[min(720px,calc(100vh-2rem))] flex-col ${
+        className={`modal-panel menu-panel flex max-h-[min(720px,calc(100vh-2rem))] min-w-0 flex-col ${
           wide ? "w-full max-w-[720px]" : "w-full max-w-[440px]"
         }`}
         onClick={(e) => e.stopPropagation()}

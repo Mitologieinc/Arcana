@@ -154,7 +154,7 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
 
   return (
     <Modal title="共有" onClose={onClose}>
-      <div className="mb-4 flex items-center gap-2.5">
+      <div className="mb-4 flex min-w-0 items-center gap-2.5">
         <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={22} />
         <div className="min-w-0">
           <p className="truncate text-[14px] font-medium">{page.title || "無題"}</p>
@@ -164,17 +164,12 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
 
       <section className="mb-4">
         <h3 className="mb-1.5 text-[12px] font-medium text-muted">チーム</h3>
-        <div className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2">
-          <span className="min-w-0 flex-1 text-[13px]">ワークスペースの全員</span>
-          <select
-            className="input h-8 w-[7.5rem] shrink-0 text-[12px]"
-            value={wsPerm}
-            disabled={!canManageAcl}
-            onChange={(e) => saveWsPerm(e.target.value as Permission)}
-          >
+        <label className="field mb-0">
+          <span>ワークスペースの全員</span>
+          <select value={wsPerm} disabled={!canManageAcl} onChange={(e) => saveWsPerm(e.target.value as Permission)}>
             {permOptions()}
           </select>
-        </div>
+        </label>
         {wsPerm === "none" && (
           <p className="mt-1.5 text-[12px] text-muted">足した人以外には見えません。</p>
         )}
@@ -183,44 +178,46 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
       <section className="mb-4">
         <h3 className="mb-1.5 text-[12px] font-medium text-muted">人</h3>
         {people.length > 0 && (
-          <ul className="mb-2 overflow-hidden rounded-[10px] border border-line">
+          <ul className="mb-2 space-y-2">
             {people.map((p) => {
               const member = members.find((m) => m.userId === p.principalId);
               const name = member?.name ?? "不明";
               const self = p.principalId === userId;
               return (
-                <li key={p.principalId} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
-                  <Avatar name={name} seed={p.principalId ?? name} size={22} />
-                  <span className="min-w-0 flex-1 truncate text-[13px]">
-                    {name}
-                    {self ? <span className="text-muted">（あなた）</span> : ""}
-                  </span>
+                <li key={p.principalId} className="rounded-[10px] border border-line px-3 py-2">
+                  <div className="mb-2 flex min-w-0 items-center gap-2">
+                    <Avatar name={name} seed={p.principalId ?? name} size={22} />
+                    <span className="min-w-0 flex-1 truncate text-[13px]">
+                      {name}
+                      {self ? <span className="text-muted">（あなた）</span> : ""}
+                    </span>
+                    {canManageAcl && (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-md p-1 text-muted hover:bg-hover hover:text-danger"
+                        title="上書きを外す"
+                        onClick={() => void removePerson(p.principalId!)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                   <select
-                    className="input h-8 w-[7.5rem] shrink-0 text-[12px]"
+                    className="input"
                     value={p.permission}
                     disabled={!canManageAcl}
                     onChange={(e) => void savePerson(p.principalId!, e.target.value as Permission)}
                   >
                     {permOptions()}
                   </select>
-                  {canManageAcl && (
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-md p-1 text-muted hover:bg-hover hover:text-danger"
-                      title="上書きを外す"
-                      onClick={() => void removePerson(p.principalId!)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
                 </li>
               );
             })}
           </ul>
         )}
         {canManageAcl && addable.length > 0 && (
-          <div className="flex gap-2">
-            <select className="input min-w-0 flex-1 text-[13px]" value={addId} onChange={(e) => setAddId(e.target.value)}>
+          <div className="space-y-2">
+            <select className="input" value={addId} onChange={(e) => setAddId(e.target.value)}>
               <option value="">メンバーを選ぶ</option>
               {addable.map((m) => (
                 <option key={m.userId} value={m.userId}>
@@ -229,14 +226,10 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
                 </option>
               ))}
             </select>
-            <select
-              className="input h-8 w-[7.5rem] shrink-0 text-[12px]"
-              value={addPerm}
-              onChange={(e) => setAddPerm(e.target.value as Permission)}
-            >
+            <select className="input" value={addPerm} onChange={(e) => setAddPerm(e.target.value as Permission)}>
               {permOptions()}
             </select>
-            <button type="button" className="btn btn-secondary shrink-0" disabled={!addId} onClick={() => void addPerson()}>
+            <button type="button" className="btn btn-secondary w-full" disabled={!addId} onClick={() => void addPerson()}>
               追加
             </button>
           </div>
@@ -253,58 +246,43 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
             設定のチームで公開リンクがオフです。既存のリンクも開けません。
           </p>
         ) : (
-          <>
-            <div className="mb-2 flex items-center gap-2">
-              <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted">
-                <span className="shrink-0">期限</span>
-                <select
-                  className="input h-8 flex-1 text-[13px]"
-                  value={expiresIn}
-                  onChange={(e) => setExpiresIn(e.target.value as ExpiresIn)}
-                >
-                  <option value="7d">7日</option>
-                  <option value="30d">30日</option>
-                  <option value="never">無期限</option>
-                </select>
-              </label>
-            </div>
-            <div className="mb-3 flex gap-2">
-              <button type="button" className="btn btn-primary flex-1 gap-1.5" onClick={() => void createLink("view")}>
-                <Link2 size={14} />
-                閲覧リンク
-              </button>
-              <button type="button" className="btn btn-secondary flex-1" onClick={() => void createLink("edit")}>
-                編集リンク
-              </button>
-            </div>
-          </>
+          <div className="space-y-2">
+            <label className="field mb-0">
+              <span>期限</span>
+              <select value={expiresIn} onChange={(e) => setExpiresIn(e.target.value as ExpiresIn)}>
+                <option value="7d">7日</option>
+                <option value="30d">30日</option>
+                <option value="never">無期限</option>
+              </select>
+            </label>
+            <button type="button" className="btn btn-primary w-full" onClick={() => void createLink("view")}>
+              <Link2 size={14} />
+              閲覧リンクを作ってコピー
+            </button>
+            <button type="button" className="btn btn-secondary w-full" onClick={() => void createLink("edit")}>
+              編集リンクを作ってコピー
+            </button>
+          </div>
         )}
         {links.length > 0 && (
-          <>
-            <ul className="overflow-hidden rounded-[10px] border border-line">
-              {links.map((l) => {
-                const url = shareUrl(l.token);
-                const isCopied = copied === url;
-                return (
-                  <li key={l.id} className="flex items-center gap-2 border-b border-line px-3 py-2.5 last:border-b-0">
-                    <Link2 size={14} className="shrink-0 text-muted" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px]">
-                        {permissionLabel(l.permission)}
-                        <span className="text-muted"> · {expiryLabel(l.expiresAt)}</span>
-                      </p>
-                      <p className="truncate text-[12px] text-muted">{url.replace(/^https?:\/\//, "")}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-secondary h-8 shrink-0 px-2.5 text-[12px]"
-                      onClick={() => void copyText(url)}
-                    >
+          <ul className="mt-3 space-y-2">
+            {links.map((l) => {
+              const url = shareUrl(l.token);
+              const isCopied = copied === url;
+              return (
+                <li key={l.id} className="rounded-[10px] border border-line px-3 py-2.5">
+                  <p className="text-[13px]">
+                    {permissionLabel(l.permission)}
+                    <span className="text-muted"> · {expiryLabel(l.expiresAt)}</span>
+                  </p>
+                  <p className="mt-0.5 truncate text-[12px] text-muted">{url.replace(/^https?:\/\//, "")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" className="btn btn-secondary h-8 flex-1 text-[12px]" onClick={() => void copyText(url)}>
                       {isCopied ? "コピー済" : "コピー"}
                     </button>
                     <button
                       type="button"
-                      className="shrink-0 rounded-md px-1.5 py-1 text-[12px] text-danger hover:bg-hover"
+                      className="btn btn-secondary h-8 flex-1 text-[12px] text-danger"
                       onClick={async () => {
                         await api(`/api/share-links/${l.id}`, { method: "DELETE" });
                         await load();
@@ -312,13 +290,13 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
                     >
                       無効化
                     </button>
-                  </li>
-                );
-              })}
-            </ul>
+                  </div>
+                </li>
+              );
+            })}
             <button
               type="button"
-              className="mt-2 text-[12px] text-muted hover:text-danger"
+              className="text-[12px] text-muted hover:text-danger"
               onClick={async () => {
                 await api(`/api/pages/${page.id}/share-links`, { method: "DELETE" });
                 await load();
@@ -326,7 +304,7 @@ export function ShareDialog({ page, members, userId, canManageAcl, onClose }: Pr
             >
               すべて無効化
             </button>
-          </>
+          </ul>
         )}
       </section>
     </Modal>

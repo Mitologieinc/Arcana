@@ -327,7 +327,7 @@ export function PageEditor({
             title="共有の先頭へ"
             onClick={() => onOpenPage("")}
           >
-            {isMobile ? <BrandMark className="h-6 w-auto" /> : <BrandLockup className="h-6 w-auto" animate={false} />}
+            <BrandMark className="h-6 w-auto" />
           </button>
         )}
         <nav className={`flex min-w-0 items-center gap-0.5 text-[13px] text-muted ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
@@ -908,7 +908,7 @@ export function PageEditor({
       )}
       {shareToken && page.type !== "canvas" && (
         <footer className="share-footer">
-          <BrandLockup className="h-5 w-auto" animate={false} />
+          <BrandLockup className="h-5 w-[6.9rem]" animate={false} />
           <span>Arcana で共有されたページ</span>
         </footer>
       )}

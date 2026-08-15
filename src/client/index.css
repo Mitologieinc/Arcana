@@ -295,6 +295,11 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   border-bottom: 1px solid var(--color-line);
 }
 
+.share-bar > nav {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .share-paper {
   margin: 16px auto 0;
   max-width: 880px;
