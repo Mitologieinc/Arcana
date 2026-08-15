@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import { Eye, EyeOff, Fingerprint, Loader2 } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { BrandLockup, BrandMark, MadeBy, hideBootSplash } from "../components/Brand";
+import { BrandLockup, MadeBy, hideBootSplash } from "../components/Brand";
 import { NotionImport } from "../components/NotionImport";
 
 function Field({
@@ -72,18 +72,11 @@ function AuthLayout({
     hideBootSplash();
   }, []);
   return (
-    <div className="auth-split">
-      <aside className="auth-hero">
-        <div className="auth-hero-aurora" aria-hidden />
-        <div className="auth-hero-grid" aria-hidden />
-        <div className="auth-hero-ghost" aria-hidden>
-          <BrandMark className="w-full" animate />
-        </div>
-        <div className="auth-hero-copy">
-          <BrandLockup className="h-10 w-auto max-w-full" />
-          <MadeBy className="auth-made" />
-        </div>
-      </aside>
+    <div className="auth-page">
+      <header className="auth-head">
+        <BrandLockup className="h-8 w-auto max-w-full" />
+        <MadeBy className="auth-made" />
+      </header>
       <main className="auth-main">
         <div className={`auth-card ${wide ? "is-wide" : ""}`}>
           {step != null && (
@@ -115,7 +108,6 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [inviteOnly, setInviteOnly] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState("");
   const [environment, setEnvironment] = useState("");
   const [busy, setBusy] = useState<"passkey" | "email" | null>(null);
 
@@ -126,7 +118,6 @@ export function LoginPage() {
       .then((d) => {
         setNeedsSetup(d.needsSetup);
         setInviteOnly(Boolean(d.inviteOnly));
-        setWorkspaceName(d.workspaceName ?? "");
         setEnvironment(d.environment ?? "");
       })
       .catch(() => setNeedsSetup(false));
@@ -171,17 +162,9 @@ export function LoginPage() {
   if (needsSetup === true) return <Navigate to="/setup" replace />;
 
   const locked = busy !== null;
-  const title = workspaceName ? `${workspaceName} に入る` : "ログイン";
 
   return (
-    <AuthLayout title={title}>
-      <button type="button" className="auth-passkey" onClick={onPasskey} disabled={locked}>
-        <span className="auth-passkey-mark">
-          {busy === "passkey" ? <Loader2 size={15} className="animate-spin" /> : <Fingerprint size={15} />}
-        </span>
-        {busy === "passkey" ? "確認しています…" : "パスキーでログイン"}
-      </button>
-      <div className="divider">またはメール</div>
+    <AuthLayout title="ログイン">
       <form onSubmit={onSubmit}>
         <Field label="メール" type="email" value={email} onChange={setEmail} autoComplete="username webauthn" />
         <Field
@@ -202,24 +185,27 @@ export function LoginPage() {
           }
         />
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-secondary w-full" disabled={locked}>
+        <button type="submit" className="btn btn-primary w-full" disabled={locked}>
           {busy === "email" && <Loader2 size={15} className="animate-spin" />}
-          {busy === "email" ? "入っています…" : "メールでログイン"}
+          {busy === "email" ? "入っています…" : "ログイン"}
         </button>
       </form>
-      <p className="mt-5 text-[12px] leading-relaxed text-muted">
-        忘れた場合は管理者にリセットリンクを依頼するか、パスキーで入ってください。
+      <button type="button" className="auth-passkey" onClick={onPasskey} disabled={locked}>
+        <span className="auth-passkey-mark">
+          {busy === "passkey" ? <Loader2 size={15} className="animate-spin" /> : <Fingerprint size={15} />}
+        </span>
+        {busy === "passkey" ? "確認しています…" : "パスキーでログイン"}
+      </button>
+      <p className="auth-note">
+        パスワードを忘れた方は、管理者にリセットリンクを依頼してください。
       </p>
       {!inviteOnly && (
-        <p className="mt-8 text-[13px] text-muted">
-          アカウントがない場合{" "}
-          <Link className="auth-link" to="/signup">
-            作成
-          </Link>
+        <p className="auth-note">
+          はじめての方は <Link className="auth-link" to="/signup">ユーザー登録</Link>
         </p>
       )}
       {environment && environment !== "production" && (
-        <p className="mt-10 text-[11px] tracking-wide text-muted">{environment}</p>
+        <p className="auth-note is-env">{environment}</p>
       )}
     </AuthLayout>
   );
