@@ -2098,7 +2098,7 @@ export function CanvasEditor({
     if (!ctx) return;
     ctx.scale(scale, scale);
     ctx.translate(-uni.x + pad, -uni.y + pad);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim() || "#f5f5f5";
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim() || "#fafafa";
     ctx.fillRect(uni.x - pad, uni.y - pad, uni.w + pad * 2, uni.h + pad * 2);
     const get = (id: string) => list.find((n) => n.id === id) ?? nodesRef.current.find((n) => n.id === id);
     for (const n of list) {

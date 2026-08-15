@@ -407,7 +407,7 @@ export function SettingsPanel({
               <div className="grid grid-cols-2 gap-3">
                 {(
                   [
-                    ["light", "ライト", Sun, "#f5f5f5", "#f5f5f5"],
+                    ["light", "ライト", Sun, "#fafafa", "#fafafa"],
                     ["dark", "ダーク", Moon, "#191919", "#2a2a28"],
                   ] as const
                 ).map(([id, label, Icon, page, rail]) => (
