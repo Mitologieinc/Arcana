@@ -92,9 +92,9 @@ function AuthLayout({
               ))}
             </div>
           )}
-          <h1 className="text-[18px] font-medium tracking-tight">{title}</h1>
-          {kicker && <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{kicker}</p>}
-          <div className="mt-7">{children}</div>
+          <h1 className="auth-title">{title}</h1>
+          {kicker && <p className="auth-kicker">{kicker}</p>}
+          <div className="auth-body">{children}</div>
         </div>
       </main>
     </div>
@@ -176,11 +176,11 @@ export function LoginPage() {
     <AuthLayout title={title} kicker="パスキーがあれば、それで十分です。">
       <button
         type="button"
-        className="btn btn-primary h-10 w-full"
+        className="btn btn-primary w-full"
         onClick={onPasskey}
         disabled={locked}
       >
-        {busy === "passkey" ? <Loader2 size={16} className="animate-spin" /> : <Fingerprint size={16} />}
+        {busy === "passkey" ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
         {busy === "passkey" ? "確認しています…" : "パスキーで続ける"}
       </button>
       <div className="divider">またはメール</div>
@@ -204,7 +204,7 @@ export function LoginPage() {
           }
         />
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
-        <button type="submit" className="btn btn-secondary h-10 w-full" disabled={locked}>
+        <button type="submit" className="btn btn-secondary w-full" disabled={locked}>
           {busy === "email" && <Loader2 size={15} className="animate-spin" />}
           {busy === "email" ? "入っています…" : "メールでログイン"}
         </button>
@@ -218,7 +218,7 @@ export function LoginPage() {
         ) : (
           <>
             アカウントがない場合{" "}
-            <Link className="underline underline-offset-2" to="/signup">
+            <Link className="auth-link" to="/signup">
               作成
             </Link>
           </>
@@ -313,7 +313,7 @@ export function SignupPage() {
       <AuthLayout title="招待が必要です" kicker="このワークスペースは招待リンクがある人だけ参加できます。">
         <p className="text-[13px] text-muted">届いたリンクを開くか、すでにアカウントがある場合はログインしてください。</p>
         <p className="mt-8 text-center text-[13px] text-muted">
-          <Link className="underline underline-offset-2" to="/login">
+          <Link className="auth-link" to="/login">
             ログイン
           </Link>
         </p>
@@ -346,7 +346,7 @@ export function SignupPage() {
       </form>
       <p className="mt-8 text-center text-[13px] text-muted">
         アカウントがある場合{" "}
-        <Link className="underline underline-offset-2" to="/login">
+        <Link className="auth-link" to="/login">
           ログイン
         </Link>
       </p>
@@ -432,7 +432,7 @@ export function SetupPage() {
     if (error) {
       return (
         <AuthLayout title="セットアップできません" kicker={error}>
-          <Link className="underline underline-offset-2 text-[13px]" to="/login">
+          <Link className="auth-link text-[13px]" to="/login">
             ログインへ
           </Link>
         </AuthLayout>
@@ -620,7 +620,7 @@ export function ResetPasswordPage() {
     return (
       <AuthLayout title="リンクが無効です" kicker="期限切れか、すでに使われています。管理者に新しいリンクを依頼してください。">
         <p className="text-center text-[13px] text-muted">
-          <Link className="underline underline-offset-2" to="/login">
+          <Link className="auth-link" to="/login">
             ログイン
           </Link>
         </p>

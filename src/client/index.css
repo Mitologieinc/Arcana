@@ -823,7 +823,7 @@ button:disabled {
   min-height: 100%;
   padding: 16px;
   gap: 16px;
-  background: #fff;
+  background: #fafafa;
 }
 
 .auth-hero {
@@ -910,16 +910,126 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 48px 32px;
-  background: #fff;
+  background: transparent;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 328px;
+  max-width: 360px;
 }
 
 .auth-card.is-wide {
-  max-width: 380px;
+  max-width: 400px;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.auth-kicker {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+
+.auth-body {
+  margin-top: 28px;
+}
+
+.auth-link {
+  color: var(--color-cf);
+  font-weight: 510;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  color: var(--color-cf-hover);
+}
+
+.auth-card .field {
+  margin-bottom: 14px;
+}
+
+.auth-card .field > span:first-child {
+  margin-bottom: 7px;
+  letter-spacing: 0.01em;
+}
+
+.auth-card .field input,
+.auth-card .field select {
+  height: 44px;
+  padding: 0 14px;
+  border-color: transparent;
+  border-radius: 12px;
+  background: #f3f1eb;
+}
+
+.auth-card .field-wrap input {
+  padding-right: 44px;
+}
+
+.auth-card .field input:focus,
+.auth-card .field select:focus {
+  border-color: transparent;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 182, 158, 0.28);
+}
+
+.auth-card .field-eye {
+  top: 4px;
+  right: 4px;
+  height: 36px;
+  width: 36px;
+  border-radius: 10px;
+}
+
+.auth-card .btn {
+  height: 44px;
+  border-radius: 999px;
+  font-weight: 560;
+}
+
+.auth-card .btn.h-auto {
+  height: auto;
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.auth-card .btn-primary {
+  box-shadow: 0 8px 22px rgba(0, 182, 158, 0.22);
+}
+
+.auth-card .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 10px 26px rgba(0, 182, 158, 0.28);
+}
+
+.auth-card .btn-secondary {
+  background: #fff;
+  border-color: rgba(55, 53, 47, 0.1);
+}
+
+.auth-card .divider {
+  margin: 22px 0;
+}
+
+.auth-card .setup-dots {
+  gap: 5px;
+  margin-bottom: 22px;
+}
+
+.auth-card .setup-dots span {
+  width: 28px;
+  height: 3px;
+  background: rgba(55, 53, 47, 0.12);
+}
+
+.auth-card .setup-dots span.is-on {
+  background: var(--color-cf);
 }
 
 .field-wrap {
@@ -956,7 +1066,31 @@ html[data-theme="dark"] .auth-split {
 }
 
 html[data-theme="dark"] .auth-main {
-  background: #191919;
+  background: transparent;
+}
+
+html[data-theme="dark"] .auth-card .field input,
+html[data-theme="dark"] .auth-card .field select {
+  background: #2a2a28;
+}
+
+html[data-theme="dark"] .auth-card .field input:focus,
+html[data-theme="dark"] .auth-card .field select:focus {
+  background: #323230;
+  box-shadow: 0 0 0 2px rgba(0, 182, 158, 0.35);
+}
+
+html[data-theme="dark"] .auth-card .btn-secondary {
+  background: #2a2a28;
+  border-color: #3a3a37;
+}
+
+html[data-theme="dark"] .auth-card .btn-primary {
+  box-shadow: 0 8px 24px rgba(0, 182, 158, 0.16);
+}
+
+html[data-theme="dark"] .auth-card .setup-dots span {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 html[data-theme="dark"] .auth-hero {
