@@ -143,6 +143,8 @@ export function PropertyValue({
               <Avatar name={current.name} seed={current.userId} size={18} />
               <span className="truncate">{current.name}</span>
             </span>
+          ) : value ? (
+            <span className="text-muted">退会したメンバー</span>
           ) : (
             <span className="text-muted">未設定</span>
           )}

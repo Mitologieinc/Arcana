@@ -22,7 +22,7 @@ export function rewriteFormulaRefs(expression: string, props: { id: string; name
   return out;
 }
 
-function parseProps(raw: string | null) {
+export function parseProps(raw: string | null) {
   if (!raw) return {} as Record<string, unknown>;
   try {
     const v = JSON.parse(raw) as unknown;

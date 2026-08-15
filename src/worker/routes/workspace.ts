@@ -8,6 +8,7 @@ import type { AppEnv } from "../types";
 import { emailAllowed, normalizeDomains } from "../lib/access";
 import { allowAttempt, clientIp } from "../lib/rate-limit";
 import { setCredentialPassword, verifyCredentialPassword } from "../lib/password";
+import { parseProps } from "../lib/db-props";
 
 const DEFAULT_DB_PROPERTIES = [
   { id: "title", type: "title", name: "名前" },
@@ -402,6 +403,56 @@ async function stripMembership(
           inArray(schema.pageAcl.pageId, pageIds),
         ),
       );
+  }
+
+  const schemas = await db
+    .select({
+      pageId: schema.databaseSchemas.pageId,
+      properties: schema.databaseSchemas.properties,
+    })
+    .from(schema.databaseSchemas)
+    .innerJoin(schema.pages, eq(schema.pages.id, schema.databaseSchemas.pageId))
+    .where(eq(schema.pages.workspaceId, workspaceId));
+  const personByParent = new Map<string, string[]>();
+  for (const row of schemas) {
+    let props: { id?: string; type?: string }[] = [];
+    try {
+      const parsed = JSON.parse(row.properties) as unknown;
+      props = Array.isArray(parsed) ? (parsed as { id?: string; type?: string }[]) : [];
+    } catch {
+      props = [];
+    }
+    const ids = props.filter((p) => p.type === "person" && p.id).map((p) => p.id as string);
+    if (ids.length) personByParent.set(row.pageId, ids);
+  }
+  if (!personByParent.size) return;
+
+  const pages = await db
+    .select({
+      id: schema.pages.id,
+      parentId: schema.pages.parentId,
+      properties: schema.pages.properties,
+    })
+    .from(schema.pages)
+    .where(eq(schema.pages.workspaceId, workspaceId));
+  const now = new Date();
+  for (const page of pages) {
+    const keys = page.parentId ? personByParent.get(page.parentId) : undefined;
+    if (!keys?.length) continue;
+    const props = parseProps(page.properties);
+    let changed = false;
+    for (const key of keys) {
+      if (props[key] === userId) {
+        props[key] = null;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await db
+        .update(schema.pages)
+        .set({ properties: JSON.stringify(props), updatedAt: now })
+        .where(eq(schema.pages.id, page.id));
+    }
   }
 }
 
