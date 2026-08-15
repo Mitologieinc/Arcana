@@ -64,8 +64,30 @@ export async function restoreSubtree(
   return ids;
 }
 
-export async function purgeSubtree(db: Db, env: { DB: D1Database }, rootId: string) {
+export async function purgeSubtree(
+  db: Db,
+  env: { DB: D1Database; FILES: R2Bucket; Y_DURABLE_OBJECTS: DurableObjectNamespace },
+  rootId: string,
+) {
   const ids = await collectSubtreeIds(db, rootId);
+  const rows = ids.length
+    ? await db.select().from(schema.pages).where(inArray(schema.pages.id, ids))
+    : [];
+  for (const page of rows) {
+    const ws = page.workspaceId;
+    if (page.coverR2Key && !page.coverR2Key.startsWith("preset:")) {
+      await env.FILES.delete(`${ws}/${page.coverR2Key}`).catch(() => undefined);
+    }
+    if (page.icon?.startsWith("file:")) {
+      await env.FILES.delete(`${ws}/${page.icon.slice(5)}`).catch(() => undefined);
+    }
+    try {
+      const stub = env.Y_DURABLE_OBJECTS.get(env.Y_DURABLE_OBJECTS.idFromName(page.id));
+      await stub.wipe();
+    } catch {
+      /* already gone */
+    }
+  }
   if (ids.length) {
     await db.delete(schema.comments).where(inArray(schema.comments.pageId, ids));
     await db.delete(schema.favorites).where(inArray(schema.favorites.pageId, ids));

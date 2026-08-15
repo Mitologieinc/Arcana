@@ -81,7 +81,22 @@ export class PageRoom extends YDurableObjects<AppEnv> {
       }
     };
     walk(this.doc.getXmlFragment("prosemirror"));
+    this.doc.getMap("jam.nodes").forEach((node) => {
+      if (!node || typeof node !== "object") return;
+      const text = (node as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim()) parts.push(text);
+    });
     return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  async wipe() {
+    const xml = this.doc.getXmlFragment("prosemirror");
+    if (xml.length > 0) xml.delete(0, xml.length);
+    const nodes = this.doc.getMap("jam.nodes");
+    for (const key of [...nodes.keys()]) nodes.delete(key);
+    const order = this.doc.getArray("jam.order");
+    if (order.length) order.delete(0, order.length);
+    await this.storage.storeUpdate(encodeStateAsUpdate(this.doc));
   }
 }
 
