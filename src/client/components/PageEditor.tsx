@@ -614,7 +614,7 @@ export function PageEditor({
         </div>
       )}
       {page.type !== "canvas" && (
-      <div className={sharedDoc ? `share-paper${page.type === "database" ? " is-wide" : ""}` : undefined}>
+      <div>
       {page.coverR2Key && (
         <div className="group/cover relative h-48 w-full bg-canvas">
           <CoverVisual cover={page.coverR2Key} className="h-48 w-full object-cover" />
@@ -650,7 +650,7 @@ export function PageEditor({
       )}
       <div
         className={
-          page.type === "database" ? "group pb-32" : sharedDoc ? "group mx-auto max-w-[900px] pb-16" : "group mx-auto max-w-[900px] pb-40"
+          page.type === "database" ? "group pb-32" : "group mx-auto max-w-[900px] pb-40"
         }
       >
         <div
