@@ -406,8 +406,11 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  margin: 4px 10px 10px;
-  padding: 0 0 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 4px 0 10px;
+  padding: 0 10px 12px;
   border-bottom: 1px solid var(--color-line);
 }
 
@@ -452,6 +455,10 @@ button:disabled {
 
 .arcana-nav > * {
   min-width: 252px;
+}
+
+.arcana-nav > .arcana-favs {
+  min-width: 0;
 }
 
 .sidebar-scroll {
