@@ -314,14 +314,20 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .arcana-home {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 72px 40px 80px;
+  padding: 64px 40px 88px;
+}
+
+.arcana-home-head {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .arcana-home-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 560;
   letter-spacing: -0.03em;
   line-height: 1.2;
@@ -339,7 +345,6 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   gap: 10px;
   width: 100%;
   height: 44px;
-  margin-top: 32px;
   padding: 0 14px;
   border: 0;
   border-radius: 12px;
@@ -357,11 +362,104 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   color: var(--color-ink);
 }
 
+.arcana-home-hero {
+  display: block;
+  width: 100%;
+  margin-top: 36px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+}
+
+.arcana-home-hero:hover {
+  background: #f7f6f2;
+}
+
+.arcana-home-hero-cover {
+  display: block;
+  width: 100%;
+  height: 148px;
+  object-fit: cover;
+}
+
+.arcana-home-hero-cover.is-plain {
+  height: 88px;
+  background:
+    radial-gradient(80% 120% at 0% 100%, rgba(0, 182, 158, 0.22), transparent 60%),
+    radial-gradient(70% 100% at 100% 0%, rgba(37, 140, 219, 0.16), transparent 58%),
+    #f3f1eb;
+}
+
+.arcana-home-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.arcana-home-hero-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.arcana-home-hero-name {
+  font-size: 18px;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+}
+
+.arcana-home-hero-name.is-empty,
+.arcana-home-tile-name.is-empty {
+  color: var(--color-muted);
+}
+
+.arcana-home-hero-meta,
+.arcana-home-tile-meta {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.arcana-home-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.arcana-home-tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+}
+
+.arcana-home-tile:hover {
+  background: #f7f6f2;
+}
+
+.arcana-home-tile-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 510;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .arcana-home-starts {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 18px;
 }
 
 .arcana-home-starts button {
@@ -372,21 +470,21 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   padding: 0 12px;
   border: 0;
   border-radius: 10px;
-  background: transparent;
+  background: #fff;
   color: var(--color-ink);
   font-size: 13px;
 }
 
 .arcana-home-starts button:hover {
-  background: var(--color-hover);
+  background: #f7f6f2;
 }
 
 .arcana-home-section {
-  margin-top: 40px;
+  margin-top: 36px;
 }
 
 .arcana-home-label {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   color: var(--color-muted);
   font-size: 12px;
 }
@@ -396,7 +494,7 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   width: 100%;
   align-items: center;
   gap: 12px;
-  padding: 10px 2px;
+  padding: 10px 4px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -409,13 +507,37 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   background: var(--color-hover);
 }
 
-html[data-theme="dark"] .arcana-home-search {
+html[data-theme="dark"] .arcana-home-search,
+html[data-theme="dark"] .arcana-home-hero,
+html[data-theme="dark"] .arcana-home-tile,
+html[data-theme="dark"] .arcana-home-starts button {
   background: #2a2a28;
+}
+
+html[data-theme="dark"] .arcana-home-hero:hover,
+html[data-theme="dark"] .arcana-home-tile:hover,
+html[data-theme="dark"] .arcana-home-starts button:hover {
+  background: #323230;
+}
+
+html[data-theme="dark"] .arcana-home-hero-cover.is-plain {
+  background:
+    radial-gradient(80% 120% at 0% 100%, rgba(0, 182, 158, 0.2), transparent 60%),
+    radial-gradient(70% 100% at 100% 0%, rgba(37, 140, 219, 0.14), transparent 58%),
+    #2a2824;
 }
 
 @media (max-width: 720px) {
   .arcana-home {
-    padding: 36px 20px 64px;
+    padding: 32px 20px 64px;
+  }
+
+  .arcana-home-title {
+    font-size: 26px;
+  }
+
+  .arcana-home-tiles {
+    grid-template-columns: 1fr;
   }
 }
 

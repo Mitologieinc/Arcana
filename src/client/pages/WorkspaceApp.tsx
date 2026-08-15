@@ -5,6 +5,7 @@ import { CreateMenuPanel, type CreateSeed } from "../components/CreateMenu";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
 import { greeting, modSymbol, pageTypeIcon, relativeTime } from "../lib/format";
+import { CoverVisual } from "../lib/covers";
 import type { Member, Page, PageType, SavedTemplate, User, Workspace } from "../lib/types";
 import { AppRail } from "../components/AppRail";
 import { SidebarTree } from "../components/SidebarTree";
@@ -294,9 +295,11 @@ export function WorkspaceApp() {
           <Home
             workspaceName={workspace.name}
             userName={user.name}
+            pages={pages}
             favorites={favorites}
             recent={recent}
             templates={templates}
+            canWrite={workspace.role !== "guest"}
             showMenu
             onMenu={toggleNav}
             onSearch={() => setSearchOpen(true)}
@@ -368,12 +371,20 @@ export function WorkspaceApp() {
   );
 }
 
+function pageKind(type: PageType) {
+  if (type === "database") return "データベース";
+  if (type === "canvas") return "キャンバス";
+  return "ページ";
+}
+
 function Home({
   workspaceName,
   userName,
+  pages,
   favorites,
   recent,
   templates,
+  canWrite,
   showMenu,
   onMenu,
   onSearch,
@@ -386,9 +397,11 @@ function Home({
 }: {
   workspaceName: string;
   userName: string;
+  pages: Page[];
   favorites: Page[];
   recent: Page[];
   templates: SavedTemplate[];
+  canWrite?: boolean;
   showMenu?: boolean;
   onMenu?: () => void;
   onSearch: () => void;
@@ -399,8 +412,14 @@ function Home({
   onCanvas: () => void;
   onTemplate: (t: SavedTemplate) => void;
 }) {
-  const favIds = new Set(favorites.map((p) => p.id));
-  const continuePages = recent.filter((p) => !favIds.has(p.id)).slice(0, 8);
+  const roots = useMemo(
+    () => pages.filter((p) => !p.parentId).sort((a, b) => a.position - b.position),
+    [pages],
+  );
+  const featured = roots[0] ?? null;
+  const directory = roots.slice(1, 7);
+  const seen = new Set<string>([featured?.id, ...favorites.map((p) => p.id)].filter(Boolean) as string[]);
+  const continuePages = recent.filter((p) => !seen.has(p.id)).slice(0, 6);
 
   return (
     <>
@@ -413,39 +432,55 @@ function Home({
         </div>
       )}
       <div className="arcana-home">
-        <h1 className="arcana-home-title">{workspaceName}</h1>
-        <p className="arcana-home-kicker">
-          {greeting()}、{userName}
-        </p>
-        <button type="button" className="arcana-home-search" onClick={onSearch}>
-          <Search size={16} strokeWidth={1.6} />
-          <span>検索</span>
-          <kbd className="kbd">{modSymbol()}K</kbd>
-        </button>
-        <div className="arcana-home-starts">
-          <button type="button" onClick={onMemo}>
-            <FileText size={15} strokeWidth={1.6} />
-            メモ
+        <header className="arcana-home-head">
+          <div>
+            <h1 className="arcana-home-title">{workspaceName}</h1>
+            <p className="arcana-home-kicker">
+              {greeting()}、{userName}
+              {pages.length > 0 && <span> · {pages.length} ページ</span>}
+            </p>
+          </div>
+          <button type="button" className="arcana-home-search" onClick={onSearch}>
+            <Search size={16} strokeWidth={1.6} />
+            <span>検索</span>
+            <kbd className="kbd">{modSymbol()}K</kbd>
           </button>
-          <button type="button" onClick={onMeeting}>
-            <Calendar size={15} strokeWidth={1.6} />
-            会議
+        </header>
+
+        {featured && (
+          <button type="button" className="arcana-home-hero" onClick={() => onOpen(featured.id)}>
+            {featured.coverR2Key ? (
+              <CoverVisual cover={featured.coverR2Key} className="arcana-home-hero-cover" />
+            ) : (
+              <div className="arcana-home-hero-cover is-plain" />
+            )}
+            <span className="arcana-home-hero-body">
+              <PageIcon icon={featured.icon} fallback={pageTypeIcon(featured.type)} size={22} />
+              <span className="arcana-home-hero-copy">
+                <span className={`arcana-home-hero-name ${featured.title ? "" : "is-empty"}`}>
+                  {featured.title || "無題"}
+                </span>
+                <span className="arcana-home-hero-meta">{pageKind(featured.type)}</span>
+              </span>
+            </span>
           </button>
-          <button type="button" onClick={onTasks}>
-            <CheckSquare size={15} strokeWidth={1.6} />
-            タスク
-          </button>
-          <button type="button" onClick={onCanvas}>
-            <StickyNote size={15} strokeWidth={1.6} />
-            キャンバス
-          </button>
-          {templates.map((t) => (
-            <button type="button" key={t.id} onClick={() => onTemplate(t)}>
-              <span>{t.icon || "📄"}</span>
-              {t.name}
-            </button>
-          ))}
-        </div>
+        )}
+
+        {directory.length > 0 && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">ページ</p>
+            <div className="arcana-home-tiles">
+              {directory.map((p) => (
+                <button type="button" key={p.id} className="arcana-home-tile" onClick={() => onOpen(p.id)}>
+                  <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={18} />
+                  <span className={`arcana-home-tile-name ${p.title ? "" : "is-empty"}`}>{p.title || "無題"}</span>
+                  <span className="arcana-home-tile-meta">{pageKind(p.type)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {favorites.length > 0 && (
           <section className="arcana-home-section">
             <p className="arcana-home-label">お気に入り</p>
@@ -456,6 +491,7 @@ function Home({
             </ul>
           </section>
         )}
+
         {continuePages.length > 0 && (
           <section className="arcana-home-section">
             <p className="arcana-home-label">最近</p>
@@ -464,6 +500,36 @@ function Home({
                 <HomeRow key={p.id} page={p} onOpen={onOpen} showTime />
               ))}
             </ul>
+          </section>
+        )}
+
+        {canWrite && (
+          <section className="arcana-home-section">
+            <p className="arcana-home-label">書く</p>
+            <div className="arcana-home-starts">
+              <button type="button" onClick={onMemo}>
+                <FileText size={15} strokeWidth={1.6} />
+                メモ
+              </button>
+              <button type="button" onClick={onMeeting}>
+                <Calendar size={15} strokeWidth={1.6} />
+                会議
+              </button>
+              <button type="button" onClick={onTasks}>
+                <CheckSquare size={15} strokeWidth={1.6} />
+                タスク
+              </button>
+              <button type="button" onClick={onCanvas}>
+                <StickyNote size={15} strokeWidth={1.6} />
+                キャンバス
+              </button>
+              {templates.map((t) => (
+                <button type="button" key={t.id} onClick={() => onTemplate(t)}>
+                  <span>{t.icon || "📄"}</span>
+                  {t.name}
+                </button>
+              ))}
+            </div>
           </section>
         )}
       </div>
