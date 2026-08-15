@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Maximize2, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
-import type { DbProperty, Page, User } from "../lib/types";
+import type { DbProperty, Member, Page, User } from "../lib/types";
 import { TiptapEditor } from "../editor/TiptapEditor";
 import { parseProps, PropertyIcon, PropertyValue } from "./PropertyValue";
 
@@ -11,6 +11,8 @@ export function RowPeek({
   user,
   editable,
   shareToken,
+  members = [],
+  pages = [],
   onClose,
   onOpenPage,
   onChanged,
@@ -21,6 +23,8 @@ export function RowPeek({
   user: User;
   editable: boolean;
   shareToken?: string;
+  members?: Member[];
+  pages?: Page[];
   onClose: () => void;
   onOpenPage: () => void;
   onChanged: () => Promise<unknown>;
@@ -59,26 +63,26 @@ export function RowPeek({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
+    <div className="fixed inset-0 z-40 flex justify-end max-[720px]:flex-col max-[720px]:justify-end">
       <button className="h-full flex-1 bg-[rgba(15,15,15,0.08)]" onClick={onClose} aria-label="閉じる" />
-      <aside className="arcana-sheet flex h-full w-[min(720px,92vw)] flex-col border-l border-line bg-white">
-        <header className="flex h-11 shrink-0 items-center justify-between px-3">
-          <button className="btn-ghost h-8 gap-1.5 px-2 text-[13px] text-muted" onClick={onOpenPage}>
+      <aside className="arcana-sheet arcana-peek flex h-full w-[min(720px,92vw)] flex-col border-l border-line bg-white">
+        <header className="flex h-12 shrink-0 items-center justify-between px-3">
+          <button className="btn-ghost h-9 gap-1.5 px-2 text-[13px] text-muted" onClick={onOpenPage}>
             <Maximize2 size={14} />
             ページとして開く
           </button>
           <div className="flex items-center">
             {editable && onDelete && (
-              <button className="btn-ghost h-8 w-8 p-0 text-muted" onClick={onDelete} title="削除">
+              <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onDelete} title="削除">
                 <Trash2 size={15} />
               </button>
             )}
-            <button className="btn-ghost h-8 w-8 p-0 text-muted" onClick={onClose} aria-label="閉じる">
+            <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onClose} aria-label="閉じる">
               <X size={16} />
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto px-12 pb-24 pt-6">
+        <div className="min-h-0 flex-1 overflow-auto px-12 pb-24 pt-6 max-[720px]:px-4 max-[720px]:pt-4">
           <input
             autoFocus={!page.title}
             className="page-title text-[32px]"
@@ -96,9 +100,9 @@ export function RowPeek({
             }}
           />
           {fields.length > 0 && (
-            <div className="mt-5 space-y-0.5">
+            <div className="mt-5 space-y-0.5 max-[720px]:space-y-2">
               {fields.map((p) => (
-                <div key={p.id} className="flex min-h-8 items-center gap-3">
+                <div key={p.id} className="flex min-h-8 items-center gap-3 max-[720px]:min-h-11 max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:gap-1">
                   <span className="flex w-36 shrink-0 items-center gap-1.5 truncate text-[13px] text-muted">
                     <PropertyIcon type={p.type} />
                     {p.name}
@@ -108,6 +112,11 @@ export function RowPeek({
                       property={p}
                       value={props[p.id]}
                       editable={editable}
+                      members={members}
+                      pages={pages}
+                      title={title}
+                      schema={schema}
+                      allProps={props}
                       onChange={(v) => void saveProp(p.id, v)}
                     />
                   </div>

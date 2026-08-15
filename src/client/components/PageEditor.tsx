@@ -766,6 +766,8 @@ export function PageEditor({
           user={user}
           editable={editable}
           shareToken={shareToken}
+          members={members}
+          pages={pages}
           onClose={() => setPeekId(null)}
           onOpenPage={() => {
             setPeekId(null);

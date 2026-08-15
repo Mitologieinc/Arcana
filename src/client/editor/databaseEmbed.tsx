@@ -107,6 +107,8 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
             user={chrome.user}
             editable={editable}
             shareToken={chrome.shareToken}
+            members={members}
+            pages={pages}
             onClose={() => setPeekId(null)}
             onOpenPage={() => {
               setPeekId(null);

@@ -128,7 +128,7 @@ export function PropertyValue({
         <button
           type="button"
           disabled={!editable}
-          className="flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover"
+          className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover"
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -169,7 +169,7 @@ export function PropertyValue({
         <button
           type="button"
           disabled={!editable}
-          className="flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover"
+          className="arcana-prop-hit flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover"
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -208,7 +208,7 @@ export function PropertyValue({
         type="checkbox"
         disabled={!editable}
         checked={Boolean(value)}
-        className="accent-[#37352f]"
+        className="arcana-prop-check accent-[#37352f]"
         onChange={(e) => onChange(e.target.checked)}
         onClick={(e) => e.stopPropagation()}
       />
@@ -224,7 +224,7 @@ export function PropertyValue({
           ref={btnRef}
           type="button"
           disabled={!editable}
-          className="flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
+          className="arcana-prop-hit flex h-7 w-full items-center gap-1 overflow-hidden rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -284,7 +284,7 @@ export function PropertyValue({
           ref={btnRef}
           type="button"
           disabled={!editable}
-          className="flex h-7 w-full items-center rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
+          className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left hover:bg-hover disabled:hover:bg-transparent"
           onClick={(e) => {
             e.stopPropagation();
             openMenu(e.currentTarget);
@@ -355,7 +355,7 @@ export function PropertyValue({
       <input
         autoFocus
         type={property.type === "number" ? "number" : property.type === "date" ? "date" : "text"}
-        className="h-7 w-full border-none bg-transparent text-[13px] outline-none"
+        className="arcana-prop-hit h-7 w-full border-none bg-transparent text-[16px] outline-none max-[720px]:text-[16px]"
         value={draft}
         placeholder="空"
         onChange={(e) => setDraft(e.target.value)}
@@ -384,7 +384,7 @@ export function PropertyValue({
     <button
       type="button"
       disabled={!editable}
-      className="flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover disabled:hover:bg-transparent"
+      className="arcana-prop-hit flex h-7 w-full items-center rounded-[4px] px-0.5 text-left text-[13px] hover:bg-hover disabled:hover:bg-transparent"
       onClick={(e) => {
         e.stopPropagation();
         openMenu(e.currentTarget);

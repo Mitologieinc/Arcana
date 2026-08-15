@@ -2496,6 +2496,57 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  .arcana-peek {
+    height: min(92dvh, 100%);
+    max-height: 92dvh;
+    border-radius: 16px 16px 0 0;
+    padding-top: 0;
+  }
+
+  .arcana-prop-hit {
+    min-height: 44px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .arcana-prop-check {
+    width: 20px;
+    height: 20px;
+  }
+
+  .arcana-float-sheet .menu-panel button {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .arcana-board {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .arcana-board-col {
+    width: min(300px, calc(100vw - 48px));
+    scroll-snap-align: start;
+  }
+
+  .arcana-db-toolbar {
+    position: sticky;
+    top: 40px;
+    z-index: 4;
+    padding-top: 4px;
+    padding-bottom: 6px;
+    background: #fff;
+  }
+
+  .arcana-db-toolbar.is-embedded {
+    top: 0;
+  }
+
+  html[data-theme="dark"] .arcana-db-toolbar {
+    background: #191919;
+  }
+
   .page-title {
     font-size: 28px;
   }

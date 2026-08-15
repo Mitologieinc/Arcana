@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { CalendarDays, Columns3, GripVertical, LayoutGrid, Plus, Search, Table2, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronRight, Columns3, GripVertical, LayoutGrid, Plus, Search, SlidersHorizontal, Table2, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { computePosition, dropEdgeFromY, reorderIds, type DropEdge } from "../lib/dnd";
+import { useIsMobile } from "../lib/media";
 import type { DbFilter, DbProperty, DbView, Member, Page } from "../lib/types";
 import { CoverVisual } from "../lib/covers";
+import { FloatMenu } from "./FloatMenu";
 import { PageIcon } from "./PageIcon";
 import {
   optionClass,
@@ -60,6 +62,73 @@ function applySorts(rows: Page[], schema: DbProperty[], sorts: DbView["config"][
     }
     return 0;
   });
+}
+
+function hasPropValue(value: unknown) {
+  if (value == null || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+function RowChips({
+  schema,
+  props,
+  skipId,
+  limit = 4,
+}: {
+  schema: DbProperty[];
+  props: Record<string, unknown>;
+  skipId?: string;
+  limit?: number;
+}) {
+  const extras = schema.filter((p) => p.type !== "title" && p.id !== skipId && hasPropValue(props[p.id])).slice(0, limit);
+  if (!extras.length) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {extras.map((p) => {
+        if (p.type === "multi_select") {
+          const ids = Array.isArray(props[p.id]) ? (props[p.id] as string[]) : [];
+          return ids.map((id) => {
+            const current = p.options?.find((o) => o.id === id);
+            if (!current) return null;
+            return (
+              <span key={`${p.id}-${id}`} className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}>
+                {current.name}
+              </span>
+            );
+          });
+        }
+        if (p.type === "select" || p.type === "status") {
+          const current = p.options?.find((o) => o.id === String(props[p.id] ?? ""));
+          if (!current) return null;
+          return (
+            <span key={p.id} className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}>
+              {current.name}
+            </span>
+          );
+        }
+        if (p.type === "checkbox") {
+          return (
+            <span key={p.id} className="text-[12px] text-muted">
+              {p.name}: {props[p.id] ? "済" : "未"}
+            </span>
+          );
+        }
+        if (p.type === "person") {
+          return (
+            <span key={p.id} className="text-[12px] text-muted">
+              {p.name}
+            </span>
+          );
+        }
+        return (
+          <span key={p.id} className="text-[12px] text-muted">
+            {String(props[p.id])}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function createProperty(type: Exclude<DbProperty["type"], "title">): DbProperty {
@@ -185,6 +254,7 @@ export function DatabaseView({
   onOpenRow,
   onChanged,
 }: Props) {
+  const isMobile = useIsMobile();
   const gutter = embedded ? "" : "px-24 max-[860px]:px-6 max-[720px]:px-4";
   const [viewId, setViewId] = useState(views[0]?.id);
   const view = views.find((v) => v.id === viewId) ?? views[0];
@@ -278,7 +348,8 @@ export function DatabaseView({
       body: JSON.stringify({ parentId: pageId, type: "page", title: "", properties }),
     });
     await onChanged();
-    setEditingTitleId(res.page.id);
+    if (isMobile) onOpenRow(res.page.id);
+    else setEditingTitleId(res.page.id);
   }
 
   async function updateRow(
@@ -473,11 +544,12 @@ export function DatabaseView({
 
   return (
     <div className="mt-3">
-      <div className={`mb-1 flex flex-wrap items-center gap-1 ${gutter}`}>
+      <div className={`arcana-db-toolbar mb-1 flex items-center gap-1 ${embedded ? "is-embedded" : ""} ${gutter}`}>
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {views.map((v) => (
           <button
             key={v.id}
-            className={`flex h-8 items-center gap-1.5 rounded-[6px] px-2 text-[13px] ${
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] ${
               v.id === view.id ? "bg-hover font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink"
             }`}
             onClick={() => setViewId(v.id)}
@@ -489,7 +561,7 @@ export function DatabaseView({
         {searchOpen ? (
           <input
             autoFocus
-            className="ml-1 h-8 w-44 rounded-md border-none bg-transparent px-2 text-[13px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
+            className="ml-1 h-9 min-w-[8rem] flex-1 rounded-md border-none bg-transparent px-2 text-[16px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
             placeholder="検索"
             value={filterValue}
             onChange={(e) => setFilterValue(e.target.value)}
@@ -499,7 +571,7 @@ export function DatabaseView({
           />
         ) : (
           <button
-            className="btn-ghost ml-1 h-8 w-8 p-0 text-muted"
+            className="btn-ghost ml-1 h-9 w-9 shrink-0 p-0 text-muted"
             title="検索"
             onClick={() => setSearchOpen(true)}
           >
@@ -508,22 +580,31 @@ export function DatabaseView({
         )}
         {statusProp && (
           <button
-            className={`h-8 rounded-[6px] px-2 text-[13px] ${equalsFilter ? "bg-hover text-ink" : "text-muted hover:bg-hover"}`}
+            className={`h-9 shrink-0 rounded-[6px] px-2.5 text-[13px] ${equalsFilter ? "bg-hover text-ink" : "text-muted hover:bg-hover"}`}
             onClick={(e) => setFilterMenu(e.currentTarget.getBoundingClientRect())}
           >
             フィルター
           </button>
         )}
+        {editable && isMobile && (
+          <button
+            className="btn-ghost h-9 shrink-0 px-2 text-muted"
+            title="プロパティ"
+            onClick={(e) => setAddProp(e.currentTarget.getBoundingClientRect())}
+          >
+            <SlidersHorizontal size={15} />
+          </button>
+        )}
         {editable && (
           <button
-            className="btn-ghost h-8 w-8 p-0 text-muted"
+            className="btn-ghost h-9 w-9 shrink-0 p-0 text-muted"
             title="ビューを追加"
             onClick={(e) => setAddView(e.currentTarget.getBoundingClientRect())}
           >
             <Plus size={15} />
           </button>
         )}
-        {editable && views.length > 1 && (
+        {editable && views.length > 1 && !isMobile && (
           <button
             className="btn-ghost h-8 px-2 text-[12px] text-muted"
             onClick={() => void api(`/api/views/${view.id}`, { method: "DELETE" }).then(onChanged)}
@@ -531,19 +612,61 @@ export function DatabaseView({
             ビュー削除
           </button>
         )}
+        </div>
         {editable && (
-          <button className="btn-ghost ml-auto h-8 px-2.5 text-[13px]" onClick={() => void addRow()}>
+          <button
+            className={`ml-1 shrink-0 ${isMobile ? "btn btn-primary h-9 px-3 text-[13px]" : "btn-ghost h-8 px-2.5 text-[13px]"}`}
+            onClick={() => void addRow()}
+          >
             新規
           </button>
         )}
       </div>
 
-      {view.type === "gallery" ? (
-        <div className={`grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 ${gutter}`}>
+      {isMobile && view.type === "table" ? (
+        <div className={`${gutter} pb-8`}>
+          <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
+            {filtered.map((row) => {
+              const props = parseProps(row.properties);
+              return (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-hover"
+                    onClick={() => onOpenRow(row.id)}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className={`flex items-center gap-1.5 text-[15px] ${row.title ? "" : "text-muted"}`}>
+                        {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
+                        <span className="truncate">{row.title || "無題"}</span>
+                      </span>
+                      <RowChips schema={schema} props={props} />
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-[#c4c2bc]" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {filtered.length === 0 && (
+            <p className="px-1 py-8 text-center text-[13px] text-muted">行がありません</p>
+          )}
+          {editable && (
+            <button
+              type="button"
+              className="mt-3 flex h-11 w-full items-center justify-center rounded-[10px] border border-dashed border-line text-[14px] text-muted active:bg-hover"
+              onClick={() => void addRow()}
+            >
+              + 新規
+            </button>
+          )}
+        </div>
+      ) : view.type === "gallery" ? (
+        <div className={`grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 max-[720px]:grid-cols-2 ${gutter}`}>
           {filtered.map((row) => (
             <button
               key={row.id}
-              className="overflow-hidden rounded-[10px] border border-line text-left hover:bg-hover"
+              className="overflow-hidden rounded-[10px] border border-line text-left hover:bg-hover max-[720px]:min-h-[9.5rem]"
               onClick={() => onOpenRow(row.id)}
             >
               <div className="h-24 bg-canvas">
@@ -581,7 +704,7 @@ export function DatabaseView({
               <div>
                 <div className="mb-2 flex items-center gap-2">
                   <button
-                    className="btn-ghost h-7 px-2 text-[13px] text-muted"
+                    className="btn-ghost h-7 px-2 text-[13px] text-muted max-[720px]:h-9 max-[720px]:px-3"
                     onClick={() =>
                       setCalCursor((c) => (c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }))
                     }
@@ -592,7 +715,7 @@ export function DatabaseView({
                     {calCursor.y}年{calCursor.m + 1}月
                   </p>
                   <button
-                    className="btn-ghost h-7 px-2 text-[13px] text-muted"
+                    className="btn-ghost h-7 px-2 text-[13px] text-muted max-[720px]:h-9 max-[720px]:px-3"
                     onClick={() =>
                       setCalCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))
                     }
@@ -600,6 +723,32 @@ export function DatabaseView({
                     →
                   </button>
                 </div>
+                {isMobile ? (
+                  <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
+                    {cells.filter((c) => c && c.dayRows.length).length === 0 && (
+                      <li className="px-3 py-8 text-center text-[13px] text-muted">この月の予定はありません</li>
+                    )}
+                    {cells.map((cell, i) => {
+                      if (!cell || cell.dayRows.length === 0) return null;
+                      return (
+                        <li key={i} className="px-3 py-2.5">
+                          <p className="mb-1 text-[12px] font-medium text-muted">
+                            {calCursor.m + 1}/{cell.day}
+                          </p>
+                          {cell.dayRows.map((r) => (
+                            <button
+                              key={r.id}
+                              className="flex min-h-10 w-full items-center rounded-[6px] px-1 text-left text-[15px] active:bg-hover"
+                              onClick={() => onOpenRow(r.id)}
+                            >
+                              {r.title || "無題"}
+                            </button>
+                          ))}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
                 <div className="grid grid-cols-7 gap-px rounded-[8px] bg-line">
                   {["月", "火", "水", "木", "金", "土", "日"].map((d) => (
                     <div key={d} className="bg-white px-2 py-1 text-[11px] text-muted">{d}</div>
@@ -619,12 +768,13 @@ export function DatabaseView({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             );
           })()}
         </div>
       ) : view.type === "board" && statusProp ? (
-        <div className={`flex gap-3 overflow-x-auto pb-2 ${gutter}`}>
+        <div className={`arcana-board flex gap-3 overflow-x-auto pb-2 ${gutter}`}>
           {(() => {
             const options = statusProp.options ?? [];
             const known = new Set(options.map((o) => o.id));
@@ -642,7 +792,7 @@ export function DatabaseView({
               return (
                 <div
                   key={col.id}
-                  className={`w-[260px] shrink-0 rounded-[10px] bg-canvas p-2 ${
+                  className={`arcana-board-col w-[260px] shrink-0 rounded-[10px] bg-canvas p-2 ${
                     drag?.type === "card" && drag.overCol === col.id ? "arcana-drop-col" : ""
                   }`}
                   onDragOver={(e) => {
@@ -671,12 +821,11 @@ export function DatabaseView({
                   </div>
                   {colRows.map((row) => {
                     const props = parseProps(row.properties);
-                    const extras = dataProps.filter((p) => p.id !== statusProp.id && props[p.id]);
                     return (
                       <div
                         key={row.id}
                         data-card
-                        draggable={editable && editingTitleId !== row.id}
+                        draggable={editable && !isMobile && editingTitleId !== row.id}
                         onDragStart={(e) => beginDrag(e, "card", row.id)}
                         onDragOver={(e) => hoverDrag(e, row.id, col.id)}
                         onDrop={(e) => {
@@ -685,7 +834,7 @@ export function DatabaseView({
                           void commitCardDrop(col.status);
                         }}
                         onDragEnd={(e) => endDrag(e)}
-                        className={`relative mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa] ${
+                        className={`relative mb-2 cursor-pointer rounded-[8px] bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-[#fafafa] max-[720px]:p-3 ${
                           drag?.id === row.id ? "opacity-40" : ""
                         }`}
                         onClick={() => {
@@ -699,49 +848,17 @@ export function DatabaseView({
                         {editingTitleId === row.id ? (
                           titleCell(row)
                         ) : (
-                          <div className={`text-[14px] ${row.title ? "" : "text-muted"}`}>{row.title || "無題"}</div>
+                          <div className={`text-[15px] ${row.title ? "" : "text-muted"}`}>{row.title || "無題"}</div>
                         )}
-                        {extras.length > 0 && editingTitleId !== row.id && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {extras.map((p) => {
-                              if (p.type === "multi_select") {
-                                const ids = Array.isArray(props[p.id]) ? (props[p.id] as string[]) : [];
-                                return ids.map((id) => {
-                                  const current = p.options?.find((o) => o.id === id);
-                                  if (!current) return null;
-                                  return (
-                                    <span key={`${p.id}-${id}`} className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}>
-                                      {current.name}
-                                    </span>
-                                  );
-                                });
-                              }
-                              if (p.type === "select" || p.type === "status") {
-                                const current = p.options?.find((o) => o.id === String(props[p.id] ?? ""));
-                                if (!current) return null;
-                                return (
-                                  <span
-                                    key={p.id}
-                                    className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}
-                                  >
-                                    {current.name}
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span key={p.id} className="text-[12px] text-muted">
-                                  {String(props[p.id])}
-                                </span>
-                              );
-                            })}
-                          </div>
+                        {editingTitleId !== row.id && (
+                          <RowChips schema={schema} props={props} skipId={statusProp.id} />
                         )}
                       </div>
                     );
                   })}
                   {editable && (
                     <button
-                      className="w-full rounded-md px-1.5 py-1.5 text-left text-[13px] text-muted hover:bg-hover"
+                      className="w-full rounded-md px-1.5 py-1.5 text-left text-[13px] text-muted hover:bg-hover max-[720px]:min-h-11 max-[720px]:px-2"
                       onClick={() => void addRow(col.status)}
                     >
                       + 新規
@@ -1023,6 +1140,17 @@ export function DatabaseView({
               {t === "table" ? "テーブル" : t === "board" ? "ボード" : t === "calendar" ? "カレンダー" : "ギャラリー"}
             </button>
           ))}
+          {isMobile && editable && views.length > 1 && (
+            <button
+              className="flex w-full rounded-[6px] px-2 py-1.5 text-left text-[13px] text-danger hover:bg-hover"
+              onClick={() => {
+                setAddView(null);
+                void api(`/api/views/${view.id}`, { method: "DELETE" }).then(onChanged);
+              }}
+            >
+              このビューを削除
+            </button>
+          )}
         </FloatMenu>
       )}
 
