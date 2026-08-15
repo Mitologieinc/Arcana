@@ -13,6 +13,46 @@ export const COVER_PRESETS: CoverPreset[] = [
     css: "radial-gradient(80% 120% at 0% 100%, rgba(0, 182, 158, 0.22), transparent 60%), radial-gradient(70% 100% at 100% 0%, rgba(37, 140, 219, 0.16), transparent 58%), #f3f1eb",
   },
   {
+    id: "dawn",
+    name: "朝",
+    css: "radial-gradient(75% 110% at 8% 100%, rgba(255, 176, 122, 0.32), transparent 58%), radial-gradient(65% 90% at 100% 8%, rgba(255, 214, 170, 0.28), transparent 55%), #f6f2ea",
+  },
+  {
+    id: "haze",
+    name: "霞",
+    css: "radial-gradient(80% 115% at 0% 90%, rgba(176, 154, 214, 0.22), transparent 60%), radial-gradient(70% 100% at 95% 0%, rgba(122, 168, 214, 0.18), transparent 56%), #f4f2f6",
+  },
+  {
+    id: "sprout",
+    name: "若葉",
+    css: "radial-gradient(78% 118% at 4% 100%, rgba(126, 188, 138, 0.26), transparent 58%), radial-gradient(68% 95% at 100% 6%, rgba(196, 220, 168, 0.22), transparent 54%), #f3f4ec",
+  },
+  {
+    id: "peach",
+    name: "桃",
+    css: "radial-gradient(82% 120% at 0% 100%, rgba(242, 168, 176, 0.26), transparent 60%), radial-gradient(70% 100% at 100% 0%, rgba(255, 214, 196, 0.28), transparent 55%), #f7f1ee",
+  },
+  {
+    id: "moon",
+    name: "月",
+    css: "radial-gradient(80% 115% at 10% 100%, rgba(148, 168, 188, 0.2), transparent 58%), radial-gradient(72% 100% at 100% 4%, rgba(210, 218, 228, 0.35), transparent 56%), #eef0f3",
+  },
+  {
+    id: "honey",
+    name: "蜜",
+    css: "radial-gradient(78% 112% at 0% 95%, rgba(232, 186, 96, 0.26), transparent 58%), radial-gradient(66% 92% at 96% 8%, rgba(244, 214, 150, 0.24), transparent 54%), #f6f1e4",
+  },
+  {
+    id: "rain",
+    name: "雨",
+    css: "radial-gradient(84% 120% at 6% 100%, rgba(110, 160, 184, 0.22), transparent 60%), radial-gradient(70% 98% at 100% 0%, rgba(168, 196, 210, 0.2), transparent 55%), #eef2f4",
+  },
+  {
+    id: "silk",
+    name: "絹",
+    css: "radial-gradient(76% 110% at 0% 88%, rgba(232, 214, 196, 0.4), transparent 58%), radial-gradient(68% 96% at 100% 10%, rgba(236, 224, 216, 0.35), transparent 54%), #f7f4ef",
+  },
+  {
     id: "sunset",
     name: "夕焼け",
     css: "linear-gradient(115deg, #ffb088 0%, #f08060 42%, #c44b4b 100%)",
