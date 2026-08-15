@@ -818,7 +818,7 @@ export function PageEditor({
               pages={pages}
               members={members}
               editable={editable}
-              onOpenRow={setPeekId}
+              onOpenRow={(id) => (editable ? setPeekId(id) : onOpenPage(id))}
             onChanged={async () => {
               await reloadPage();
               await onPagesChanged();

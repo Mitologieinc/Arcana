@@ -91,7 +91,10 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
             members={members}
             editable={editable}
             embedded
-            onOpenRow={setPeekId}
+            onOpenRow={(id) => {
+              if (editable) setPeekId(id);
+              else chrome?.onOpenPage?.(id);
+            }}
             onChanged={async () => {
               await reload();
               await chrome?.onPagesChanged?.();
