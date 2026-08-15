@@ -1108,7 +1108,7 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-doc.is-reading {
   min-height: 0;
-  padding-bottom: 5rem;
+  padding: 4px 0 4rem;
   caret-color: transparent;
 }
 
@@ -1119,8 +1119,53 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-doc.is-reading .collaboration-carets__caret,
 .arcana-doc.is-reading .collaboration-carets__label,
-.arcana-doc.is-reading .collaboration-carets__selection {
+.arcana-doc.is-reading .collaboration-carets__selection,
+.arcana-doc.is-reading .column-resize-handle,
+.arcana-doc.is-reading [data-resize-handle] {
   display: none !important;
+}
+
+.arcana-doc.is-reading .page-link,
+.arcana-doc.is-reading .user-mention {
+  padding: 0;
+  background: none;
+  font-weight: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(55, 53, 47, 0.28);
+  text-underline-offset: 3px;
+}
+
+.arcana-doc.is-reading .user-mention {
+  color: inherit;
+}
+
+.arcana-doc.is-reading .page-link:hover,
+.arcana-doc.is-reading .user-mention:hover {
+  background: none;
+  color: var(--color-cf);
+  text-decoration-color: var(--color-cf);
+}
+
+.arcana-doc.is-reading ul[data-type="taskList"] li input[type="checkbox"] {
+  pointer-events: none;
+}
+
+.arcana-doc.is-reading .arcana-toggle > button {
+  background: transparent;
+}
+
+.arcana-doc.is-reading [data-type="detailsSummary"],
+.arcana-doc.is-reading summary {
+  cursor: pointer;
+}
+
+.arcana-doc.is-reading .arcana-page-block {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.arcana-doc.is-reading .arcana-page-block:hover {
+  background: transparent;
 }
 
 .page-meta {
@@ -2934,6 +2979,10 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     padding-left: 16px;
     padding-right: 16px;
     padding-bottom: 24vh;
+  }
+
+  .arcana-doc.is-reading {
+    padding-bottom: 2rem;
   }
 
   .arcana-block-handle {

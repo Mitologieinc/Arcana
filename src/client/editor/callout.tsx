@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 import { EmojiPicker } from "../components/EmojiPicker";
+import { useEditorChrome } from "./chrome";
 
 function calloutTone(emoji: string) {
   if (/💡|✨|🧠|💭/.test(emoji)) return "idea";
@@ -13,8 +14,10 @@ function calloutTone(emoji: string) {
 }
 
 function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
+  const chrome = useEditorChrome();
   const [open, setOpen] = useState(false);
   const emoji = (node.attrs.emoji as string) || "💡";
+  const canEdit = chrome?.editable ?? false;
   return (
     <NodeViewWrapper
       className={`arcana-callout ${selected ? "is-selected" : ""}`}
@@ -22,6 +25,7 @@ function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
       data-emoji={emoji}
       data-tone={calloutTone(emoji)}
     >
+      {canEdit ? (
       <button
         type="button"
         className="arcana-callout-emoji"
@@ -30,6 +34,11 @@ function CalloutView({ node, updateAttributes, selected }: ReactNodeViewProps) {
       >
         {emoji}
       </button>
+      ) : (
+        <span className="arcana-callout-emoji" contentEditable={false}>
+          {emoji}
+        </span>
+      )}
       {open && (
         <div
           className="menu-panel arcana-callout-picker"

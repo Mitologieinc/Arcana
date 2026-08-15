@@ -378,18 +378,6 @@ export function PageEditor({
         </nav>
         <div className={`relative ml-auto flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
           {!shareToken && editable && <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />}
-          {shareToken && (
-            <button
-              type="button"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted opacity-50 hover:bg-hover hover:opacity-100"
-              title="リンクをコピー"
-              onClick={() => {
-                void navigator.clipboard.writeText(window.location.href).then(() => toast("リンクをコピーしました"));
-              }}
-            >
-              <Link2 size={14} />
-            </button>
-          )}
           {!shareToken && (
             <>
             <button
@@ -559,16 +547,18 @@ export function PageEditor({
                 </button>
               )
             )}
+            {editable ? (
             <button
               className="jam-title-icon"
-              onClick={() => {
-                if (!editable) return;
-                setIconOpen((v) => !v);
-              }}
-              disabled={!editable}
+              onClick={() => setIconOpen((v) => !v)}
             >
               <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={20} />
             </button>
+            ) : (
+              <span className="jam-title-icon">
+                <PageIcon icon={page.icon} fallback={pageTypeIcon("canvas")} size={20} />
+              </span>
+            )}
             {editable ? (
             <input
               ref={titleRef}
@@ -663,7 +653,9 @@ export function PageEditor({
       )}
       <div
         className={
-          page.type === "database" ? "group pb-32" : "group mx-auto max-w-[900px] pb-40"
+          page.type === "database"
+            ? `group ${editable ? "pb-32" : "pb-16"}`
+            : `group mx-auto max-w-[900px] ${editable ? "pb-40" : "pb-16"}`
         }
       >
         <div

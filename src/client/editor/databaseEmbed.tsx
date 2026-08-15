@@ -70,7 +70,9 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
         </div>
       ) : (
         <>
+          {page.title ? (
           <div className="mb-1 flex items-center gap-2">
+            {editable ? (
             <button
               type="button"
               className="min-w-0 truncate rounded-[6px] px-1 py-0.5 text-left text-[15px] font-medium hover:bg-hover"
@@ -78,10 +80,23 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
             >
               <span className="inline-flex items-center gap-1">
                 <PageIcon icon={page.icon} fallback="🗃️" size={16} />
-                {page.title || "無題のデータベース"}
+                {page.title}
               </span>
             </button>
+            ) : (
+              <h3 className="m-0 min-w-0 truncate px-1 py-0.5 text-[15px] font-medium">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-inherit"
+                  onClick={() => chrome?.onOpenPage?.(embedId)}
+                >
+                  <PageIcon icon={page.icon} fallback="🗃️" size={16} />
+                  {page.title}
+                </button>
+              </h3>
+            )}
           </div>
+          ) : null}
           <DatabaseView
             pageId={embedId}
             schema={schema}

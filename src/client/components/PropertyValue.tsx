@@ -79,6 +79,86 @@ export function newSelectOption(name: string, existing = 0): SelectOption {
   };
 }
 
+function PropertyRead({
+  property,
+  value,
+  members,
+  pages,
+  title,
+  schema,
+  allProps,
+}: {
+  property: DbProperty;
+  value: unknown;
+  members: Member[];
+  pages: Page[];
+  title: string;
+  schema: DbProperty[];
+  allProps: Record<string, unknown>;
+}) {
+  if (property.type === "formula") {
+    const snapshot = value == null ? "" : String(value);
+    const shown = evalFormula(property.expression ?? "", { title, schema, values: allProps }, snapshot);
+    if (!shown) return null;
+    return <span className="truncate text-[13px] text-muted">{shown}</span>;
+  }
+  if (property.type === "checkbox") {
+    if (!value) return null;
+    return <span className="text-[13px] text-muted">済</span>;
+  }
+  if (property.type === "person") {
+    const current = members.find((m) => m.userId === String(value ?? ""));
+    if (!current && !value) return null;
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
+        {current ? (
+          <>
+            <Avatar name={current.name} seed={current.userId} size={18} />
+            <span className="truncate">{current.name}</span>
+          </>
+        ) : (
+          <span className="text-muted">退会したメンバー</span>
+        )}
+      </span>
+    );
+  }
+  if (property.type === "relation") {
+    const ids = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
+    const linked = pages.filter((p) => ids.includes(p.id));
+    if (!linked.length) return null;
+    return (
+      <span className="flex min-w-0 flex-wrap items-center gap-1">
+        {linked.map((p) => (
+          <span key={p.id} className="truncate text-[13px]">
+            {p.title || "無題"}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  if (property.type === "multi_select") {
+    const ids = Array.isArray(value) ? value.map(String) : [];
+    const selected = (property.options ?? []).filter((o) => ids.includes(o.id));
+    if (!selected.length) return null;
+    return (
+      <span className="flex min-w-0 flex-wrap items-center gap-1">
+        {selected.map((o) => (
+          <span key={o.id} className={`truncate rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(o.color)}`}>
+            {o.name}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  if (property.type === "select" || property.type === "status") {
+    const current = property.options?.find((o) => o.id === String(value ?? ""));
+    if (!current) return null;
+    return <span className={`rounded-[4px] px-1.5 py-0.5 text-[12px] ${optionClass(current.color)}`}>{current.name}</span>;
+  }
+  if (value == null || value === "") return null;
+  return <span className="truncate text-[13px]">{String(value)}</span>;
+}
+
 export function PropertyValue({
   property,
   value,
@@ -118,6 +198,20 @@ export function PropertyValue({
   }
 
   const hit = dense ? "" : "arcana-prop-hit ";
+
+  if (!editable) {
+    return (
+      <PropertyRead
+        property={property}
+        value={value}
+        members={members}
+        pages={pages}
+        title={title}
+        schema={schema}
+        allProps={allProps}
+      />
+    );
+  }
 
   if (property.type === "formula") {
     const snapshot = value == null ? "" : String(value);

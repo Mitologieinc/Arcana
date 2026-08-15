@@ -593,9 +593,10 @@ export function DatabaseView({
 
   return (
     <div className="mt-3">
+      {(editable || views.length > 1) && (
       <div className={`arcana-db-toolbar mb-1 flex items-center gap-1 ${embedded ? "is-embedded" : ""} ${gutter}`}>
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {(editable || views.length > 1) && views.map((v) => (
+        {views.map((v) => (
           <button
             key={v.id}
             className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] ${
@@ -617,7 +618,7 @@ export function DatabaseView({
             {v.name}
           </button>
         ))}
-        {searchOpen ? (
+        {editable && (searchOpen ? (
           <input
             autoFocus
             className="ml-1 h-9 min-w-[8rem] flex-1 rounded-md border-none bg-transparent px-2 text-[16px] outline-none placeholder:text-muted hover:bg-hover focus:bg-hover"
@@ -636,8 +637,8 @@ export function DatabaseView({
           >
             <Search size={15} />
           </button>
-        )}
-        {statusProp && !equalsFilter && (
+        ))}
+        {editable && statusProp && !equalsFilter && (
           <button
             className="h-9 shrink-0 rounded-[6px] px-2.5 text-[13px] text-muted hover:bg-hover"
             onClick={(e) => setFilterMenu(e.currentTarget.getBoundingClientRect())}
@@ -690,8 +691,9 @@ export function DatabaseView({
           </button>
         )}
       </div>
+      )}
 
-      {isMobile && view.type === "table" ? (
+      {(isMobile || !editable) && view.type === "table" ? (
         <div className={`${gutter} pb-8`}>
           <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
             {filtered.map((row) => {
@@ -707,9 +709,9 @@ export function DatabaseView({
                       {row.icon ? <PageIcon icon={row.icon} size={16} /> : null}
                       <span className="truncate">{row.title || (editable ? "名前を入力" : "無題")}</span>
                     </span>
-                    <RowChips schema={schema} props={props} skipId={statusProp?.id} limit={3} members={members} />
+                    <RowChips schema={schema} props={props} skipId={editable ? statusProp?.id : undefined} limit={3} members={members} />
                   </button>
-                  {statusProp && (
+                  {editable && statusProp && (
                     <div className="w-[7.5rem] shrink-0">
                       <PropertyValue
                         dense
@@ -728,7 +730,7 @@ export function DatabaseView({
                       />
                     </div>
                   )}
-                  <ChevronRight size={16} className="shrink-0 text-[#c4c2bc]" />
+                  {editable && <ChevronRight size={16} className="shrink-0 text-[#c4c2bc]" />}
                 </li>
               );
             })}

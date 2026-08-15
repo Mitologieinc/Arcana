@@ -882,7 +882,11 @@ export function CanvasEditor({
 
   useEffect(() => {
     const awareness = collab.provider.awareness;
-    awareness.setLocalStateField("user", { name: user.name || "ゲスト", color: colorFor(user.id), id: user.id });
+    if (editable) {
+      awareness.setLocalStateField("user", { name: user.name || "ゲスト", color: colorFor(user.id), id: user.id });
+    } else {
+      awareness.setLocalStateField("user", null);
+    }
     const report = () => {
       const others: PresenceUser[] = [];
       const next: { id: string; name: string; color: string }[] = [];
@@ -947,7 +951,7 @@ export function CanvasEditor({
       if (cursorRaf.current != null) cancelAnimationFrame(cursorRaf.current);
       cursorRaf.current = null;
     };
-  }, [collab, user, onPresence]);
+  }, [collab, user, onPresence, editable]);
 
   useEffect(() => {
     if (!onSyncStatus) return;
@@ -2366,7 +2370,7 @@ export function CanvasEditor({
         )}
       </div>
 
-      {peers.map((c) => (
+      {editable && peers.map((c) => (
         <div
           key={c.id}
           className="jam-cursor"
@@ -2444,7 +2448,7 @@ export function CanvasEditor({
         </div>
       )}
 
-      {empty && (
+      {empty && editable && (
         <div className="jam-empty">
           <p>付箋を置いて、線でつなぐ</p>
           <p>F セクション　E スタンプ　M 蛍光ペン</p>
@@ -2763,6 +2767,7 @@ export function CanvasEditor({
       )}
       </div>
 
+      {editable && (
       <div className={`jam-bar${isMobile && moreTools ? " is-more" : ""}`}>
         <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => { setTool("select"); setMoreTools(false); }} />
         <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => { setTool("hand"); setMoreTools(false); }} />
@@ -2886,6 +2891,7 @@ export function CanvasEditor({
         </>
         )}
       </div>
+      )}
 
       <div className="jam-zoom">
         {editable && (
@@ -2920,12 +2926,16 @@ export function CanvasEditor({
         <button type="button" title="全体を表示（Shift+1）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); fitContent(); }} aria-label="全体を表示">
           <Scan size={14} />
         </button>
+        {editable && (
+          <>
         <button type="button" title="PNG書き出し（⌘⇧E）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); exportPng(); }} aria-label="PNG書き出し">
           <ImageDown size={14} />
         </button>
         <button type="button" title="ショートカット（?）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setHelp((v) => !v); }} aria-label="ショートカット">
           <CircleHelp size={14} />
         </button>
+          </>
+        )}
       </div>
     </div>
   );
