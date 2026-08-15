@@ -5,13 +5,15 @@
     "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   --color-cf: #00b69e;
   --color-cf-hover: #009882;
-  --color-ink: #37352f;
-  --color-muted: #9b9a97;
-  --color-line: #e9e9e7;
-  --color-canvas: #fafafa;
-  --color-sidebar: #fafafa;
-  --color-danger: #eb5757;
-  --color-hover: rgba(55, 53, 47, 0.06);
+  --color-ink: #202124;
+  --color-muted: #5f6368;
+  --color-line: #dadce0;
+  --color-canvas: #fff;
+  --color-sidebar: #f8f9fa;
+  --color-link: #1a73e8;
+  --color-link-hover: #174ea6;
+  --color-danger: #d93025;
+  --color-hover: rgba(32, 33, 36, 0.06);
 }
 
 html,
@@ -21,20 +23,22 @@ body,
   height: 100dvh;
   margin: 0;
   color: var(--color-ink);
-  background: #fafafa;
+  background: #f8f9fa;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
 
 html[data-theme="dark"] {
-  --color-ink: #e8e6e3;
-  --color-muted: #9b9a97;
-  --color-line: #3a3a37;
-  --color-canvas: #202020;
-  --color-sidebar: #191919;
+  --color-ink: #e8eaed;
+  --color-muted: #9aa0a6;
+  --color-line: #3c4043;
+  --color-canvas: #202124;
+  --color-sidebar: #171717;
+  --color-link: #8ab4f8;
+  --color-link-hover: #aecbfa;
   --color-hover: rgba(255, 255, 255, 0.08);
-  --color-danger: #eb5757;
+  --color-danger: #f28b82;
 }
 
 html[data-theme="dark"],
@@ -69,8 +73,8 @@ html[data-theme="dark"] .arcana-db-table thead th {
 }
 
 html[data-theme="dark"] .arcana-db-tab.is-on {
-  background: #2a2a28;
-  box-shadow: 0 0 0 1px #3a3a37;
+  background: transparent;
+  box-shadow: none;
 }
 
 html[data-theme="dark"] .arcana-db-table th:first-child,
@@ -109,16 +113,18 @@ html[data-theme="dark"] .arcana-doc ul[data-type="taskList"] li input[type="chec
 }
 
 html[data-theme="dark"] .page-link {
-  background: rgba(255, 255, 255, 0.08);
+  background: none;
+  color: var(--color-link);
 }
 
 html[data-theme="dark"] .page-link:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: none;
+  color: var(--color-link-hover);
 }
 
 html[data-theme="dark"] .user-mention {
-  background: rgba(35, 131, 226, 0.22);
-  color: #79b8f3;
+  background: rgba(138, 180, 248, 0.16);
+  color: var(--color-link);
 }
 
 html[data-theme="dark"] .page-title,
@@ -255,34 +261,35 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .page-link {
-  display: inline-flex;
+  display: inline;
   vertical-align: baseline;
-  align-items: baseline;
-  border-radius: 4px;
-  padding: 1px 5px;
-  background: rgba(55, 53, 47, 0.08);
-  color: inherit;
-  text-decoration: none;
-  font-weight: 510;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: inherit;
   cursor: pointer;
-  line-height: 1.45;
+  line-height: inherit;
 }
 
 .arcana-doc [data-node-view-wrapper].page-link {
-  display: inline-flex;
+  display: inline;
 }
 
 .page-link:hover {
-  background: rgba(55, 53, 47, 0.12);
+  background: none;
+  color: var(--color-link-hover);
 }
 
 .user-mention {
   display: inline;
-  border-radius: 4px;
-  padding: 1px 4px;
-  background: rgba(35, 131, 226, 0.12);
-  color: #2383e2;
-  font-weight: 510;
+  border-radius: 2px;
+  padding: 0 2px;
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--color-link);
+  font-weight: inherit;
   white-space: nowrap;
 }
 
@@ -320,10 +327,10 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 48px;
   padding: 0 16px;
-  background: color-mix(in srgb, var(--color-canvas) 82%, transparent);
-  backdrop-filter: blur(12px);
+  background: #fff;
+  border-bottom: 1px solid var(--color-line);
 }
 
 .share-bar > nav {
@@ -368,10 +375,9 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .share-sheet-kicker {
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
   color: var(--color-muted);
 }
 
@@ -383,8 +389,8 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background: var(--color-canvas);
+  border-radius: 4px;
+  background: var(--color-sidebar);
   color: var(--color-ink);
 }
 
@@ -396,8 +402,8 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
-  background: var(--color-canvas);
+  border-radius: 4px;
+  background: var(--color-sidebar);
   color: var(--color-muted);
 }
 
@@ -413,17 +419,16 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 .share-sheet-card,
 .share-sheet-link {
   min-width: 0;
-  padding: 14px;
-  border-radius: 16px;
-  background: var(--color-canvas);
+  padding: 12px;
+  border-radius: 4px;
+  background: var(--color-sidebar);
 }
 
 .share-sheet-label {
   margin: 0 0 8px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
   color: var(--color-muted);
 }
 
@@ -451,8 +456,8 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   width: auto;
   max-width: 9.5rem;
   padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
   background: #fff;
   color: var(--color-ink);
   font-size: 12px;
@@ -481,8 +486,8 @@ html[data-theme="dark"] .arcana-nav-backdrop {
 }
 
 .share-sheet .btn {
-  border-radius: 10px;
-  height: 38px;
+  border-radius: 4px;
+  height: 36px;
 }
 
 html[data-theme="dark"] .share-select {
@@ -529,9 +534,9 @@ button:disabled {
   gap: 8px;
   height: 34px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 14px;
-  font-weight: 510;
+  font-weight: 500;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
@@ -572,7 +577,7 @@ button:disabled {
   background: transparent;
   color: var(--color-ink);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .btn-ghost svg {
@@ -592,7 +597,7 @@ button:disabled {
   height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: var(--color-ink);
   font-size: 14px;
@@ -627,9 +632,9 @@ button:disabled {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 10px;
+  border-radius: 4px;
   background: transparent;
-  color: #6b6b6b;
+  color: #5f6368;
 }
 
 .arcana-rail-btn svg {
@@ -665,8 +670,8 @@ button:disabled {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 12px;
-  background: rgba(55, 53, 47, 0.055);
+  border-radius: 4px;
+  background: rgba(32, 33, 36, 0.06);
 }
 
 .arcana-fav:hover {
@@ -674,8 +679,8 @@ button:disabled {
 }
 
 .arcana-fav.is-on {
-  background: rgba(55, 53, 47, 0.12);
-  box-shadow: inset 0 0 0 1.5px rgba(55, 53, 47, 0.16);
+  background: rgba(32, 33, 36, 0.12);
+  box-shadow: inset 0 0 0 1px var(--color-line);
 }
 
 .arcana-tip {
@@ -773,20 +778,20 @@ button:disabled {
 .field select,
 .input {
   width: 100%;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
-  border: 1px solid rgba(15, 15, 15, 0.12);
-  border-radius: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
   background: #fff;
   outline: none;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color 0.12s ease;
 }
 
 .field input:focus,
 .input:focus,
 .field select:focus {
-  border-color: rgba(55, 53, 47, 0.28);
-  box-shadow: 0 0 0 1px rgba(55, 53, 47, 0.08);
+  border-color: var(--color-cf);
+  box-shadow: none;
 }
 
 .field input::placeholder {
@@ -829,7 +834,7 @@ button:disabled {
 
 .auth-page {
   min-height: 100%;
-  background: #f4f3ef;
+  background: #f8f9fa;
 }
 
 .auth-head {
@@ -897,13 +902,13 @@ button:disabled {
 }
 
 .auth-link {
-  color: #2568b0;
+  color: var(--color-link);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .auth-link:hover {
-  color: #1a4f86;
+  color: var(--color-link-hover);
 }
 
 .auth-note {
@@ -1126,11 +1131,15 @@ html[data-theme="dark"] .auth-made:hover {
 }
 
 html[data-theme="dark"] .auth-link {
-  color: #7eb6e8;
+  color: var(--color-link);
 }
 
 html[data-theme="dark"] .auth-link:hover {
-  color: #a8d0f2;
+  color: var(--color-link-hover);
+}
+
+html[data-theme="dark"] .share-bar {
+  background: var(--color-canvas);
 }
 
 @media (max-width: 860px) {
@@ -1148,9 +1157,9 @@ html[data-theme="dark"] .auth-link:hover {
   border: none;
   background: transparent;
   padding: 0;
-  font-size: 40px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  font-size: 36px;
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 1.25;
   outline: none;
 }
@@ -1161,7 +1170,7 @@ html[data-theme="dark"] .auth-link:hover {
 
 .page-title-compact {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
 }
 
@@ -1234,8 +1243,8 @@ html[data-theme="dark"] .auth-link:hover {
   z-index: 80;
   transform: translateX(-50%);
   padding: 8px 14px;
-  border-radius: 8px;
-  background: #2f2e2c;
+  border-radius: 4px;
+  background: #202124;
   color: #fff;
   font-size: 13px;
   animation: rise 0.16s ease;
@@ -1249,9 +1258,9 @@ html[data-theme="dark"] .arcana-toast {
 .menu-panel {
   overflow: hidden;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 14px 40px rgba(15, 15, 15, 0.12), 0 0 0 1px rgba(15, 15, 15, 0.02);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px rgba(60, 64, 67, 0.15);
 }
 
 .arcana-editor {
@@ -1338,20 +1347,17 @@ html[data-theme="dark"] .arcana-toast {
   padding: 0;
   background: none;
   font-weight: inherit;
+  color: var(--color-link);
   text-decoration: underline;
-  text-decoration-color: rgba(55, 53, 47, 0.28);
-  text-underline-offset: 3px;
-}
-
-.arcana-doc.is-reading .user-mention {
-  color: inherit;
+  text-decoration-color: currentColor;
+  text-underline-offset: 2px;
 }
 
 .arcana-doc.is-reading .page-link:hover,
 .arcana-doc.is-reading .user-mention:hover {
   background: none;
-  color: var(--color-cf);
-  text-decoration-color: var(--color-cf);
+  color: var(--color-link-hover);
+  text-decoration-color: currentColor;
 }
 
 .arcana-doc.is-reading ul[data-type="taskList"] li input[type="checkbox"] {
@@ -1412,40 +1418,42 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-db-tab {
   display: inline-flex;
-  height: 32px;
+  height: 36px;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 999px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--color-muted);
   font-size: 13px;
 }
 
 .arcana-db-tab:hover {
-  background: var(--color-hover);
+  background: transparent;
   color: var(--color-ink);
 }
 
 .arcana-db-tab.is-on {
-  background: #fff;
+  background: transparent;
   color: var(--color-ink);
-  font-weight: 560;
-  box-shadow: 0 0 0 1px rgba(55, 53, 47, 0.08), 0 1px 2px rgba(15, 15, 15, 0.04);
+  font-weight: 500;
+  box-shadow: none;
+  border-bottom-color: var(--color-cf);
 }
 
 .arcana-db-new {
   display: inline-flex;
   height: 32px;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--color-cf);
   color: #fff;
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .arcana-db-new:hover {
@@ -1455,10 +1463,10 @@ html[data-theme="dark"] .arcana-toast {
 .arcana-db-frame,
 .arcana-db-list {
   overflow: hidden;
-  border: 1px solid rgba(55, 53, 47, 0.08);
-  border-radius: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.03);
+  box-shadow: none;
 }
 
 .arcana-db-frame {
@@ -1469,10 +1477,10 @@ html[data-theme="dark"] .arcana-toast {
   display: block;
   width: 100%;
   overflow: hidden;
-  border: 1px solid rgba(55, 53, 47, 0.08);
-  border-radius: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.03);
+  box-shadow: none;
   text-align: left;
 }
 
@@ -1550,14 +1558,15 @@ html[data-theme="dark"] .arcana-toast {
 }
 
 .arcana-board-col {
-  border-radius: 16px;
-  background: rgba(55, 53, 47, 0.035);
+  border-radius: 4px;
+  background: var(--color-sidebar);
 }
 
 .arcana-board-card {
-  border-radius: 12px;
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.05);
+  border: 1px solid var(--color-line);
+  box-shadow: none;
 }
 
 .arcana-db-table tbody tr.arcana-drop-before td {

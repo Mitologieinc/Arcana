@@ -403,7 +403,7 @@ function Home({
   return (
     <>
       {showMenu && onMenu && (
-        <div className="sticky top-0 z-[5] hidden h-11 items-center gap-2 bg-canvas/75 px-3 backdrop-blur-md max-[720px]:flex">
+        <div className="sticky top-0 z-[5] hidden h-11 items-center gap-2 border-b border-line bg-canvas px-3 max-[720px]:flex">
           <button className="btn-ghost h-9 w-9 p-0 text-muted" onClick={onMenu} title="ページ一覧">
             <PanelLeft size={18} strokeWidth={1.6} />
           </button>
