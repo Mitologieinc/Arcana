@@ -368,7 +368,7 @@ export function PageEditor({
             </span>
           ))}
           {page.type !== "canvas" && (
-          <span className={`min-w-0 truncate px-1.5 py-0.5 ${shareToken ? "text-muted" : "text-ink"}`}>
+          <span className={`min-w-0 flex-1 truncate px-1.5 py-0.5 ${shareToken ? "text-muted" : "text-ink"}`}>
             {!shareToken && (
               <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 align-middle" />
             )}

@@ -132,7 +132,7 @@ export function CalendarView({
               </button>
             </div>
           )}
-          <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
+          <ul className="arcana-db-list divide-y divide-line">
             {agenda.length === 0 && (
               <li className="px-3 py-8 text-center text-[13px] text-muted">この月の予定はありません</li>
             )}
@@ -172,7 +172,7 @@ export function CalendarView({
           </ul>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[10px] border border-line">
+        <div className="arcana-db-frame">
           <div className="grid grid-cols-7 border-b border-line bg-canvas">
             {WEEK_MON.map((d, i) => (
               <div

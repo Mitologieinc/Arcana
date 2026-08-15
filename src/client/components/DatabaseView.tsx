@@ -594,7 +594,7 @@ export function DatabaseView({
   return (
     <div className="mt-3">
       {(editable || views.length > 1) && (
-      <div className={`arcana-db-toolbar mb-1 flex items-center gap-1 ${embedded ? "is-embedded" : ""} ${gutter}`}>
+      <div className={`arcana-db-toolbar flex items-center gap-1 ${embedded ? "is-embedded" : ""} ${gutter}`}>
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {views.map((v) => (
           <button
@@ -693,7 +693,7 @@ export function DatabaseView({
       </div>
       )}
 
-      {(isMobile || !editable) && view.type === "table" ? (
+      {isMobile && view.type === "table" ? (
         <div className={`${gutter} pb-8`}>
           <ul className="arcana-db-list divide-y divide-line">
             {filtered.map((row) => {

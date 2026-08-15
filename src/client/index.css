@@ -82,6 +82,10 @@ html[data-theme="dark"] .arcana-db-table thead th:first-child {
   background: #202020;
 }
 
+html[data-theme="dark"] .arcana-db-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 html[data-theme="dark"] .arcana-db-table tbody tr:hover td:first-child {
   background: #222;
 }
@@ -318,7 +322,8 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   gap: 8px;
   min-height: 40px;
   padding: 0 16px;
-  background: transparent;
+  background: color-mix(in srgb, var(--color-canvas) 82%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 .share-bar > nav {
@@ -1136,7 +1141,7 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-doc.is-reading {
   min-height: 0;
-  padding: 4px 0 4rem;
+  padding: 4px 96px 4rem;
   caret-color: transparent;
 }
 
@@ -1194,6 +1199,12 @@ html[data-theme="dark"] .arcana-toast {
 
 .arcana-doc.is-reading .arcana-page-block:hover {
   background: transparent;
+}
+
+.arcana-doc.is-reading .arcana-callout-emoji,
+.arcana-doc.is-reading .arcana-callout-emoji:hover {
+  background: transparent;
+  pointer-events: none;
 }
 
 .page-meta {
@@ -1327,19 +1338,19 @@ html[data-theme="dark"] .arcana-toast {
   left: 0;
   z-index: 1;
   min-width: 240px;
-  padding-left: 28px;
+  padding-left: 16px;
   background: #fff;
   box-shadow: 8px 0 16px -12px rgba(15, 15, 15, 0.12);
 }
 
 .arcana-db-table thead th:first-child {
-  background: #fafafa;
+  background: rgba(55, 53, 47, 0.025);
 }
 
 .arcana-db-table td:first-child .arcana-grip {
   position: absolute;
   top: 50%;
-  left: 6px;
+  left: 2px;
   z-index: 2;
   margin-top: -12px;
 }
@@ -1431,11 +1442,11 @@ html[data-theme="dark"] .arcana-toast {
 @media (max-width: 860px) {
   .arcana-db-table th:first-child,
   .arcana-db-table td:first-child {
-    padding-left: 24px;
+    padding-left: 16px;
   }
 
   .arcana-db-table td:first-child .arcana-grip {
-    left: 4px;
+    left: 2px;
   }
 }
 
@@ -1666,14 +1677,20 @@ html[data-theme="dark"] .arcana-toast {
 }
 
 .arcana-db-embed {
-  margin: 10px 0 16px;
+  margin: 8px 0 14px;
   overflow-x: auto;
+  padding: 4px;
 }
 
 .arcana-db-embed.is-selected {
   outline: 2px solid rgba(35, 131, 226, 0.4);
-  outline-offset: 4px;
-  border-radius: 8px;
+  outline-offset: 0;
+  border-radius: 12px;
+}
+
+.arcana-db-embed .arcana-db-frame {
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 .arcana-db-embed .arcana-db-table th:first-child,
@@ -2954,6 +2971,11 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     padding-left: 52px;
     padding-right: 24px;
   }
+
+  .arcana-doc.is-reading {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -3093,7 +3115,7 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
   }
 
   .arcana-db-toolbar.is-embedded {
-    top: 0;
+    top: 40px;
   }
 
   html[data-theme="dark"] .arcana-db-toolbar {
@@ -3111,6 +3133,8 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
   }
 
   .arcana-doc.is-reading {
+    padding-left: 16px;
+    padding-right: 16px;
     padding-bottom: 2rem;
   }
 
