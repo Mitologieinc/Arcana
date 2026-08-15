@@ -73,6 +73,7 @@ export function PageEditor({
   const [members, setMembers] = useState<Member[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
+  const [followPeer, setFollowPeer] = useState<number | null>(null);
   const [customTemplates, setCustomTemplates] = useState<SavedTemplate[]>([]);
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [saveTplName, setSaveTplName] = useState("");
@@ -331,7 +332,7 @@ export function PageEditor({
           )}
         </nav>
         <div className={`relative flex shrink-0 items-center gap-0.5 ${page.type === "canvas" ? "pointer-events-auto" : ""}`}>
-          <PresencePile users={presence} />
+          <PresencePile users={presence} onOpen={(u) => setFollowPeer(u.clientId)} />
           {shareToken && (
             <span className="px-2 text-[12px] text-muted">{permissionLabel(permission)}</span>
           )}
@@ -511,6 +512,8 @@ export function PageEditor({
             shareToken={shareToken}
             editable={editable}
             title={title}
+            followClientId={followPeer}
+            onFollowEnd={() => setFollowPeer(null)}
             onPresence={setPresence}
           />
         </div>

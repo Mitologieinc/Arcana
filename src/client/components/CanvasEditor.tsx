@@ -9,6 +9,7 @@ import {
   AlignRight,
   AlignStartVertical,
   Circle,
+  CircleHelp,
   Diamond,
   Hand,
   Minus,
@@ -379,6 +380,8 @@ export function CanvasEditor({
   shareToken,
   editable,
   title,
+  followClientId,
+  onFollowEnd,
   onPresence,
 }: {
   pageId: string;
@@ -386,6 +389,8 @@ export function CanvasEditor({
   shareToken?: string;
   editable: boolean;
   title: string;
+  followClientId?: number | null;
+  onFollowEnd?: () => void;
   onPresence?: (users: PresenceUser[]) => void;
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
@@ -405,6 +410,10 @@ export function CanvasEditor({
   const cursorEls = useRef(new Map<string, HTMLDivElement>());
   const cursorRaf = useRef<number | null>(null);
   const cursorLast = useRef(0);
+  const selectedRef = useRef<string[]>([]);
+  const chatRef = useRef("");
+  const followRef = useRef<number | null>(null);
+  const chatBoxRef = useRef<HTMLDivElement>(null);
   const drag = useRef<null | {
     mode: "pan" | "move" | "pen" | "marquee" | "line" | "shape" | "resize" | "port";
     x: number;
@@ -436,7 +445,9 @@ export function CanvasEditor({
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [space, setSpace] = useState(false);
-  const [peers, setPeers] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [peers, setPeers] = useState<{ id: string; name: string; color: string; chat?: string; sel?: string[] }[]>([]);
+  const [chat, setChat] = useState<string | null>(null);
+  const [help, setHelp] = useState(false);
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [lineHover, setLineHover] = useState<{ x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<null | { x: number; y: number; w: number; h: number }>(null);
@@ -538,7 +549,11 @@ export function CanvasEditor({
       }
     });
     paintCursors();
-    if (moving) cursorRaf.current = requestAnimationFrame(tickCursors);
+    if (followRef.current != null) {
+      const r = remotes.current.get(String(followRef.current));
+      if (r) centerOnWorld(r.x, r.y);
+    }
+    if (moving || followRef.current != null) cursorRaf.current = requestAnimationFrame(tickCursors);
     else cursorRaf.current = null;
   }
 
@@ -583,12 +598,35 @@ export function CanvasEditor({
     el.className = `jam-ghost ${g.kind === "sticky" ? "jam-sticky" : g.kind === "text" ? "jam-label" : `jam-shape is-${shapeKind}`}`;
   }
 
+  function stopFollow() {
+    if (followRef.current == null) return;
+    followRef.current = null;
+    onFollowEnd?.();
+  }
+
+  function centerOnWorld(x: number, y: number, commit = false) {
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const z = camRef.current.z;
+    paintCam({ z, x: r.width / 2 - x * z, y: r.height / 2 - y * z }, commit);
+  }
+
+  function flushJam() {
+    collab.provider.awareness.setLocalStateField("jam", {
+      x: cursorBuf.current.x,
+      y: cursorBuf.current.y,
+      chat: chatRef.current || undefined,
+      sel: selectedRef.current.length ? selectedRef.current : undefined,
+    });
+  }
+
   function sendCursor(w: { x: number; y: number }) {
     cursorBuf.current = w;
     if (awareRaf.current != null) return;
     awareRaf.current = requestAnimationFrame(() => {
       awareRaf.current = null;
-      collab.provider.awareness.setLocalStateField("jam", cursorBuf.current);
+      flushJam();
     });
   }
 
@@ -641,16 +679,24 @@ export function CanvasEditor({
         if (clientId === awareness.clientID) return;
         const raw = state.user as { name?: string; color?: string; id?: string } | undefined;
         if (!raw?.name) return;
+        const p = state.jam as { x?: number; y?: number; chat?: string; sel?: string[] } | undefined;
         others.push({
           clientId,
           id: raw.id || String(clientId),
           name: raw.name,
           color: raw.color || "#37352f",
+          x: typeof p?.x === "number" ? p.x : undefined,
+          y: typeof p?.y === "number" ? p.y : undefined,
         });
-        const p = state.jam as { x?: number; y?: number } | undefined;
         if (typeof p?.x === "number" && typeof p.y === "number") {
           const id = String(clientId);
-          next.push({ id, name: raw.name, color: raw.color || "#37352f" });
+          next.push({
+            id,
+            name: raw.name,
+            color: raw.color || "#37352f",
+            chat: p.chat,
+            sel: Array.isArray(p.sel) ? p.sel : undefined,
+          });
           const cur = remotes.current.get(id);
           if (cur) {
             cur.tx = p.x;
@@ -665,7 +711,18 @@ export function CanvasEditor({
       }
       onPresence?.(others);
       setPeers((prev) => {
-        if (prev.length === next.length && prev.every((c, i) => c.id === next[i].id && c.name === next[i].name && c.color === next[i].color)) return prev;
+        if (
+          prev.length === next.length &&
+          prev.every(
+            (c, i) =>
+              c.id === next[i].id &&
+              c.name === next[i].name &&
+              c.color === next[i].color &&
+              c.chat === next[i].chat &&
+              (c.sel ?? []).join() === (next[i].sel ?? []).join(),
+          )
+        )
+          return prev;
         return next;
       });
       startCursorTick();
@@ -680,6 +737,26 @@ export function CanvasEditor({
       cursorRaf.current = null;
     };
   }, [collab, user, onPresence]);
+
+  useEffect(() => {
+    selectedRef.current = selected;
+    flushJam();
+  }, [selected]);
+
+  useEffect(() => {
+    followRef.current = followClientId ?? null;
+    if (followClientId == null) return;
+    const r = remotes.current.get(String(followClientId));
+    if (r) {
+      const el = boardRef.current;
+      if (el) {
+        const box = el.getBoundingClientRect();
+        const z = camRef.current.z;
+        animateCam({ z, x: box.width / 2 - r.x * z, y: box.height / 2 - r.y * z });
+      }
+    }
+    startCursorTick();
+  }, [followClientId]);
 
   useEffect(() => {
     if (indexTimer.current) window.clearTimeout(indexTimer.current);
@@ -883,6 +960,7 @@ export function CanvasEditor({
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      stopFollow();
       if (camAnim.current != null) {
         cancelAnimationFrame(camAnim.current);
         camAnim.current = null;
@@ -919,7 +997,7 @@ export function CanvasEditor({
   }, []);
 
   function overUi(t: EventTarget | null) {
-    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float, .jam-menu"));
+    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float, .jam-menu, .jam-help, .jam-chat, .jam-follow"));
   }
 
   function ghostAt(tool: Tool, w: { x: number; y: number }) {
@@ -934,6 +1012,7 @@ export function CanvasEditor({
     if (overUi(e.target)) return;
     if (e.button === 2) return;
     if (e.button === 1 || activeTool === "hand") {
+      stopFollow();
       drag.current = { mode: "pan", x: e.clientX, y: e.clientY, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
       paintGhost(null);
@@ -1131,6 +1210,11 @@ export function CanvasEditor({
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const w = worldFromClient(e.clientX, e.clientY);
     pointerRef.current = w;
+    if (chatBoxRef.current && boardRef.current) {
+      const r = boardRef.current.getBoundingClientRect();
+      chatBoxRef.current.style.left = `${e.clientX - r.left + 18}px`;
+      chatBoxRef.current.style.top = `${e.clientY - r.top + 20}px`;
+    }
     sendCursor(w);
     const d = drag.current;
     if (!d) {
@@ -1369,6 +1453,16 @@ export function CanvasEditor({
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if (e.key === "Escape") {
         e.preventDefault();
+        if (help) {
+          setHelp(false);
+          return;
+        }
+        if (chat !== null) {
+          chatRef.current = "";
+          setChat(null);
+          flushJam();
+          return;
+        }
         if (menu) {
           setMenu(null);
           return;
@@ -1398,6 +1492,18 @@ export function CanvasEditor({
         return;
       }
       if (editing || typing) return;
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setHelp((v) => !v);
+        return;
+      }
+      if (e.key === "/" && chat === null) {
+        e.preventDefault();
+        setChat("");
+        chatRef.current = "";
+        requestAnimationFrame(() => chatBoxRef.current?.querySelector("input")?.focus());
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+" || e.code === "Equal")) {
         e.preventDefault();
         zoomBy(1.25);
@@ -1505,7 +1611,7 @@ export function CanvasEditor({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [editing, editable, selected, collab, menu]);
+  }, [editing, editable, selected, collab, menu, help, chat]);
 
   function animateCam(to: { x: number; y: number; z: number }) {
     stopCamAnim();
@@ -1530,6 +1636,7 @@ export function CanvasEditor({
   }
 
   function zoomBy(factor: number) {
+    stopFollow();
     const el = boardRef.current;
     const from = camRef.current;
     const r = el?.getBoundingClientRect();
@@ -1541,6 +1648,7 @@ export function CanvasEditor({
   }
 
   function zoomToLevel(z: number) {
+    stopFollow();
     const el = boardRef.current;
     const from = camRef.current;
     const r = el?.getBoundingClientRect();
@@ -1550,6 +1658,7 @@ export function CanvasEditor({
   }
 
   function fitContent(ids?: string[]) {
+    stopFollow();
     const want = ids ? new Set(ids) : null;
     const boxes = nodesRef.current.filter((n) => n.kind !== "line" && (!want || want.has(n.id))).map(boundsOf);
     const uni = unionBoxes(boxes);
@@ -1802,6 +1911,20 @@ export function CanvasEditor({
             </div>
           );
         })}
+        {peers.flatMap((p) =>
+          (p.sel ?? []).map((id) => {
+            const n = byId.get(id);
+            if (!n || n.kind === "line") return null;
+            const b = boundsOf(n);
+            return (
+              <div
+                key={`${p.id}-${id}`}
+                className="jam-peer-sel"
+                style={{ left: b.x, top: b.y, width: b.w, height: b.h, outlineColor: p.color }}
+              />
+            );
+          }),
+        )}
         {marquee && <div className="jam-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
         {(guides.v.length > 0 || guides.h.length > 0) && (
           <svg className="jam-svg jam-guides" aria-hidden>
@@ -1843,8 +1966,53 @@ export function CanvasEditor({
             />
           </svg>
           <span style={{ background: c.color }}>{c.name}</span>
+          {c.chat ? <em className="jam-cursor-chat">{c.chat}</em> : null}
         </div>
       ))}
+      {chat !== null && (
+        <div ref={chatBoxRef} className="jam-chat">
+          <input
+            value={chat}
+            placeholder="メッセージ"
+            onChange={(e) => {
+              setChat(e.target.value);
+              chatRef.current = e.target.value;
+              flushJam();
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Escape" || e.key === "Enter") {
+                e.preventDefault();
+                chatRef.current = "";
+                setChat(null);
+                flushJam();
+              }
+            }}
+          />
+        </div>
+      )}
+      {followClientId != null && (
+        <div className="jam-follow">
+          {peers.find((p) => p.id === String(followClientId))?.name ?? "参加者"}を表示中
+          <button type="button" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); stopFollow(); }}>
+            やめる
+          </button>
+        </div>
+      )}
+      {help && (
+        <div className="jam-help" onPointerDown={(e) => e.stopPropagation()}>
+          <p>ショートカット</p>
+          <ul>
+            <li><kbd>V</kbd> 選択　<kbd>H</kbd> 移動　<kbd>S</kbd> 付箋</li>
+            <li><kbd>R</kbd> 図形　<kbd>T</kbd> 文字　<kbd>L</kbd> 線　<kbd>P</kbd> ペン</li>
+            <li><kbd>⌘Z</kbd> 戻す　<kbd>⌘D</kbd> 複製　<kbd>⌘C</kbd> / <kbd>⌘V</kbd></li>
+            <li><kbd>⌘+</kbd> / <kbd>⌘-</kbd> ズーム　<kbd>Shift+1</kbd> 全体</li>
+            <li><kbd>/</kbd> カーソル会話　<kbd>?</kbd> この一覧</li>
+            <li>空白ダブルクリックで文字　右クリックでメニュー</li>
+          </ul>
+          <button type="button" onPointerDown={() => setHelp(false)}>閉じる</button>
+        </div>
+      )}
 
       {empty && (
         <div className="jam-empty">
@@ -2137,6 +2305,9 @@ export function CanvasEditor({
         </button>
         <button type="button" title="全体を表示（Shift+1）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); fitContent(); }} aria-label="全体を表示">
           <Scan size={14} />
+        </button>
+        <button type="button" title="ショートカット（?）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setHelp((v) => !v); }} aria-label="ショートカット">
+          <CircleHelp size={14} />
         </button>
       </div>
     </div>

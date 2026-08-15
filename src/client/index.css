@@ -1493,8 +1493,12 @@ html[data-theme="dark"] .arcana-callout[data-tone="info"] {
 
 .arcana-presence {
   display: inline-flex;
+  padding: 0;
+  border: 0;
   border-radius: 99px;
+  background: transparent;
   outline: 2px solid #fff;
+  cursor: pointer;
 }
 
 html[data-theme="dark"] .arcana-presence {
@@ -2067,6 +2071,130 @@ html[data-theme="dark"] .jam-label textarea {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 
+.jam-cursor-chat,
+.jam-chat {
+  position: absolute;
+  left: 14px;
+  top: 40px;
+  min-width: 72px;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e1e1e;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 1.35;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 6px 16px rgba(0, 0, 0, 0.12);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.jam-chat {
+  z-index: 22;
+  left: 80px;
+  top: 80px;
+  padding: 0;
+}
+
+.jam-chat input {
+  display: block;
+  width: 200px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.jam-peer-sel {
+  position: absolute;
+  box-sizing: border-box;
+  outline: 2px solid;
+  outline-offset: 3px;
+  pointer-events: none;
+}
+
+.jam-follow {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 20px rgba(0, 0, 0, 0.12);
+  color: #1e1e1e;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.jam-follow button {
+  border: 0;
+  border-radius: 999px;
+  background: #f1f0ed;
+  color: inherit;
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.jam-help {
+  position: absolute;
+  left: 16px;
+  bottom: 72px;
+  z-index: 30;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.14);
+  color: #1e1e1e;
+}
+
+.jam-help p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.jam-help ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #3d3c38;
+}
+
+.jam-help kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #f1f0ed;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.jam-help button {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f0ed;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 6px 10px;
+}
+
 html[data-theme="dark"] .jam {
   background: #1c1c1a;
 }
@@ -2080,7 +2208,11 @@ html[data-theme="dark"] .jam-pop,
 html[data-theme="dark"] .jam-zoom,
 html[data-theme="dark"] .jam-title,
 html[data-theme="dark"] .jam-float,
-html[data-theme="dark"] .jam-menu {
+html[data-theme="dark"] .jam-menu,
+html[data-theme="dark"] .jam-help,
+html[data-theme="dark"] .jam-follow,
+html[data-theme="dark"] .jam-chat,
+html[data-theme="dark"] .jam-cursor-chat {
   background: #2a2a28;
   box-shadow: 0 0 0 1px #3a3a37, 0 10px 28px rgba(0, 0, 0, 0.35);
 }
@@ -2112,8 +2244,22 @@ html[data-theme="dark"] .jam-menu-sep {
   background: #3a3a37;
 }
 
+html[data-theme="dark"] .jam-help,
+html[data-theme="dark"] .jam-follow,
+html[data-theme="dark"] .jam-chat,
+html[data-theme="dark"] .jam-cursor-chat,
 html[data-theme="dark"] .jam-menu button {
   color: #e8e6e3;
+}
+
+html[data-theme="dark"] .jam-help ul {
+  color: #c4c2bc;
+}
+
+html[data-theme="dark"] .jam-help kbd,
+html[data-theme="dark"] .jam-help button,
+html[data-theme="dark"] .jam-follow button {
+  background: #3a3a37;
 }
 
 html[data-theme="dark"] .jam-menu button:hover:not(:disabled) {
