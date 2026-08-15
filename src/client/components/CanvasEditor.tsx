@@ -11,18 +11,26 @@ import {
   Circle,
   CircleHelp,
   Diamond,
+  Frame,
+  Group,
   Hand,
+  Highlighter,
+  ImageDown,
+  Lock,
   Minus,
   MousePointer2,
   Pencil,
   Plus,
   Redo2,
   Scan,
+  Smile,
   Spline,
   Square,
   StickyNote,
   Type,
   Undo2,
+  Ungroup,
+  Unlock,
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
@@ -63,6 +71,10 @@ const SHAPE_STROKE = "#b3b3b3";
 const COLORS = ["#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#196a63"];
 const STROKE_COLORS = [INK, "#5c5c5c", LINE, "#e16259", "#2383e2", "#0f7b6c", "#d9730d", "#9065b0", "#ffffff"];
 const SHAPE_FILLS = ["#ffffff", "#FFE299", "#FFB8A8", "#D3BDFF", "#A8DAFF", "#B3EFBD", "#E6E6E6"];
+const SECTION_COLORS = ["#E8F0FE", "#E6F4EA", "#FEF7E0", "#FCE8E6", "#F3E8FD", "#E0F2F1", "#F1F0ED"];
+const STAMPS = ["👍", "❤️", "⭐", "🎉", "🔥", "👀", "✅", "❓"];
+const PEN_WIDTHS = [2, 4, 8];
+const MARKER_WIDTHS = [12, 18, 28];
 const SELECT = "#0d99ff";
 const GUIDE = "#f24822";
 const SNAP = 8;
@@ -103,11 +115,13 @@ function paintGrid(el: HTMLDivElement, x: number, y: number, z: number) {
 
 type Pt = { x: number; y: number };
 
-type Tool = "select" | "hand" | "sticky" | "shape" | "text" | "line" | "pen";
+type Tool = "select" | "hand" | "sticky" | "shape" | "text" | "line" | "pen" | "section" | "stamp";
 type ShapeKind = "round" | "ellipse" | "diamond";
+type Ink = "pen" | "marker";
+type JamKind = "sticky" | "shape" | "text" | "pen" | "line" | "section" | "stamp";
 type JamNode = {
   id: string;
-  kind: "sticky" | "shape" | "text" | "pen" | "line";
+  kind: JamKind;
   x: number;
   y: number;
   w: number;
@@ -120,6 +134,12 @@ type JamNode = {
   fromId?: string;
   toId?: string;
   fontSize?: number;
+  locked?: boolean;
+  groupId?: string;
+  strokeWidth?: number;
+  ink?: Ink;
+  votes?: number;
+  emoji?: string;
 };
 
 function colorFor(id: string) {
@@ -139,7 +159,49 @@ function clone<T>(v: T): T {
 function isJam(n: unknown): n is JamNode {
   if (!n || typeof n !== "object") return false;
   const k = (n as JamNode).kind;
-  return k === "sticky" || k === "shape" || k === "text" || k === "pen" || k === "line";
+  return k === "sticky" || k === "shape" || k === "text" || k === "pen" || k === "line" || k === "section" || k === "stamp";
+}
+
+function isStroke(n: JamNode) {
+  return n.kind === "pen" || n.kind === "line";
+}
+
+function inkWidth(n: JamNode) {
+  if (n.strokeWidth) return n.strokeWidth;
+  return n.ink === "marker" ? 18 : 3;
+}
+
+function groupOf(list: JamNode[], id: string) {
+  const n = list.find((x) => x.id === id);
+  if (!n?.groupId) return [id];
+  return list.filter((x) => x.groupId === n.groupId).map((x) => x.id);
+}
+
+function expandIds(list: JamNode[], ids: string[]) {
+  const out = new Set<string>();
+  for (const id of ids) {
+    for (const g of groupOf(list, id)) out.add(g);
+  }
+  return [...out];
+}
+
+function sectionKids(list: JamNode[], section: JamNode) {
+  return list.filter((n) => {
+    if (n.id === section.id || n.kind === "line" || n.kind === "section") return false;
+    const b = boundsOf(n);
+    return inRect(b.x + b.w / 2, b.y + b.h / 2, section);
+  });
+}
+
+function moveIds(list: JamNode[], ids: string[]) {
+  const set = new Set(expandIds(list, ids));
+  for (const id of [...set]) {
+    const n = list.find((x) => x.id === id);
+    if (n?.kind === "section") {
+      for (const k of sectionKids(list, n)) set.add(k.id);
+    }
+  }
+  return [...set];
 }
 
 function hitBox(n: JamNode, x: number, y: number) {
@@ -374,6 +436,144 @@ function stickyH(text: string, w: number, fontSize: number) {
   return Math.max(STICKY, 28 + rows * fontSize * 1.35);
 }
 
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
+  const out: string[] = [];
+  for (const para of (text || "").split("\n")) {
+    if (!para) {
+      out.push("");
+      continue;
+    }
+    let cur = "";
+    for (const ch of para) {
+      const next = cur + ch;
+      if (cur && ctx.measureText(next).width > maxW) {
+        out.push(cur);
+        cur = ch;
+      } else cur = next;
+    }
+    if (cur) out.push(cur);
+  }
+  return out;
+}
+
+function drawJam(ctx: CanvasRenderingContext2D, n: JamNode, get: (id: string) => JamNode | undefined) {
+  if (n.kind === "line") {
+    const curve = connectorCurve(n, get);
+    if (!curve) return;
+    ctx.save();
+    ctx.strokeStyle = n.stroke || LINE;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(curve.p1.x, curve.p1.y);
+    ctx.bezierCurveTo(curve.c1.x, curve.c1.y, curve.c2.x, curve.c2.y, curve.p2.x, curve.p2.y);
+    ctx.stroke();
+    const ah = 10;
+    ctx.fillStyle = n.stroke || LINE;
+    ctx.beginPath();
+    ctx.moveTo(curve.p2.x, curve.p2.y);
+    ctx.lineTo(curve.p2.x - ah * Math.cos(curve.ang - 0.4), curve.p2.y - ah * Math.sin(curve.ang - 0.4));
+    ctx.lineTo(curve.p2.x - ah * Math.cos(curve.ang + 0.4), curve.p2.y - ah * Math.sin(curve.ang + 0.4));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  if (n.kind === "pen" && n.points?.length) {
+    ctx.save();
+    ctx.strokeStyle = n.stroke || INK;
+    ctx.lineWidth = inkWidth(n);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (n.ink === "marker") {
+      ctx.globalAlpha = 0.38;
+      ctx.globalCompositeOperation = "multiply";
+    }
+    ctx.beginPath();
+    ctx.moveTo(n.points[0].x, n.points[0].y);
+    for (let i = 1; i < n.points.length; i++) ctx.lineTo(n.points[i].x, n.points[i].y);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (n.kind === "stamp") {
+    ctx.save();
+    ctx.font = `${Math.round(n.w * 0.72)}px ${getComputedStyle(document.documentElement).getPropertyValue("--font-sans") || "sans-serif"}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(n.emoji || "👍", n.x + n.w / 2, n.y + n.h / 2);
+    ctx.restore();
+    return;
+  }
+  ctx.save();
+  if (n.kind === "section") {
+    ctx.fillStyle = n.fill || SECTION_COLORS[0];
+    roundRect(ctx, n.x, n.y, n.w, n.h, 12);
+    ctx.fill();
+    ctx.font = `650 ${n.fontSize ?? 16}px ${getComputedStyle(document.documentElement).getPropertyValue("--font-sans") || "sans-serif"}`;
+    ctx.fillStyle = "#1e1e1e";
+    ctx.textBaseline = "top";
+    ctx.fillText(n.text || "セクション", n.x + 14, n.y + 10);
+    ctx.restore();
+    return;
+  }
+  if (n.kind === "shape") {
+    ctx.fillStyle = n.fill || "#fff";
+    ctx.strokeStyle = n.stroke || SHAPE_STROKE;
+    ctx.lineWidth = 2;
+    if (n.variant === "ellipse") {
+      ctx.beginPath();
+      ctx.ellipse(n.x + n.w / 2, n.y + n.h / 2, n.w / 2, n.h / 2, 0, 0, Math.PI * 2);
+    } else if (n.variant === "diamond") {
+      ctx.beginPath();
+      ctx.moveTo(n.x + n.w / 2, n.y);
+      ctx.lineTo(n.x + n.w, n.y + n.h / 2);
+      ctx.lineTo(n.x + n.w / 2, n.y + n.h);
+      ctx.lineTo(n.x, n.y + n.h / 2);
+      ctx.closePath();
+    } else {
+      roundRect(ctx, n.x, n.y, n.w, n.h, 8);
+    }
+    ctx.fill();
+    ctx.stroke();
+  } else if (n.kind === "sticky") {
+    ctx.fillStyle = n.fill || STICKY_COLORS[0];
+    ctx.fillRect(n.x, n.y, n.w, n.h);
+  }
+  if (n.text) {
+    const size = n.fontSize ?? (n.kind === "text" ? 28 : 18);
+    ctx.fillStyle = "#1e1e1e";
+    ctx.font = `${n.kind === "text" ? 650 : 500} ${size}px ${getComputedStyle(document.documentElement).getPropertyValue("--font-sans") || "sans-serif"}`;
+    ctx.textBaseline = "top";
+    const pad = n.kind === "text" ? 0 : 16;
+    const lines = wrapLines(ctx, n.text, Math.max(20, n.w - pad * 2));
+    const startY = n.kind === "shape" ? n.y + n.h * 0.18 : n.y + pad;
+    lines.forEach((line, i) => {
+      const x = n.kind === "shape" ? n.x + n.w / 2 : n.x + pad;
+      if (n.kind === "shape") ctx.textAlign = "center";
+      ctx.fillText(line, x, startY + i * size * 1.35);
+    });
+  }
+  if (n.votes) {
+    ctx.textAlign = "left";
+    ctx.font = "650 13px sans-serif";
+    ctx.fillStyle = "#1e1e1e";
+    ctx.fillText(`👍 ${n.votes}`, n.x + 8, n.y + n.h - 22);
+  }
+  ctx.restore();
+}
+
 export function CanvasEditor({
   pageId,
   user,
@@ -456,6 +656,11 @@ export function CanvasEditor({
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
   const [penColor, setPenColor] = useState(INK);
+  const [penInk, setPenInk] = useState<Ink>("pen");
+  const [penWidth, setPenWidth] = useState(3);
+  const [markerWidth, setMarkerWidth] = useState(18);
+  const [sectionColor, setSectionColor] = useState(SECTION_COLORS[0]);
+  const [stampEmoji, setStampEmoji] = useState(STAMPS[0]);
   const [menu, setMenu] = useState<null | { x: number; y: number; world: Pt }>(null);
   const pointerRef = useRef({ x: 0, y: 0 });
 
@@ -581,7 +786,7 @@ export function CanvasEditor({
     }, 120);
   }
 
-  function paintGhost(g: { kind: "sticky" | "shape" | "text"; x: number; y: number; w: number; h: number } | null) {
+  function paintGhost(g: { kind: "sticky" | "shape" | "text" | "section" | "stamp"; x: number; y: number; w: number; h: number } | null) {
     const el = ghostRef.current;
     if (!el) return;
     if (!g) {
@@ -593,9 +798,9 @@ export function CanvasEditor({
     el.style.top = `${g.y}px`;
     el.style.width = `${g.w}px`;
     el.style.height = `${g.h}px`;
-    el.style.background = g.kind === "sticky" ? stickyColor : g.kind === "shape" ? "#fff" : "transparent";
+    el.style.background = g.kind === "sticky" ? stickyColor : g.kind === "section" ? sectionColor : g.kind === "shape" ? "#fff" : "transparent";
     el.style.borderColor = g.kind === "shape" ? SHAPE_STROKE : "transparent";
-    el.className = `jam-ghost ${g.kind === "sticky" ? "jam-sticky" : g.kind === "text" ? "jam-label" : `jam-shape is-${shapeKind}`}`;
+    el.className = `jam-ghost ${g.kind === "sticky" ? "jam-sticky" : g.kind === "text" ? "jam-label" : g.kind === "section" ? "jam-section" : g.kind === "stamp" ? "jam-stamp" : `jam-shape is-${shapeKind}`}`;
   }
 
   function stopFollow() {
@@ -785,19 +990,26 @@ export function CanvasEditor({
     const get = (id: string) => list.find((n) => n.id === id);
     const pad = Math.max(6, 10 / camRef.current.z);
     let stroke: JamNode | null = null;
+    let section: JamNode | null = null;
     for (let i = list.length - 1; i >= 0; i--) {
       const n = list[i];
       if (n.kind === "pen" || n.kind === "line") {
-        if (!stroke && hitStroke(n, x, y, pad, get)) stroke = n;
+        if (!stroke && hitStroke(n, x, y, Math.max(pad, n.kind === "pen" ? inkWidth(n) / 2 + 2 : pad), get)) stroke = n;
+        continue;
+      }
+      if (n.kind === "section") {
+        if (!section && hitBox(n, x, y)) section = n;
         continue;
       }
       if (hitBox(n, x, y)) return n;
     }
-    return stroke;
+    return stroke ?? section;
   }
 
   function startEdit(id: string) {
     if (!editable) return;
+    const n = nodesRef.current.find((x) => x.id === id);
+    if (n?.locked || n?.kind === "stamp" || n?.kind === "pen" || n?.kind === "line") return;
     setEditing(id);
     setSelected([id]);
     requestAnimationFrame(() => {
@@ -824,9 +1036,14 @@ export function CanvasEditor({
       next.id = id;
       return next.kind === "line" ? next : shiftNode(next, dx, dy);
     });
+    const gmap = new Map<string, string>();
     for (const n of copies) {
       if (n.fromId) n.fromId = idMap.get(n.fromId) ?? n.fromId;
       if (n.toId) n.toId = idMap.get(n.toId) ?? n.toId;
+      if (n.groupId) {
+        if (!gmap.has(n.groupId)) gmap.set(n.groupId, nid());
+        n.groupId = gmap.get(n.groupId);
+      }
     }
     const created: string[] = [];
     collab.doc.transact(() => {
@@ -907,7 +1124,7 @@ export function CanvasEditor({
     e.preventDefault();
     e.stopPropagation();
     const n = collab.map.get(id);
-    if (!isJam(n)) return;
+    if (!isJam(n) || n.locked || n.kind === "section" || n.kind === "stamp") return;
     setLineFrom(id);
     setLineHover(center(n));
     drag.current = { mode: "port", x: 0, y: 0, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id, side };
@@ -919,7 +1136,7 @@ export function CanvasEditor({
     e.preventDefault();
     e.stopPropagation();
     const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
-    if (!isJam(n)) return;
+    if (!isJam(n) || n.locked) return;
     const w = worldFromClient(e.clientX, e.clientY);
     const b = boundsOf(n);
     drag.current = {
@@ -1004,6 +1221,8 @@ export function CanvasEditor({
     if (tool === "sticky") return { kind: "sticky" as const, x: w.x - STICKY / 2, y: w.y - STICKY / 2, w: STICKY, h: STICKY };
     if (tool === "shape") return { kind: "shape" as const, x: w.x - 80, y: w.y - 80, w: 160, h: 160 };
     if (tool === "text") return { kind: "text" as const, x: w.x, y: w.y - 16, w: 280, h: 48 };
+    if (tool === "section") return { kind: "section" as const, x: w.x - 160, y: w.y - 120, w: 320, h: 240 };
+    if (tool === "stamp") return { kind: "stamp" as const, x: w.x - 24, y: w.y - 24, w: 48, h: 48 };
     return null;
   }
 
@@ -1096,6 +1315,8 @@ export function CanvasEditor({
         text: "",
         fill: "transparent",
         stroke: penColor,
+        ink: penInk,
+        strokeWidth: penInk === "marker" ? markerWidth : penWidth,
         points: [{ x: w.x, y: w.y }],
       };
       put(n);
@@ -1104,9 +1325,53 @@ export function CanvasEditor({
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
+    if (activeTool === "section") {
+      const n: JamNode = {
+        id: nid(),
+        kind: "section",
+        x: w.x,
+        y: w.y,
+        w: 1,
+        h: 1,
+        text: "",
+        fill: sectionColor,
+        stroke: "transparent",
+        fontSize: 16,
+      };
+      put(n);
+      setSelected([n.id]);
+      paintGhost(null);
+      setBusy(true);
+      drag.current = { mode: "shape", x: w.x, y: w.y, cx: camRef.current.x, cy: camRef.current.y, sx: e.clientX, sy: e.clientY, id: n.id };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (activeTool === "stamp") {
+      const t = topAt(w.x, w.y);
+      if (t && t.kind !== "stamp" && t.kind !== "pen" && t.kind !== "line" && t.kind !== "section") {
+        patch(t.id, { votes: (t.votes ?? 0) + 1 });
+        return;
+      }
+      const n: JamNode = {
+        id: nid(),
+        kind: "stamp",
+        x: w.x - 24,
+        y: w.y - 24,
+        w: 48,
+        h: 48,
+        text: "",
+        fill: "transparent",
+        stroke: "transparent",
+        emoji: stampEmoji,
+      };
+      put(n);
+      setSelected([n.id]);
+      backToSelect();
+      return;
+    }
     if (activeTool === "line") {
       const t = topAt(w.x, w.y);
-      if (lineFrom && t && t.id !== lineFrom && t.kind !== "pen" && t.kind !== "line") {
+      if (lineFrom && t && t.id !== lineFrom && !isStroke(t) && t.kind !== "stamp") {
         put({
           id: nid(),
           kind: "line",
@@ -1125,7 +1390,7 @@ export function CanvasEditor({
         setSelected([t.id]);
         return;
       }
-      if (!t || t.kind === "pen" || t.kind === "line") {
+      if (!t || isStroke(t) || t.kind === "stamp") {
         setLineFrom(null);
         setLineHover(null);
         return;
@@ -1141,23 +1406,26 @@ export function CanvasEditor({
 
     const t = topAt(w.x, w.y);
     if (t) {
-      const already = !e.shiftKey && selected.length === 1 && selected[0] === t.id;
-      const ids = e.shiftKey
+      const grouped = e.shiftKey
         ? selected.includes(t.id)
-          ? selected.filter((id) => id !== t.id)
-          : [...selected, t.id]
+          ? selected.filter((id) => !groupOf(nodesRef.current, t.id).includes(id))
+          : [...selected, ...groupOf(nodesRef.current, t.id)]
         : selected.includes(t.id)
-          ? selected
-          : [t.id];
-      setSelected(ids);
+          ? expandIds(nodesRef.current, selected)
+          : groupOf(nodesRef.current, t.id);
+      const already = !e.shiftKey && selected.length === 1 && selected[0] === t.id;
+      setSelected(grouped);
       if (e.shiftKey || t.kind === "line") return;
-      if (e.detail >= 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape")) {
+      if (e.detail >= 2 && (t.kind === "sticky" || t.kind === "text" || t.kind === "shape" || t.kind === "section")) {
         startEdit(t.id);
         return;
       }
-      let idsMove = ids;
+      if (t.locked) return;
+      const unlocked = grouped.filter((id) => !nodesRef.current.find((x) => x.id === id)?.locked);
+      if (!unlocked.length) return;
+      let idsMove = moveIds(nodesRef.current, unlocked);
       if (e.altKey) {
-        idsMove = duplicateIds(ids);
+        idsMove = duplicateIds(idsMove);
         setSelected(idsMove);
       }
       const origin: Record<string, { x: number; y: number; points?: Pt[] }> = {};
@@ -1374,8 +1642,11 @@ export function CanvasEditor({
     }
     if (d?.mode === "shape" && d.id) {
       const cur = nodesRef.current.find((n) => n.id === d.id);
-      if (isJam(cur) && (cur.w < 24 || cur.h < 24)) patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
-      else if (isJam(cur)) patch(d.id, { x: cur.x, y: cur.y, w: cur.w, h: cur.h });
+      if (isJam(cur) && (cur.w < 24 || cur.h < 24)) {
+        if (cur.kind === "section") patch(d.id, { x: d.x - 160, y: d.y - 120, w: 320, h: 240 });
+        else patch(d.id, { x: d.x - 80, y: d.y - 80, w: 160, h: 160 });
+      } else if (isJam(cur)) patch(d.id, { x: cur.x, y: cur.y, w: cur.w, h: cur.h });
+      if (cur?.kind === "section") startEdit(d.id);
       backToSelect();
     }
     if (d?.mode === "resize" && d.id) {
@@ -1399,7 +1670,7 @@ export function CanvasEditor({
     let keepLine = false;
     if (d?.mode === "line" && d.id) {
       const t = topAt(w.x, w.y);
-      if (t && t.id !== d.id && t.kind !== "pen" && t.kind !== "line") {
+      if (t && t.id !== d.id && !isStroke(t) && t.kind !== "stamp") {
         put({
           id: nid(),
           kind: "line",
@@ -1420,7 +1691,7 @@ export function CanvasEditor({
     }
     if (d?.mode === "move" && d.editOnUp && d.ids?.length === 1 && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) {
       const n = nodesRef.current.find((x) => x.id === d.ids![0]);
-      if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) startEdit(n.id);
+      if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape" || n.kind === "section")) startEdit(n.id);
     }
     drag.current = null;
     pendingMove.current = null;
@@ -1531,7 +1802,7 @@ export function CanvasEditor({
       }
       if (e.key === "Enter" && selected.length === 1) {
         const n = nodesRef.current.find((x) => x.id === selected[0]);
-        if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape")) {
+        if (n && (n.kind === "sticky" || n.kind === "text" || n.kind === "shape" || n.kind === "section")) {
           e.preventDefault();
           startEdit(n.id);
           return;
@@ -1562,7 +1833,8 @@ export function CanvasEditor({
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "x") {
         e.preventDefault();
-        if (copySelected()) removeIds(selected);
+        const drop = selected.filter((id) => !nodesRef.current.find((n) => n.id === id)?.locked);
+        if (copySelected() && drop.length) removeIds(drop);
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") {
@@ -1575,10 +1847,27 @@ export function CanvasEditor({
         if (selected.length) setSelected(duplicateIds(selected));
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        if (e.shiftKey) ungroupSelected();
+        else groupSelected();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        toggleLock();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        exportPng();
+        return;
+      }
       if (e.key === "Backspace" || e.key === "Delete") {
-        if (selected.length) {
+        const drop = selected.filter((id) => !nodesRef.current.find((n) => n.id === id)?.locked);
+        if (drop.length) {
           e.preventDefault();
-          removeIds(selected);
+          removeIds(drop);
         }
         return;
       }
@@ -1587,7 +1876,8 @@ export function CanvasEditor({
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        for (const id of selected) {
+        const ids = moveIds(nodesRef.current, selected.filter((id) => !nodesRef.current.find((n) => n.id === id)?.locked));
+        for (const id of ids) {
           const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
           if (isJam(n) && n.kind !== "line") patch(id, shiftNode(n, dx, dy));
         }
@@ -1600,7 +1890,16 @@ export function CanvasEditor({
       if (k === "r") setTool("shape");
       if (k === "t") setTool("text");
       if (k === "l" || k === "x") setTool("line");
-      if (k === "p" || k === "m") setTool("pen");
+      if (k === "p") {
+        setPenInk("pen");
+        setTool("pen");
+      }
+      if (k === "m") {
+        setPenInk("marker");
+        setTool("pen");
+      }
+      if (k === "f") setTool("section");
+      if (k === "e") setTool("stamp");
     };
     const up = (e: KeyboardEvent) => {
       if (e.key === " ") setSpace(false);
@@ -1709,6 +2008,94 @@ export function CanvasEditor({
     refresh();
   }
 
+  function groupSelected() {
+    const ids = selected.filter((id) => {
+      const n = nodesRef.current.find((x) => x.id === id);
+      return n && n.kind !== "line" && !n.locked;
+    });
+    if (ids.length < 2) return;
+    const groupId = nid();
+    collab.doc.transact(() => {
+      for (const id of ids) {
+        const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
+        if (isJam(n)) collab.map.set(id, clone({ ...n, groupId }));
+      }
+    }, ORIGIN);
+    refresh();
+    setSelected(ids);
+  }
+
+  function ungroupSelected() {
+    const ids = selected.filter((id) => nodesRef.current.find((x) => x.id === id)?.groupId);
+    if (!ids.length) return;
+    collab.doc.transact(() => {
+      for (const id of ids) {
+        const n = nodesRef.current.find((x) => x.id === id) ?? collab.map.get(id);
+        if (isJam(n)) {
+          const next = { ...n };
+          delete next.groupId;
+          collab.map.set(id, clone(next));
+        }
+      }
+    }, ORIGIN);
+    refresh();
+  }
+
+  function toggleLock() {
+    if (!selected.length) return;
+    const items = selected
+      .map((id) => nodesRef.current.find((n) => n.id === id))
+      .filter((n): n is JamNode => !!n && n.kind !== "line");
+    if (!items.length) return;
+    const next = !items.every((n) => n.locked);
+    collab.doc.transact(() => {
+      for (const n of items) {
+        const cur = { ...n, locked: next || undefined };
+        if (!next) delete cur.locked;
+        collab.map.set(n.id, clone(cur));
+      }
+    }, ORIGIN);
+    refresh();
+  }
+
+  function exportPng() {
+    const want = selected.length ? new Set(selected) : null;
+    const list = nodesRef.current.filter((n) => {
+      if (!want) return true;
+      if (want.has(n.id)) return true;
+      return n.kind === "line" && n.fromId && n.toId && want.has(n.fromId) && want.has(n.toId);
+    });
+    const boxes = list.filter((n) => n.kind !== "line").map(boundsOf);
+    const uni = unionBoxes(boxes);
+    if (!uni || uni.w < 2 || uni.h < 2) return;
+    const pad = 40;
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round((uni.w + pad * 2) * scale));
+    canvas.height = Math.max(1, Math.round((uni.h + pad * 2) * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(scale, scale);
+    ctx.translate(-uni.x + pad, -uni.y + pad);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim() || "#f7f6f3";
+    ctx.fillRect(uni.x - pad, uni.y - pad, uni.w + pad * 2, uni.h + pad * 2);
+    const get = (id: string) => list.find((n) => n.id === id) ?? nodesRef.current.find((n) => n.id === id);
+    for (const n of list) {
+      if (n.kind === "section") drawJam(ctx, n, get);
+    }
+    for (const n of list) {
+      if (n.kind !== "section") drawJam(ctx, n, get);
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${title || "canvas"}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  }
+
   function alignSelected(how: "left" | "center" | "right" | "top" | "middle" | "bottom") {
     const items = selected
       .map((id) => nodesRef.current.find((n) => n.id === id))
@@ -1745,7 +2132,13 @@ export function CanvasEditor({
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const empty = nodes.length === 0;
-  const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text";
+  const ghosting = activeTool === "sticky" || activeTool === "shape" || activeTool === "text" || activeTool === "section" || activeTool === "stamp";
+  const canGroup = selected.filter((id) => {
+    const n = byId.get(id);
+    return n && n.kind !== "line" && !n.locked;
+  }).length >= 2;
+  const canUngroup = selected.some((id) => byId.get(id)?.groupId);
+  const allLocked = selected.length > 0 && selected.every((id) => byId.get(id)?.locked);
   const solo = selected.length === 1 ? byId.get(selected[0]) : undefined;
   const box =
     solo && solo.kind !== "line"
@@ -1780,7 +2173,7 @@ export function CanvasEditor({
   const multiStickies = selected.length > 1 && selected.every((id) => byId.get(id)?.kind === "sticky");
 
   return (
-    <div className={`jam ${activeTool === "hand" || panning ? "is-hand" : ""} ${panning ? "is-grabbing" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""}`}>
+    <div className={`jam ${activeTool === "hand" || panning ? "is-hand" : ""} ${panning ? "is-grabbing" : ""} ${activeTool === "pen" || activeTool === "line" ? "is-pen" : ""} ${ghosting ? "is-place" : ""} ${penInk === "marker" && activeTool === "pen" ? "is-marker" : ""}`}>
       <div
         ref={boardRef}
         className="jam-stage"
@@ -1802,23 +2195,24 @@ export function CanvasEditor({
             const on = selected.includes(n.id);
             const hover = hoverId === n.id && !on;
             if (n.kind === "pen" && n.points?.length) {
+              const sw = inkWidth(n);
               if (n.points.length === 1) {
                 const p = n.points[0];
                 return (
                   <g key={n.id}>
-                    {(on || hover) && <circle cx={p.x} cy={p.y} r={8} fill="none" stroke={SELECT} strokeWidth={on ? 3 : 2} />}
-                    <circle cx={p.x} cy={p.y} r={3} fill={n.stroke || INK} />
+                    {(on || hover) && <circle cx={p.x} cy={p.y} r={sw + 5} fill="none" stroke={SELECT} strokeWidth={on ? 3 : 2} />}
+                    <circle cx={p.x} cy={p.y} r={sw / 2} fill={n.stroke || INK} opacity={n.ink === "marker" ? 0.38 : 1} />
                   </g>
                 );
               }
               const pts = n.points.map((p) => `${p.x},${p.y}`).join(" ");
               return (
-                <g key={n.id}>
+                <g key={n.id} style={n.ink === "marker" ? { mixBlendMode: "multiply" } : undefined}>
                   {(on || hover) && (
                     <polyline
                       fill="none"
                       stroke={SELECT}
-                      strokeWidth={on ? 8 : 6}
+                      strokeWidth={sw + (on ? 5 : 3)}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       points={pts}
@@ -1828,10 +2222,11 @@ export function CanvasEditor({
                   <polyline
                     fill="none"
                     stroke={n.stroke || INK}
-                    strokeWidth={3}
+                    strokeWidth={sw}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={pts}
+                    opacity={n.ink === "marker" ? 0.38 : 1}
                   />
                 </g>
               );
@@ -1866,12 +2261,17 @@ export function CanvasEditor({
           if (n.kind === "pen" || n.kind === "line") return null;
           const on = selected.includes(n.id);
           const hover = hoverId === n.id && !on;
+          const state = `${on ? "is-on" : ""} ${hover ? "is-hover" : ""} ${n.locked ? "is-locked" : ""}`;
           const cls =
             n.kind === "sticky"
-              ? `jam-sticky ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`
+              ? `jam-sticky ${state}`
               : n.kind === "text"
-                ? `jam-label ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`
-                : `jam-shape is-${n.variant ?? "round"} ${on ? "is-on" : ""} ${hover ? "is-hover" : ""}`;
+                ? `jam-label ${state}`
+                : n.kind === "section"
+                  ? `jam-section ${state}`
+                  : n.kind === "stamp"
+                    ? `jam-stamp ${state}`
+                    : `jam-shape is-${n.variant ?? "round"} ${state}`;
           return (
             <div
               key={n.id}
@@ -1881,33 +2281,40 @@ export function CanvasEditor({
                 top: n.y,
                 width: n.w,
                 height: n.h,
-                background: n.kind === "text" ? "transparent" : n.fill,
+                background: n.kind === "text" || n.kind === "stamp" ? "transparent" : n.fill,
                 borderColor: n.kind === "shape" ? n.stroke : undefined,
+                zIndex: n.kind === "section" ? 0 : 1,
               }}
             >
-              <textarea
-                data-id={n.id}
-                tabIndex={editing === n.id ? 0 : -1}
-                readOnly={!editable || editing !== n.id}
-                value={n.text}
-                placeholder={n.kind === "sticky" ? "メモ" : n.kind === "text" ? "テキスト" : ""}
-                style={{ fontSize: n.fontSize ?? (n.kind === "text" ? 28 : 18) }}
-                onPointerDown={(e) => {
-                  if (editing === n.id) e.stopPropagation();
-                }}
-                onChange={(e) => {
-                  const text = e.target.value;
-                  if (n.kind === "sticky") patch(n.id, { text, h: stickyH(text, n.w, n.fontSize ?? 18) });
-                  else patch(n.id, { text });
-                }}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && (n.kind === "sticky" || n.kind === "shape")) {
-                    e.preventDefault();
-                    spawnBeside(n, "right", false);
-                  }
-                }}
-                onBlur={() => setEditing((cur) => (cur === n.id ? null : cur))}
-              />
+              {n.kind === "stamp" ? (
+                <span className="jam-stamp-face">{n.emoji || "👍"}</span>
+              ) : (
+                <textarea
+                  data-id={n.id}
+                  tabIndex={editing === n.id ? 0 : -1}
+                  readOnly={!editable || editing !== n.id || n.locked}
+                  value={n.text}
+                  placeholder={n.kind === "sticky" ? "メモ" : n.kind === "text" ? "テキスト" : n.kind === "section" ? "セクション" : ""}
+                  style={{ fontSize: n.fontSize ?? (n.kind === "text" ? 28 : n.kind === "section" ? 16 : 18) }}
+                  onPointerDown={(e) => {
+                    if (editing === n.id) e.stopPropagation();
+                  }}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    if (n.kind === "sticky") patch(n.id, { text, h: stickyH(text, n.w, n.fontSize ?? 18) });
+                    else patch(n.id, { text });
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && (n.kind === "sticky" || n.kind === "shape")) {
+                      e.preventDefault();
+                      spawnBeside(n, "right", false);
+                    }
+                  }}
+                  onBlur={() => setEditing((cur) => (cur === n.id ? null : cur))}
+                />
+              )}
+              {n.votes ? <span className="jam-votes">👍 {n.votes}</span> : null}
+              {n.locked ? <span className="jam-lockdot" aria-hidden /> : null}
             </div>
           );
         })}
@@ -2005,10 +2412,12 @@ export function CanvasEditor({
           <ul>
             <li><kbd>V</kbd> 選択　<kbd>H</kbd> 移動　<kbd>S</kbd> 付箋</li>
             <li><kbd>R</kbd> 図形　<kbd>T</kbd> 文字　<kbd>L</kbd> 線　<kbd>P</kbd> ペン</li>
-            <li><kbd>⌘Z</kbd> 戻す　<kbd>⌘D</kbd> 複製　<kbd>⌘C</kbd> / <kbd>⌘V</kbd></li>
+            <li><kbd>M</kbd> 蛍光ペン　<kbd>F</kbd> セクション　<kbd>E</kbd> スタンプ</li>
+            <li><kbd>⌘G</kbd> グループ　<kbd>⌘⇧G</kbd> 解除　<kbd>⌘⇧L</kbd> ロック</li>
+            <li><kbd>⌘Z</kbd> 戻す　<kbd>⌘D</kbd> 複製　<kbd>⌘⇧E</kbd> PNG</li>
             <li><kbd>⌘+</kbd> / <kbd>⌘-</kbd> ズーム　<kbd>Shift+1</kbd> 全体</li>
             <li><kbd>/</kbd> カーソル会話　<kbd>?</kbd> この一覧</li>
-            <li>空白ダブルクリックで文字　右クリックでメニュー</li>
+            <li>スタンプをオブジェクトに置くと投票</li>
           </ul>
           <button type="button" onPointerDown={() => setHelp(false)}>閉じる</button>
         </div>
@@ -2017,12 +2426,12 @@ export function CanvasEditor({
       {empty && (
         <div className="jam-empty">
           <p>付箋を置いて、線でつなぐ</p>
-          <p>ダブルクリックで文字　S 付箋　L コネクタ</p>
+          <p>F セクション　E スタンプ　M 蛍光ペン</p>
         </div>
       )}
       {box && solo && activeTool === "select" && editable && !busy && (
         <>
-          {!editing && solo.kind !== "pen" &&
+          {!editing && solo.kind !== "pen" && solo.kind !== "section" && solo.kind !== "stamp" && !solo.locked &&
             (["top", "right", "bottom", "left"] as Side[]).map((side) => (
               <button
                 key={side}
@@ -2041,14 +2450,14 @@ export function CanvasEditor({
                 onPointerDown={(e) => beginPort(e, solo.id, side)}
               />
             ))}
-          {!editing && (
+          {!editing && !solo.locked && solo.kind !== "stamp" && (
             <>
               <button type="button" className="jam-handle is-e" style={{ left: box.l + box.w, top: box.t + box.h / 2 }} onPointerDown={(e) => beginResize(e, solo.id, "e")} />
               <button type="button" className="jam-handle is-s" style={{ left: box.l + box.w / 2, top: box.t + box.h }} onPointerDown={(e) => beginResize(e, solo.id, "s")} />
               <button type="button" className="jam-handle is-se" style={{ left: box.l + box.w, top: box.t + box.h }} onPointerDown={(e) => beginResize(e, solo.id, "se")} />
             </>
           )}
-          {solo.kind === "sticky" && (
+          {solo.kind === "sticky" && !solo.locked && (
             <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
               {STICKY_COLORS.map((c) => (
                 <button
@@ -2066,12 +2475,69 @@ export function CanvasEditor({
               ))}
             </div>
           )}
-          {solo.kind === "pen" && (
+          {solo.kind === "pen" && !solo.locked && (
             <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
               <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
+              <span className="jam-float-sep" />
+              {(solo.ink === "marker" ? MARKER_WIDTHS : PEN_WIDTHS).map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  className={`jam-chip ${inkWidth(solo) === w ? "is-on" : ""}`}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    patch(solo.id, { strokeWidth: w });
+                  }}
+                >
+                  {w}
+                </button>
+              ))}
             </div>
           )}
-          {solo.kind === "shape" && (
+          {solo.kind === "section" && !solo.locked && (
+            <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
+              {SECTION_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`jam-swatch ${solo.fill === c ? "is-on" : ""}`}
+                  style={{ background: c }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    patch(solo.id, { fill: c });
+                    setSectionColor(c);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          <div className="jam-float jam-lockbar" style={{ left: box.l + box.w, top: box.t, transform: "translate(12px, -50%)" }} onPointerDown={(e) => e.stopPropagation()}>
+            <button type="button" title={solo.locked ? "ロック解除（⌘⇧L）" : "ロック（⌘⇧L）"} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); toggleLock(); }}>
+              {solo.locked ? <Unlock size={14} /> : <Lock size={14} />}
+            </button>
+          </div>
+          {solo.kind === "stamp" && !solo.locked && (
+            <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
+              {STAMPS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  className={`jam-stamp-pick ${solo.emoji === e ? "is-on" : ""}`}
+                  onPointerDown={(ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    patch(solo.id, { emoji: e });
+                    setStampEmoji(e);
+                  }}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+          {solo.kind === "shape" && !solo.locked && (
             <div className="jam-float" style={{ left: box.l + box.w / 2, top: box.t }} onPointerDown={(e) => e.stopPropagation()}>
               {SHAPE_FILLS.map((c) => (
                 <button
@@ -2090,7 +2556,7 @@ export function CanvasEditor({
               <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
             </div>
           )}
-          {(solo.kind === "text" || solo.kind === "sticky") && (
+          {(solo.kind === "text" || solo.kind === "sticky" || solo.kind === "section") && !solo.locked && (
             <div
               className="jam-float"
               style={
@@ -2111,7 +2577,7 @@ export function CanvasEditor({
           )}
         </>
       )}
-      {lineMid && solo?.kind === "line" && activeTool === "select" && editable && !busy && (
+      {lineMid && solo?.kind === "line" && !solo.locked && activeTool === "select" && editable && !busy && (
         <div className="jam-float" style={{ left: lineMid.l, top: lineMid.t }} onPointerDown={(e) => e.stopPropagation()}>
           <StrokeSwatches value={solo.stroke} onPick={(c) => patch(solo.id, { stroke: c })} />
         </div>
@@ -2147,6 +2613,10 @@ export function CanvasEditor({
               ))}
             </>
           )}
+          <span className="jam-float-sep" />
+          <button type="button" title="グループ化（⌘G）" disabled={!canGroup} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); groupSelected(); }}><Group size={14} /></button>
+          <button type="button" title="グループ解除（⌘⇧G）" disabled={!canUngroup} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); ungroupSelected(); }}><Ungroup size={14} /></button>
+          <button type="button" title={allLocked ? "ロック解除（⌘⇧L）" : "ロック（⌘⇧L）"} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); toggleLock(); }}>{allLocked ? <Unlock size={14} /> : <Lock size={14} />}</button>
         </div>
       )}
       {menu && (
@@ -2190,14 +2660,60 @@ export function CanvasEditor({
           </button>
           <button
             type="button"
-            disabled={!selected.length}
+            disabled={!selected.filter((id) => !byId.get(id)?.locked).length}
             onPointerDown={(e) => {
               e.preventDefault();
-              if (selected.length) removeIds(selected);
+              const drop = selected.filter((id) => !byId.get(id)?.locked);
+              if (drop.length) removeIds(drop);
               setMenu(null);
             }}
           >
             削除
+          </button>
+          <span className="jam-menu-sep" />
+          <button
+            type="button"
+            disabled={!canGroup}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              groupSelected();
+              setMenu(null);
+            }}
+          >
+            グループ化
+          </button>
+          <button
+            type="button"
+            disabled={!canUngroup}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              ungroupSelected();
+              setMenu(null);
+            }}
+          >
+            グループ解除
+          </button>
+          <button
+            type="button"
+            disabled={!selected.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              toggleLock();
+              setMenu(null);
+            }}
+          >
+            {allLocked ? "ロック解除" : "ロック"}
+          </button>
+          <button
+            type="button"
+            disabled={!nodes.length}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              exportPng();
+              setMenu(null);
+            }}
+          >
+            PNG書き出し
           </button>
           <span className="jam-menu-sep" />
           <button
@@ -2262,10 +2778,74 @@ export function CanvasEditor({
         </div>
         <ToolBtn icon={Spline} label="コネクタ" hot="L" on={tool === "line"} onClick={() => { setTool("line"); setLineFrom(null); }} />
         <div className="jam-fly">
-          <ToolBtn icon={Pencil} label="ペン" hot="P" on={tool === "pen"} onClick={() => setTool("pen")} />
+          <ToolBtn icon={penInk === "marker" ? Highlighter : Pencil} label={penInk === "marker" ? "蛍光ペン" : "ペン"} hot={penInk === "marker" ? "M" : "P"} on={tool === "pen"} onClick={() => setTool("pen")} />
           {tool === "pen" && (
+            <div className="jam-pop jam-pop-stack">
+              <div className="jam-pop-row">
+                <button type="button" className={penInk === "pen" ? "is-on" : ""} title="ペン（P）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setPenInk("pen"); }}><Pencil size={16} /></button>
+                <button type="button" className={penInk === "marker" ? "is-on" : ""} title="蛍光ペン（M）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setPenInk("marker"); }}><Highlighter size={16} /></button>
+              </div>
+              <div className="jam-pop-row">
+                <StrokeSwatches value={penColor} onPick={setPenColor} />
+              </div>
+              <div className="jam-pop-row">
+                {(penInk === "marker" ? MARKER_WIDTHS : PEN_WIDTHS).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={`jam-chip ${(penInk === "marker" ? markerWidth : penWidth) === w ? "is-on" : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (penInk === "marker") setMarkerWidth(w);
+                      else setPenWidth(w);
+                    }}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="jam-fly">
+          <ToolBtn icon={Frame} label="セクション" hot="F" on={tool === "section"} onClick={() => setTool("section")} />
+          {tool === "section" && (
             <div className="jam-pop">
-              <StrokeSwatches value={penColor} onPick={setPenColor} />
+              {SECTION_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`jam-swatch ${sectionColor === c ? "is-on" : ""}`}
+                  style={{ background: c }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSectionColor(c);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="jam-fly">
+          <ToolBtn icon={Smile} label="スタンプ" hot="E" on={tool === "stamp"} onClick={() => setTool("stamp")} />
+          {tool === "stamp" && (
+            <div className="jam-pop">
+              {STAMPS.map((mark) => (
+                <button
+                  key={mark}
+                  type="button"
+                  className={`jam-stamp-pick ${stampEmoji === mark ? "is-on" : ""}`}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStampEmoji(mark);
+                  }}
+                >
+                  {mark}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -2305,6 +2885,9 @@ export function CanvasEditor({
         </button>
         <button type="button" title="全体を表示（Shift+1）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); fitContent(); }} aria-label="全体を表示">
           <Scan size={14} />
+        </button>
+        <button type="button" title="PNG書き出し（⌘⇧E）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); exportPng(); }} aria-label="PNG書き出し">
+          <ImageDown size={14} />
         </button>
         <button type="button" title="ショートカット（?）" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setHelp((v) => !v); }} aria-label="ショートカット">
           <CircleHelp size={14} />

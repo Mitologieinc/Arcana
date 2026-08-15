@@ -1579,7 +1579,9 @@ html[data-theme="dark"] .arcana-presence {
 
 .jam-sticky,
 .jam-shape,
-.jam-label {
+.jam-label,
+.jam-section,
+.jam-stamp {
   position: absolute;
   box-sizing: border-box;
   overflow: hidden;
@@ -1611,6 +1613,52 @@ html[data-theme="dark"] .arcana-presence {
   overflow: visible;
 }
 
+.jam-section {
+  z-index: 0;
+  overflow: visible;
+  border-radius: 12px;
+}
+
+.jam-stamp {
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jam-stamp-face {
+  font-size: 32px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.jam-votes {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.jam-lockdot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1e1e1e;
+  box-shadow: 0 0 0 2px #fff;
+  pointer-events: none;
+}
+
 .jam-ghost {
   pointer-events: none;
   opacity: 0.45;
@@ -1618,14 +1666,18 @@ html[data-theme="dark"] .arcana-presence {
 
 .jam-sticky.is-on,
 .jam-shape.is-on,
-.jam-label.is-on {
+.jam-label.is-on,
+.jam-section.is-on,
+.jam-stamp.is-on {
   outline: 1.5px solid #0d99ff;
   outline-offset: 3px;
 }
 
 .jam-sticky.is-hover,
 .jam-shape.is-hover,
-.jam-label.is-hover {
+.jam-label.is-hover,
+.jam-section.is-hover,
+.jam-stamp.is-hover {
   outline: 1.5px solid rgba(13, 153, 255, 0.45);
   outline-offset: 3px;
 }
@@ -1637,9 +1689,11 @@ html[data-theme="dark"] .arcana-presence {
 .jam-sticky textarea,
 .jam-shape textarea,
 .jam-label textarea,
+.jam-section textarea,
 html[data-theme="dark"] .jam-sticky textarea,
 html[data-theme="dark"] .jam-shape textarea,
-html[data-theme="dark"] .jam-label textarea {
+html[data-theme="dark"] .jam-label textarea,
+html[data-theme="dark"] .jam-section textarea {
   display: block;
   width: 100%;
   height: 100%;
@@ -1673,16 +1727,24 @@ html[data-theme="dark"] .jam-label textarea {
   overflow: hidden;
 }
 
+.jam-section textarea {
+  height: 36px;
+  padding: 10px 14px 0;
+  font-weight: 650;
+}
+
 .jam-sticky textarea::placeholder,
 .jam-shape textarea::placeholder,
-.jam-label textarea::placeholder {
+.jam-label textarea::placeholder,
+.jam-section textarea::placeholder {
   color: rgba(30, 30, 30, 0.35);
   -webkit-text-fill-color: rgba(30, 30, 30, 0.35);
 }
 
 .jam-sticky textarea:read-only,
 .jam-shape textarea:read-only,
-.jam-label textarea:read-only {
+.jam-label textarea:read-only,
+.jam-section textarea:read-only {
   cursor: inherit;
 }
 
@@ -1839,9 +1901,45 @@ html[data-theme="dark"] .jam-label textarea {
   color: #1e1e1e;
 }
 
-.jam-pop > button.is-on {
+.jam-pop > button.is-on,
+.jam-pop-row > button.is-on,
+.jam-chip.is-on,
+.jam-stamp-pick.is-on {
   background: #e6e6e6;
   color: #1e1e1e;
+}
+
+.jam-pop-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.jam-pop-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.jam-pop-row > button,
+.jam-chip,
+.jam-stamp-pick {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f0ed;
+  color: #1e1e1e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.jam-stamp-pick {
+  font-size: 18px;
 }
 
 .jam-swatch {
@@ -1918,6 +2016,7 @@ html[data-theme="dark"] .jam-label textarea {
 }
 
 .jam-align button,
+.jam-lockbar button,
 .jam-mini {
   display: flex;
   width: 26px;
@@ -1931,8 +2030,13 @@ html[data-theme="dark"] .jam-label textarea {
 }
 
 .jam-align button:hover,
+.jam-lockbar button:hover,
 .jam-mini:hover {
   background: #f1f0ed;
+}
+
+.jam-align button:disabled {
+  opacity: 0.35;
 }
 
 .jam-mini-label {
@@ -2271,12 +2375,14 @@ html[data-theme="dark"] .jam-menu button:disabled {
 }
 
 html[data-theme="dark"] .jam-align button,
+html[data-theme="dark"] .jam-lockbar button,
 html[data-theme="dark"] .jam-mini,
 html[data-theme="dark"] .jam-mini-label {
   color: #e8e6e3;
 }
 
 html[data-theme="dark"] .jam-align button:hover,
+html[data-theme="dark"] .jam-lockbar button:hover,
 html[data-theme="dark"] .jam-mini:hover,
 html[data-theme="dark"] .jam-zoom-pct:hover {
   background: #3a3a37;
@@ -2288,6 +2394,31 @@ html[data-theme="dark"] .jam-empty p:first-child {
 
 html[data-theme="dark"] .jam-shape {
   background: #fff;
+}
+
+html[data-theme="dark"] .jam-votes {
+  background: #2a2a28;
+  color: #e8e6e3;
+  box-shadow: 0 0 0 1px #3a3a37, 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .jam-lockdot {
+  background: #e8e6e3;
+  box-shadow: 0 0 0 2px #2a2a28;
+}
+
+html[data-theme="dark"] .jam-pop-row > button,
+html[data-theme="dark"] .jam-chip,
+html[data-theme="dark"] .jam-stamp-pick {
+  background: #3a3a37;
+  color: #e8e6e3;
+}
+
+html[data-theme="dark"] .jam-pop-row > button.is-on,
+html[data-theme="dark"] .jam-chip.is-on,
+html[data-theme="dark"] .jam-stamp-pick.is-on {
+  background: #e8e6e3;
+  color: #1e1e1e;
 }
 
 @media (max-width: 860px) {
