@@ -16,6 +16,7 @@ import { TrashPanel } from "../components/TrashPanel";
 import { NotifPanel } from "../components/NotifPanel";
 import { hideBootSplash } from "../components/Brand";
 import { useIsMobile } from "../lib/media";
+import { Tooltip } from "../components/Tooltip";
 
 export function WorkspaceApp() {
   const { pageId } = useParams();
@@ -225,15 +226,16 @@ export function WorkspaceApp() {
           {favorites.length > 0 && (
             <div className="arcana-favs" aria-label="お気に入り">
               {favorites.slice(0, 12).map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`arcana-fav ${pageId === p.id ? "is-on" : ""}`}
-                  title={p.title || "無題"}
-                  onClick={() => openPage(p.id)}
-                >
-                  <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={20} />
-                </button>
+                <Tooltip key={p.id} label={p.title || "無題"}>
+                  <button
+                    type="button"
+                    className={`arcana-fav ${pageId === p.id ? "is-on" : ""}`}
+                    aria-label={p.title || "無題"}
+                    onClick={() => openPage(p.id)}
+                  >
+                    <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={20} />
+                  </button>
+                </Tooltip>
               ))}
             </div>
           )}
