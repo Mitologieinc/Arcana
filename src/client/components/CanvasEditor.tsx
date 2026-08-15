@@ -18,6 +18,7 @@ import {
   ImageDown,
   Lock,
   Minus,
+  MoreHorizontal,
   MousePointer2,
   Pencil,
   Plus,
@@ -32,7 +33,8 @@ import {
   Ungroup,
   Unlock,
 } from "lucide-react";
-import { api } from "../lib/api";
+import { indexPage } from "../lib/index-page";
+import { useIsMobile } from "../lib/media";
 import type { User } from "../lib/types";
 import type { PresenceUser } from "./PresencePile";
 
@@ -583,6 +585,7 @@ export function CanvasEditor({
   followClientId,
   onFollowEnd,
   onPresence,
+  onSyncStatus,
 }: {
   pageId: string;
   user: User;
@@ -592,6 +595,7 @@ export function CanvasEditor({
   followClientId?: number | null;
   onFollowEnd?: () => void;
   onPresence?: (users: PresenceUser[]) => void;
+  onSyncStatus?: (status: "connected" | "connecting" | "disconnected") => void;
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
@@ -639,7 +643,9 @@ export function CanvasEditor({
   const indexTimer = useRef<number | null>(null);
   const [nodes, setNodes] = useState<JamNode[]>([]);
   const [cam, setCam] = useState({ x: 48, y: 48, z: 1 });
+  const isMobile = useIsMobile();
   const [tool, setTool] = useState<Tool>("select");
+  const [moreTools, setMoreTools] = useState(false);
   const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0]);
   const [shapeKind, setShapeKind] = useState<ShapeKind>("round");
   const [selected, setSelected] = useState<string[]>([]);
@@ -944,6 +950,21 @@ export function CanvasEditor({
   }, [collab, user, onPresence]);
 
   useEffect(() => {
+    if (!onSyncStatus) return;
+    const report = (ev: { status: string }) => {
+      const status =
+        ev.status === "connected" || ev.status === "connecting" ? ev.status : "disconnected";
+      onSyncStatus(status);
+    };
+    collab.provider.on("status", report);
+    report({ status: collab.provider.wsconnected ? "connected" : "disconnected" });
+    return () => {
+      collab.provider.off("status", report);
+      onSyncStatus("connected");
+    };
+  }, [collab, onSyncStatus]);
+
+  useEffect(() => {
     selectedRef.current = selected;
     flushJam();
   }, [selected]);
@@ -970,7 +991,7 @@ export function CanvasEditor({
         .map((n) => n.text)
         .filter(Boolean)
         .join(" ");
-      void api(`/api/pages/${pageId}/index`, { method: "POST", body: JSON.stringify({ title, bodyText }) });
+      void indexPage(pageId, { title, bodyText });
     }, 4000);
   }, [pageId, title, nodes.length]);
 
@@ -1214,7 +1235,7 @@ export function CanvasEditor({
   }, []);
 
   function overUi(t: EventTarget | null) {
-    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float, .jam-menu, .jam-help, .jam-chat, .jam-follow"));
+    return t instanceof Element && Boolean(t.closest(".jam-bar, .jam-zoom, .jam-title, .jam-float, .jam-menu, .jam-help, .jam-chat, .jam-follow, .jam-more"));
   }
 
   function ghostAt(tool: Tool, w: { x: number; y: number }) {
@@ -2742,12 +2763,12 @@ export function CanvasEditor({
       )}
       </div>
 
-      <div className="jam-bar">
-        <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => setTool("select")} />
-        <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => setTool("hand")} />
+      <div className={`jam-bar${isMobile && moreTools ? " is-more" : ""}`}>
+        <ToolBtn icon={MousePointer2} label="選択" hot="V" on={tool === "select"} onClick={() => { setTool("select"); setMoreTools(false); }} />
+        <ToolBtn icon={Hand} label="移動" hot="H" on={tool === "hand"} onClick={() => { setTool("hand"); setMoreTools(false); }} />
         <span className="jam-sep" />
         <div className="jam-fly">
-          <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} onClick={() => setTool("sticky")} />
+          <ToolBtn icon={StickyNote} label="付箋" hot="S" on={tool === "sticky"} onClick={() => { setTool("sticky"); setMoreTools(false); }} />
           {tool === "sticky" && (
             <div className="jam-pop">
               {STICKY_COLORS.map((c) => (
@@ -2766,6 +2787,17 @@ export function CanvasEditor({
             </div>
           )}
         </div>
+        {isMobile && (
+          <ToolBtn
+            icon={MoreHorizontal}
+            label="その他"
+            hot=""
+            on={moreTools || ["shape", "line", "pen", "section", "stamp", "text"].includes(tool)}
+            onClick={() => setMoreTools((v) => !v)}
+          />
+        )}
+        {(!isMobile || moreTools || ["shape", "line", "pen", "section", "stamp", "text"].includes(tool)) && (
+        <>
         <div className="jam-fly">
           <ToolBtn icon={Square} label="図形" hot="R" on={tool === "shape"} onClick={() => setTool("shape")} />
           {tool === "shape" && (
@@ -2851,6 +2883,8 @@ export function CanvasEditor({
         </div>
         <span className="jam-sep" />
         <ToolBtn icon={Type} label="文字" hot="T" on={tool === "text"} onClick={() => setTool("text")} />
+        </>
+        )}
       </div>
 
       <div className="jam-zoom">

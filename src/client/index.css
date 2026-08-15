@@ -2769,6 +2769,8 @@ html[data-theme="dark"] .jam-stamp-pick.is-on {
     justify-content: flex-start;
     overflow-x: auto;
     max-width: none;
+    flex-wrap: wrap;
+    row-gap: 6px;
   }
 
   .jam-zoom {
