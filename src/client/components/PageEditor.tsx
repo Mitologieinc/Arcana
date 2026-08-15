@@ -364,12 +364,12 @@ export function PageEditor({
           {shareToken ? (
             <button
               type="button"
-              className="btn btn-secondary h-8 gap-1.5 px-2.5 text-[13px]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(15,15,15,0.06)] hover:bg-hover"
               onClick={() => {
                 void navigator.clipboard.writeText(window.location.href).then(() => toast("リンクをコピーしました"));
               }}
             >
-              <Link2 size={14} />
+              <Link2 size={13} />
               {isMobile ? "コピー" : "リンクをコピー"}
             </button>
           ) : (
