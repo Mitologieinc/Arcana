@@ -212,18 +212,14 @@ export function LoginPage() {
       <p className="mt-5 text-[12px] leading-relaxed text-muted">
         忘れた場合は管理者にリセットリンクを依頼するか、パスキーで入ってください。
       </p>
-      <p className="mt-8 text-[13px] text-muted">
-        {inviteOnly ? (
-          "参加は招待リンクから行います。"
-        ) : (
-          <>
-            アカウントがない場合{" "}
-            <Link className="auth-link" to="/signup">
-              作成
-            </Link>
-          </>
-        )}
-      </p>
+      {!inviteOnly && (
+        <p className="mt-8 text-[13px] text-muted">
+          アカウントがない場合{" "}
+          <Link className="auth-link" to="/signup">
+            作成
+          </Link>
+        </p>
+      )}
       {environment && environment !== "production" && (
         <p className="mt-10 text-[11px] tracking-wide text-muted">{environment}</p>
       )}
