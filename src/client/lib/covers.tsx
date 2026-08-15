@@ -8,6 +8,11 @@ export type CoverPreset = {
 
 export const COVER_PRESETS: CoverPreset[] = [
   {
+    id: "welcome",
+    name: "ようこそ",
+    css: "radial-gradient(80% 120% at 0% 100%, rgba(0, 182, 158, 0.22), transparent 60%), radial-gradient(70% 100% at 100% 0%, rgba(37, 140, 219, 0.16), transparent 58%), #f3f1eb",
+  },
+  {
     id: "sunset",
     name: "夕焼け",
     css: "linear-gradient(115deg, #ffb088 0%, #f08060 42%, #c44b4b 100%)",
