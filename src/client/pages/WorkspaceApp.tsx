@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Calendar, CheckSquare, FileText, PanelLeft, Plus, Search, StickyNote } from "lucide-react";
 import { CreateMenuPanel, type CreateSeed } from "../components/CreateMenu";
@@ -22,6 +22,7 @@ export function WorkspaceApp() {
   const { pageId } = useParams();
   const nav = useNavigate();
   const isMobile = useIsMobile();
+  const mainRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -57,8 +58,13 @@ export function WorkspaceApp() {
 
   function openPage(id: string) {
     closeNavIfMobile();
+    mainRef.current?.scrollTo({ top: 0, left: 0 });
     nav(`/page/${id}`);
   }
+
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [pageId]);
 
   async function refresh() {
     const me = await api<{ user: User | null; workspace: Workspace | null }>("/api/me");
@@ -267,7 +273,10 @@ export function WorkspaceApp() {
             />
           </div>
       </aside>
-      <main className={`relative min-w-0 flex-1 ${current?.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
+      <main
+        ref={mainRef}
+        className={`relative min-w-0 flex-1 ${current?.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}
+      >
         {pageId ? (
           <PageEditor
             key={pageId}

@@ -27,6 +27,7 @@ export function SharePage() {
   const [permission, setPermission] = useState<Permission>("view");
   const [error, setError] = useState("");
   const opened = useRef(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const guest = useMemo<User>(
     () => ({ id: guestId(), name: "ゲスト", email: "" }),
     [],
@@ -80,6 +81,10 @@ export function SharePage() {
     if (page || error) hideBootSplash();
   }, [page, error]);
 
+  useLayoutEffect(() => {
+    scrollerRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [routePageId, page?.id]);
+
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
@@ -93,15 +98,20 @@ export function SharePage() {
   }
   if (!page || !token) return null;
 
+  const openId = routePageId || page.id;
+
   return (
-    <div className={`h-full bg-canvas ${page.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}>
+    <div
+      ref={scrollerRef}
+      className={`h-full bg-canvas ${page.type === "canvas" ? "overflow-hidden" : "overflow-auto"}`}
+    >
       <PageEditor
-        key={page.id}
-        pageId={page.id}
+        key={openId}
+        pageId={openId}
         user={guest}
         shareToken={token}
         pages={pages}
-        fallback={page}
+        fallback={page.id === openId ? page : null}
         forcedPermission={permission}
         onPagesChanged={async () => undefined}
         onOpenPage={(id) => {
@@ -109,7 +119,8 @@ export function SharePage() {
             nav(`/share/${token}`);
             return;
           }
-          if (id === page.id) return;
+          if (id === openId) return;
+          scrollerRef.current?.scrollTo({ top: 0, left: 0 });
           nav(`/share/${token}/${id}`);
         }}
       />

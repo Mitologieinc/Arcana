@@ -128,9 +128,9 @@ function DatabaseEmbedView({ node, selected }: ReactNodeViewProps) {
             members={members}
             pages={pages}
             onClose={() => setPeekId(null)}
-            onOpenPage={() => {
+            onOpenPage={(id) => {
               setPeekId(null);
-              chrome.onOpenPage?.(peekRow.id);
+              chrome.onOpenPage?.(id || peekRow.id);
             }}
             onChanged={async () => {
               await reload();

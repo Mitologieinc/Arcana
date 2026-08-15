@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useIsMobile } from "../lib/media";
@@ -27,7 +28,7 @@ export function RowPeek({
   members?: Member[];
   pages?: Page[];
   onClose: () => void;
-  onOpenPage: () => void;
+  onOpenPage: (id?: string) => void;
   onChanged: () => Promise<unknown>;
   onDelete?: () => void;
 }) {
@@ -92,7 +93,7 @@ export function RowPeek({
     startY.current = null;
   }
 
-  return (
+  const sheet = (
     <div className="fixed inset-0 z-40 flex justify-end max-[720px]:flex-col max-[720px]:justify-end">
       <button className="h-full flex-1 bg-[rgba(15,15,15,0.08)]" onClick={onClose} aria-label="閉じる" />
       <aside
@@ -118,7 +119,7 @@ export function RowPeek({
             {isMobile ? "完了" : "閉じる"}
           </button>
           <div className="flex items-center">
-            <button className="btn-ghost h-9 gap-1.5 px-2 text-[13px] text-muted" onClick={onOpenPage}>
+            <button className="btn-ghost h-9 gap-1.5 px-2 text-[13px] text-muted" onClick={() => onOpenPage()}>
               <Maximize2 size={14} />
               ページとして開く
             </button>
@@ -186,6 +187,7 @@ export function RowPeek({
                 editable={editable}
                 title={title}
                 compact
+                onOpenPage={(id) => onOpenPage(id)}
               />
             </div>
           </div>
@@ -193,4 +195,6 @@ export function RowPeek({
       </aside>
     </div>
   );
+
+  return createPortal(sheet, document.body);
 }

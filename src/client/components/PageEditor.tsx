@@ -896,9 +896,9 @@ export function PageEditor({
           members={members}
           pages={pages}
           onClose={() => setPeekId(null)}
-          onOpenPage={() => {
+          onOpenPage={(id) => {
             setPeekId(null);
-            onOpenPage(peekRow.id);
+            onOpenPage(id || peekRow.id);
           }}
           onChanged={async () => {
             await reloadPage();
