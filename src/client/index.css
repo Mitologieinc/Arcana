@@ -340,6 +340,16 @@ html[data-theme="dark"] .arcana-nav-backdrop {
   opacity: 0.55;
 }
 
+.share-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.share-footer a:hover {
+  color: var(--color-ink);
+  opacity: 1;
+}
+
 .share-sheet {
   display: flex;
   flex-direction: column;
@@ -893,7 +903,22 @@ button:disabled {
 .auth-hero-copy {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   max-width: 420px;
+}
+
+.auth-made {
+  margin-top: 16px;
+  color: rgba(55, 53, 47, 0.48);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.auth-made:hover {
+  color: var(--color-ink);
 }
 
 @keyframes auth-aurora {
@@ -1108,6 +1133,14 @@ html[data-theme="dark"] .auth-hero-grid {
 
 html[data-theme="dark"] .auth-hero-ghost {
   opacity: 0.2;
+}
+
+html[data-theme="dark"] .auth-made {
+  color: rgba(232, 230, 227, 0.42);
+}
+
+html[data-theme="dark"] .auth-made:hover {
+  color: var(--color-ink);
 }
 
 @media (max-width: 860px) {

@@ -106,3 +106,11 @@ export function Brand({
     <BrandLockup className={className ?? "h-11 w-auto"} animate={animate ?? true} />
   );
 }
+
+export function MadeBy({ className }: { className?: string }) {
+  return (
+    <a className={className} href="https://mitologie.jp/" target="_blank" rel="noreferrer">
+      mitologie.jp がつくる
+    </a>
+  );
+}

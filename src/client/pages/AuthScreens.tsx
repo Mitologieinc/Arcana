@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-r
 import { Eye, EyeOff, Fingerprint, Loader2 } from "lucide-react";
 import { authClient } from "../lib/auth-client";
 import { api } from "../lib/api";
-import { BrandLockup, BrandMark, hideBootSplash } from "../components/Brand";
+import { BrandLockup, BrandMark, MadeBy, hideBootSplash } from "../components/Brand";
 import { NotionImport } from "../components/NotionImport";
 
 function Field({
@@ -81,6 +81,7 @@ function AuthLayout({
         </div>
         <div className="auth-hero-copy">
           <BrandLockup className="h-10 w-auto max-w-full" />
+          <MadeBy className="auth-made" />
         </div>
       </aside>
       <main className="auth-main">

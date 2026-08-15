@@ -19,7 +19,7 @@ import { ConfirmModal } from "./ConfirmModal";
 import { Modal } from "./Modal";
 import { toast } from "../lib/toast";
 import { PresencePile, type PresenceUser } from "./PresencePile";
-import { BrandMark } from "./Brand";
+import { BrandMark, MadeBy } from "./Brand";
 import { pageTypeIcon } from "../lib/format";
 import { CanvasEditor } from "./CanvasEditor";
 import { useIsMobile } from "../lib/media";
@@ -938,7 +938,9 @@ export function PageEditor({
         />
       )}
       {shareToken && page.type !== "canvas" && (
-        <footer className="share-footer">Arcana</footer>
+        <footer className="share-footer">
+          <MadeBy />
+        </footer>
       )}
       {confirmDelete && (
         <ConfirmModal
