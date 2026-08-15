@@ -132,6 +132,14 @@ export function PageEditor({
   }, [pageId, location.state]);
 
   useEffect(() => {
+    const name = title.trim() || "無題";
+    document.title = shareToken ? name : `${name} · Arcana`;
+    return () => {
+      document.title = "Arcana";
+    };
+  }, [title, shareToken]);
+
+  useEffect(() => {
     if (prevSync.current !== "connected" && syncStatus === "connected") {
       toast("再接続しました");
     }
@@ -352,9 +360,11 @@ export function PageEditor({
               <ChevronRight size={12} className="shrink-0 text-[#c4c2bc]" />
             </span>
           ))}
-          {page.type !== "canvas" && !shareToken && (
-          <span className="truncate rounded-[5px] px-1.5 py-0.5 text-ink">
-            <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 align-middle" />
+          {page.type !== "canvas" && (
+          <span className={`min-w-0 truncate px-1.5 py-0.5 ${shareToken ? "text-muted" : "text-ink"}`}>
+            {!shareToken && (
+              <PageIcon icon={page.icon} fallback={pageTypeIcon(page.type)} size={14} className="mr-1 align-middle" />
+            )}
             {title || "無題"}
           </span>
           )}
@@ -759,12 +769,12 @@ export function PageEditor({
               />
             </div>
           )}
+          {editable ? (
           <input
             ref={titleRef}
             className="page-title"
             value={title}
             placeholder="無題"
-            readOnly={!editable}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => saveTitle(title)}
             onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
@@ -779,6 +789,9 @@ export function PageEditor({
               }
             }}
           />
+          ) : (
+            <h1 className="page-title m-0">{title || "無題"}</h1>
+          )}
           {editable && page.type === "page" && editorEmpty && (
             <div className="mt-3 flex flex-wrap gap-2">
               {[...PAGE_TEMPLATES, ...customTemplates.map(savedToChip)].map((t) => (
