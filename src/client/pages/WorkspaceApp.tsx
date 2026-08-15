@@ -169,9 +169,6 @@ export function WorkspaceApp() {
         navOpen={navOpen}
         unread={unread}
         templates={templates}
-        favorites={favorites}
-        currentId={pageId}
-        onOpenPage={openPage}
         onHome={() => {
           closeNavIfMobile();
           nav("/");
@@ -225,6 +222,21 @@ export function WorkspaceApp() {
               )}
             </div>
           </div>
+          {favorites.length > 0 && (
+            <div className="arcana-favs" aria-label="お気に入り">
+              {favorites.slice(0, 12).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`arcana-fav ${pageId === p.id ? "is-on" : ""}`}
+                  title={p.title || "無題"}
+                  onClick={() => openPage(p.id)}
+                >
+                  <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={20} />
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             className="mx-2 mb-2 flex h-8 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-muted hover:bg-hover"
@@ -234,21 +246,6 @@ export function WorkspaceApp() {
             <span className="flex-1">検索</span>
             <kbd className="kbd">{modSymbol()}K</kbd>
           </button>
-          {favorites.length > 0 && (
-            <div className="arcana-favs" aria-label="お気に入り">
-              {favorites.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`arcana-fav ${pageId === p.id ? "is-on" : ""}`}
-                  title={p.title || "無題"}
-                  onClick={() => openPage(p.id)}
-                >
-                  <PageIcon icon={p.icon} fallback={pageTypeIcon(p.type)} size={18} />
-                </button>
-              ))}
-            </div>
-          )}
           <div className="sidebar-scroll min-h-0 flex-1 overflow-auto px-2 pb-3">
             <SidebarTree
               pages={pages}
