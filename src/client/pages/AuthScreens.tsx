@@ -173,7 +173,7 @@ export function LoginPage() {
   const title = workspaceName ? `${workspaceName} に入る` : "ログイン";
 
   return (
-    <AuthLayout title={title} kicker="パスキーがあれば、それで十分です。">
+    <AuthLayout title={title}>
       <button
         type="button"
         className="btn btn-primary w-full"
