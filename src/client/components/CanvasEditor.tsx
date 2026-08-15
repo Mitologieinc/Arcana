@@ -87,11 +87,11 @@ function paintGrid(el: HTMLDivElement, x: number, y: number, z: number) {
   const layers: string[] = [];
   const sizes: string[] = [];
   if (oc > 0.02) {
-    layers.push(`radial-gradient(circle 1.15px at 0 0, rgba(var(--jam-dot), ${0.55 * oc}) 1px, transparent 1.2px)`);
+    layers.push(`radial-gradient(circle 1.25px at 0 0, rgba(var(--jam-dot), ${0.75 * oc}) 1.1px, transparent 1.3px)`);
     sizes.push(`${coarse}px ${coarse}px`);
   }
   if (of > 0.02) {
-    layers.push(`radial-gradient(circle 1px at 0 0, rgba(var(--jam-dot), ${0.28 * of}) 0.85px, transparent 1.05px)`);
+    layers.push(`radial-gradient(circle 1.1px at 0 0, rgba(var(--jam-dot), ${0.4 * of}) 0.95px, transparent 1.15px)`);
     sizes.push(`${fine}px ${fine}px`);
   }
   const pos = layers.map(() => `${x}px ${y}px`).join(", ");
